@@ -670,12 +670,12 @@ export function RosterView({
         </DialogContent>
       </Dialog>
 
-      <div className="grid lg:grid-cols-[5fr_3fr] gap-5">
+      <div className="grid lg:grid-cols-[4fr_1fr] gap-5">
         {/* KHUNG CHÍNH: danh sách HS */}
         <Card className="float-card">
-          <CardHeader className="flex flex-row items-start justify-between gap-2 flex-wrap">
-            <div>
-              <CardTitle className="flex items-center gap-2 font-heading">
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 font-heading whitespace-nowrap">
                 <Users className="size-4" aria-hidden="true" />
                 Danh sách học sinh
               </CardTitle>
@@ -689,7 +689,7 @@ export function RosterView({
                 )}
               </CardDescription>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -698,7 +698,7 @@ export function RosterView({
               >
                 <Minus className="size-4" aria-hidden="true" />
               </Button>
-              <span className="text-sm tabular-nums w-9 text-center font-semibold">{capacity}</span>
+              <span className="text-sm tabular-nums w-9 text-center font-semibold whitespace-nowrap">{capacity}</span>
               <Button
                 variant="outline"
                 size="sm"
@@ -707,7 +707,7 @@ export function RosterView({
               >
                 <Plus className="size-4" aria-hidden="true" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setBulkOpen((v) => !v)}>
+              <Button variant="outline" size="sm" onClick={() => setBulkOpen((v) => !v)} className="whitespace-nowrap">
                 <ListPlus className="size-4 mr-1" aria-hidden="true" />
                 Dán danh sách
               </Button>
@@ -716,7 +716,7 @@ export function RosterView({
                   variant="secondary"
                   size="sm"
                   onClick={() => setSelectedStudentIds([])}
-                  className="text-primary border border-primary/30"
+                  className="text-primary border border-primary/30 whitespace-nowrap"
                 >
                   Bỏ chọn
                   <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground tabular-nums">
@@ -724,11 +724,11 @@ export function RosterView({
                   </span>
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={downloadTemplate}>
+              <Button variant="outline" size="sm" onClick={downloadTemplate} className="whitespace-nowrap">
                 <Download className="size-4 mr-1" aria-hidden="true" />
                 Tải mẫu Excel
               </Button>
-              <Button variant="outline" size="sm" onClick={() => fileImportRef.current?.click()} disabled={importBusy}>
+              <Button variant="outline" size="sm" onClick={() => fileImportRef.current?.click()} disabled={importBusy} className="whitespace-nowrap">
                 {importBusy ? (
                   <Spinner className="size-4 mr-1" />
                 ) : (
