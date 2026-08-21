@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState, useTransition } from "react"
-import Link from "next/link"
 import {
   addClassGroupAction,
   bulkSetNamesAction,
@@ -32,9 +31,6 @@ import {
   ListPlus,
   Save,
   Minus,
-  PresentationIcon,
-  ClipboardCheck,
-  Table,
   ChevronDown,
   ChevronRight,
   X,
@@ -209,10 +205,24 @@ export function RosterView({
     })
   }
 
+  function onTypeName(id: string, name: string) {
+    setStudents((cur) => cur.map((s) => (s.id === id ? { ...s, name } : s)))
+  }
+
+  async function refreshStudents() {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("students")
+      .select("id, slot_number, name")
+      .eq("class_id", classId)
+      .order("slot_number")
+    if (data) setStudents(data as Student[])
+  }
+
   function onBulkPaste() {
     const names = bulkText.split(/\r?\n/)
     startTransition(() => {
-      bulkSetNamesAction(classId, names)
+      bulkSetNamesAction(classId, names).then(() => refreshStudents())
     })
     setBulkOpen(false)
     setBulkText("")
@@ -299,7 +309,10 @@ export function RosterView({
     startTransition(() => {
       importStudentsFromListAction(classId, importPreview).then((res) => {
         if (!res.ok) toast.error(res.error ?? "Không nhập được danh sách.")
-        else toast.success(`Đã nhập ${res.added} học sinh`)
+        else {
+          toast.success(`Đã nhập ${res.added} học sinh`)
+          refreshStudents()
+        }
       })
     })
     setImportOpen(false)
@@ -657,34 +670,6 @@ export function RosterView({
         </DialogContent>
       </Dialog>
 
-      {/* Quick actions — 4 nút nổi bật */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <QuickAction
-          href={`/classes/${classId}/sessions`}
-          icon={<PresentationIcon className="size-5" />}
-          label="Thảo luận nhóm"
-          accent="primary"
-        />
-        <QuickAction
-          href={`/classes/${classId}/individual`}
-          icon={<ClipboardCheck className="size-5" />}
-          label="Giao việc cá nhân"
-          accent="accent"
-        />
-        <QuickAction
-          href={`/classes/${classId}/gradebook`}
-          icon={<Table className="size-5" />}
-          label="Bảng điểm"
-          accent="primary"
-        />
-        <QuickAction
-          href={`/classes/${classId}/share`}
-          icon={<Users className="size-5" />}
-          label="Link cho HS"
-          accent="accent"
-        />
-      </div>
-
       <div className="grid lg:grid-cols-[5fr_3fr] gap-5">
         {/* KHUNG CHÍNH: danh sách HS */}
         <Card className="float-card">
@@ -912,8 +897,9 @@ export function RosterView({
                         </span>
                         <Input
                           className="h-7 border-0 shadow-none focus-visible:ring-1 focus-visible:bg-background px-1.5 text-sm font-medium flex-1"
-                          defaultValue={s.name ?? ""}
+                          value={s.name ?? ""}
                           placeholder="Chưa có tên"
+                          onChange={(e) => onTypeName(s.id, e.target.value)}
                           onBlur={(e) => onRenameStudent(s.id, e.target.value)}
                         />
                         {isLeader && (
@@ -1165,33 +1151,5 @@ export function RosterView({
         </Card>
       </div>
     </div>
-  )
-}
-
-function QuickAction({
-  href,
-  icon,
-  label,
-  accent,
-}: {
-  href: string
-  icon: React.ReactNode
-  label: string
-  accent: "primary" | "accent"
-}) {
-  const color =
-    accent === "primary"
-      ? "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
-      : "bg-accent/20 text-accent-foreground group-hover:bg-accent group-hover:text-accent-foreground"
-  return (
-    <Link
-      href={href}
-      className="group rounded-xl border bg-card float-card hover:border-primary/40 transition px-4 py-3 flex items-center gap-3"
-    >
-      <div className={`size-10 rounded-lg grid place-items-center transition ${color}`}>
-        {icon}
-      </div>
-      <span className="font-medium text-sm">{label}</span>
-    </Link>
   )
 }
