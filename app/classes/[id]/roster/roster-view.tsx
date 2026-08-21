@@ -451,7 +451,7 @@ export function RosterView({
               <Info className="size-5 text-primary" />
               Cách phân học sinh vào nhóm
             </DialogTitle>
-            <DialogDescription>Thầy cô đọc qua 7 bước trước khi bắt đầu.</DialogDescription>
+            <DialogDescription>Thầy cô đọc qua 5 bước trước khi bắt đầu.</DialogDescription>
           </DialogHeader>
           <ol className="space-y-3 text-sm leading-relaxed">
             <li className="flex gap-3">
@@ -468,31 +468,13 @@ export function RosterView({
                 2
               </span>
               <span>
-                Thẻ học sinh <strong>đổi màu theo nhóm</strong>. Cả lớp nhìn lướt là biết em nào
-                thuộc nhóm nào.
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <span className="size-6 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-bold">
-                3
-              </span>
-              <span>
-                <strong>Mỗi học sinh chỉ thuộc 1 nhóm.</strong> Kéo em sang nhóm khác sẽ có hộp
-                thoại hỏi xác nhận chuyển nhóm.
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <span className="size-6 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-bold">
-                4
-              </span>
-              <span>
                 <strong>Bấm vào tên nhóm</strong> ở cột phải để mở ra, xem danh sách học sinh trong
                 nhóm đó. Bấm dấu × để gỡ khỏi nhóm.
               </span>
             </li>
             <li className="flex gap-3">
               <span className="size-6 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-bold">
-                5
+                3
               </span>
               <span>
                 <strong>Gán nhóm trưởng:</strong> bấm nút vương miện 👑 cạnh tên nhóm, chọn 1 học
@@ -501,7 +483,7 @@ export function RosterView({
             </li>
             <li className="flex gap-3">
               <span className="size-6 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-bold">
-                6
+                4
               </span>
               <span>
                 <strong>Chọn nhiều học sinh:</strong> giữ <strong>Ctrl/Cmd</strong> rồi bấm vào thẻ
@@ -511,7 +493,7 @@ export function RosterView({
             </li>
             <li className="flex gap-3">
               <span className="size-6 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-bold">
-                7
+                5
               </span>
               <span>
                 Học sinh ở nhóm khác khi kéo theo cụm sẽ có <strong>hộp thoại xác nhận</strong>{" "}
@@ -703,7 +685,7 @@ export function RosterView({
         />
       </div>
 
-      <div className="grid lg:grid-cols-[3fr_2fr] gap-5">
+      <div className="grid lg:grid-cols-[5fr_3fr] gap-5">
         {/* KHUNG CHÍNH: danh sách HS */}
         <Card className="float-card">
           <CardHeader className="flex flex-row items-start justify-between gap-2 flex-wrap">
@@ -854,7 +836,19 @@ export function RosterView({
               </div>
             )}
 
-            <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+            <div className="rounded-xl border bg-muted/30 p-3">
+              <div className="mb-2 text-center">
+                <span className="text-[11px] font-bold tracking-wider text-muted-foreground">
+                  CUỐI LỚP
+                </span>
+              </div>
+              <div className="flex items-stretch gap-2">
+                <div className="flex items-center justify-center">
+                  <span className="text-[11px] font-bold tracking-wider text-muted-foreground [writing-mode:vertical-rl] rotate-180">
+                    TRÁI
+                  </span>
+                </div>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 flex-1 min-w-0">
               {students.map((s) => {
                 const g = studentToGroup.get(s.id)
                 const hasName = !!s.name?.trim()
@@ -944,8 +938,20 @@ export function RosterView({
                     </div>
                   </li>
                 )
-              })}
-            </ul>
+                })}
+                </ul>
+                <div className="flex items-center justify-center">
+                  <span className="text-[11px] font-bold tracking-wider text-muted-foreground [writing-mode:vertical-rl]">
+                    PHẢI
+                  </span>
+                </div>
+              </div>
+              <div className="mt-2 text-center">
+                <span className="text-[11px] font-bold tracking-wider text-primary">
+                  GIÁO VIÊN
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

@@ -75,14 +75,16 @@ export default async function DashboardPage() {
                         <School className="size-5" aria-hidden="true" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-heading font-semibold text-base leading-snug truncate">
-                          {c.name}
-                        </h3>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
-                          <span className="inline-flex items-center gap-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <h3 className="font-heading font-semibold text-base leading-snug truncate">
+                            {c.name}
+                          </h3>
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground shrink-0">
                             <Users className="size-3" aria-hidden="true" />
                             {filled}/{c.capacity} chỗ
                           </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
                           <span className="inline-flex items-center gap-1">
                             <CalendarRange className="size-3" aria-hidden="true" />
                             {sessions} phiên

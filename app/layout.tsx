@@ -27,7 +27,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Lớp học thảo luận — Báo cáo nhóm trực tuyến",
+  title: "Thảo luận nhóm — Báo cáo nhóm trực tuyến",
   description:
     "Ứng dụng thảo luận nhóm và chấm bài trực tiếp dành cho giáo viên THPT. Tạo phiên nhóm/cá nhân, HS nộp ảnh/file, GV sửa bài sống ngay trên lớp.",
   icons: {
