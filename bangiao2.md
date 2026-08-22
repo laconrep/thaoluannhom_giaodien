@@ -110,7 +110,7 @@ Kiểm thử cuối: `tsc --noEmit` + `eslint`.
 ## TIẾN ĐỘ
 
 - [x] **PHIÊN 1 — Server actions** (`app/actions.ts` + `student-submit.tsx`)
-- [ ] **PHIÊN 2 — Phía HS** (`class-lobby.tsx`)
+- [x] **PHIÊN 2 — Phía HS** (`class-lobby.tsx`)
 - [ ] **PHIÊN 3 — Phía GV** (`roster/page.tsx` + `roster-view.tsx`)
 
 ---
@@ -124,26 +124,42 @@ Trên nhánh `260822-feat-share-claim-unlock`:
   - Đổi tên action cũ `studentClaimSlotAction` (claim `session_slots`) → **`studentClaimSessionSlotAction`** (logic giữ nguyên).
   - Thêm mới **`studentClaimSlotAction(studentId, deviceToken)`**: chỉ `update({ device_token })` trên bảng `students`, `.eq("id", studentId)`, `.or("device_token.is.null,device_token.eq.${deviceToken}")`, `.select("id").maybeSingle()`; `!updated` → trả `{ ok: false, error: "Ô này đã được thiết bị khác chọn" }`. KHÔNG đụng cột `name`.
   - Thêm mới **`unlockStudentSlotAction(studentId)`**: `auth.getUser()` không có user → lỗi "Chỉ giáo viên mới thực hiện được."; lấy student kèm `classes!inner(teacher_id)`, so `teacher_id !== user.id` → lỗi "Bạn không có quyền với học sinh này."; `update({ device_token: null })` + `revalidatePath("/classes/{classId}/roster")`.
-- `app/c/[token]/session/[sid]/student-submit.tsx`: import (dòng 35) + gọi (dòng 233) đổi sang `studentClaimSessionSlotAction`.
-- Đã chạy `pnpm exec tsc --noEmit` (exit 0) + `pnpm exec eslint` trên 2 file (exit 0, chỉ còn 1 warning `no-img-element` có sẵn từ trước ở dòng 660 student-submit.tsx, không liên quan).
+- `app/c/[token]/session/[sid]/student-submit.tsx`: import + gọi đổi sang `studentClaimSessionSlotAction`.
+- Đã chạy `pnpm exec tsc --noEmit` (exit 0) + `pnpm exec eslint` trên 2 file (exit 0, chỉ còn 1 warning `no-img-element` có sẵn từ trước ở student-submit.tsx, không liên quan).
+
+### Phiên 2 — Đã hoàn thành Phần 2 (Phía học sinh `class-lobby.tsx`)
+
+Trên nhánh `260822-feat-share-claim-unlock`:
+- **Màn 1** (khi chưa có `myStudentId`): bỏ Input tên + nút "Tôi là ô số...". Lưới thẻ: thẻ có tên → bấm được, gọi `studentClaimSlotAction(s.id, getDeviceToken())`; lỗi → `toast.error` (ví dụ "Ô này đã được thiết bị khác chọn"); thành công → set `myStudentId` + `localStorage class_${classId}_student`. Thẻ trống → disabled hiện "Trống".
+- **Auto-reentry** (effect load identity): chỉ vào thẳng qua localStorage nếu `students.find(s => s.id === saved)` có `device_token === getDeviceToken()`; nếu không → xóa localStorage + quay về màn chọn ô. Vẫn giữ fallback tìm qua device_token.
+- **Màn 2** chuyển sang `Tabs`:
+  - Tab "Phiên thảo luận" (mọi HS): danh sách phiên (giữ `SessionRow`) + nút "Xem điểm" (link `/c/${token}/scores`).
+  - Tab "Nhóm của em" (chỉ `myLeaderGroup`): lưới thẻ HS trái (tô màu theo nhóm qua `groupCardStyle`, thẻ nhóm mình ring viền + Crown, thẻ nhóm khác icon Lock, thẻ trống mờ) + Card nhóm mình phải (danh sách thành viên + vùng thả nét đứt).
+    - Kéo thẻ HS **trong nhóm mình** đè lên thẻ khác → `handleLeaderSwapDrop` (swap vị trí).
+    - Kéo thẻ HS **chưa có nhóm** thả vào thẻ bất kỳ hoặc vùng thả → `leaderAdd` (`leaderUpdateGroupMembersAction` "add").
+  - Xóa UI cũ: Card "Nhóm trưởng" + Dialog chọn thành viên + `leaderRemove`, `myGroup`, `leaderOpen`, `selectedSlot`, `name`, imports `Input`/`Field`/`Dialog`/`AvatarInitials`/`Minus`; thêm imports `Tabs` + `groupCardStyle`.
+- Đã chạy `pnpm exec tsc --noEmit` (exit 0) + `pnpm exec eslint` trên `class-lobby.tsx` (exit 0).
 
 ---
 
 ## YÊU CẦU PHIÊN SAU
 
-### Phiên 2 — Phía học sinh (`app/c/[token]/class-lobby.tsx`)
+### Phiên 3 — Phía giáo viên (`app/classes/[id]/roster/page.tsx` + `roster-view.tsx`)
 
 Trước khi code, đọc:
-- `app/c/[token]/class-lobby.tsx` (609 dòng):
-  - Type `Student` (dòng 27-32) đã có `device_token`.
-  - `getDeviceToken()` (dòng 45-53) — localStorage `device_token`.
-  - Effect nhận diện identity (dòng 84-98): đọc `localStorage "class_${classId}_student"` → nếu tồn tại set `myStudentId`; không thì tìm qua `device_token`. **CẦN SỬA**: chỉ vào thẳng nếu ô còn giữ đúng device_token của thiết bị mình (nếu `s.device_token !== dt` → xóa localStorage, không set myStudentId).
-  - `claimSlot` (dòng 172-182): hiện gọi `studentSetNameAction` — **bỏ**, đổi sang gọi `studentClaimSlotAction(s.id, getDeviceToken())`; thành công thì `setMyStudentId` + set localStorage.
-  - Màn 1 UI (dòng 273-342): bỏ Input tên + nút "Tôi là ô số...", thẻ trống → disabled "Trống".
-  - Màn 2 UI (dòng 346-569): bọc Tabs; tab "Phiên thảo luận" (danh sách phiên dòng 471-484 + nút "Xem điểm" dòng 486-493, giữ link `/c/${token}/scores`); tab "Nhóm của em" (chỉ `myLeaderGroup`) — lưới thẻ HS trái tô màu theo nhóm + thẻ nhóm mình phải, giữ `leaderAdd`/`leaderRemove`/`handleLeaderSwapDrop`.
-- `app/c/[token]/page.tsx` — đã truyền đủ props `students` (có device_token), `sessions`, `groups`, `members`.
-- `@/components/ui/tabs` có sẵn (`Tabs, TabsList, TabsTrigger, TabsContent` — mẫu dùng ở `student-submit.tsx` dòng 25).
-- `app/actions.ts` — `studentClaimSlotAction(studentId, deviceToken)` mới (Phiên 1) trả `{ ok, error? }`.
+- `app/classes/[id]/roster/page.tsx` (40 dòng): select students đang là `"id, slot_number, name"` → **thêm `device_token`**.
+- `app/classes/[id]/roster/roster-view.tsx` (1193 dòng):
+  - `type Student` (dòng 55): `{ id, slot_number, name }` → **thêm `device_token: string | null`**.
+  - `refreshStudents` (dòng ~214-222): select `"id, slot_number, name"` → thêm `device_token`.
+  - Realtime subscribe `students` (dòng ~144-164) đã merge `...payload.new` khi UPDATE → badge khóa sẽ tự đồng bộ.
+  - Thẻ HS trái (dòng ~863-963): bên trong `<li>` có khối `flex-1 flex flex-col` chứa Input tên + badge Crown. **Thêm**: nếu `s.device_token` → hiện icon `Lock` + nút "Mở khóa" (xác nhận trước bằng `confirm()` hoặc dialog) → gọi `unlockStudentSlotAction(s.id)` từ `@/app/actions` → toast lỗi nếu fail.
+- `app/actions.ts` — Phiên 1 đã thêm `unlockStudentSlotAction(studentId)` trả `{ ok, error? }`, xác thực GV đăng nhập + sở hữu lớp.
 
-Những thứ ĐÃ CÓ sẵn (không tạo lại): `getDeviceToken()`, realtime channel `lobby-${classId}` (đã subscribe students/sessions/class_groups/class_group_members), `leaderAdd`/`leaderRemove`, `handleLeaderSwapDrop`, `myLeaderGroup`/`myGroup`/`studentToGroup`, component `Tabs`/`Dialog`/`Card`/`Button`/`AvatarInitials`.
+Những thứ ĐÃ CÓ sẵn (không tạo lại): realtime roster (students UPDATE), `Lock` icon (đã import ở roster-view dòng 30), `Button`, `toast` (sonner).
+
+Công việc cần làm:
+1. `roster/page.tsx`: select students thêm `device_token`.
+2. `roster-view.tsx`: type `Student` thêm `device_token`; `refreshStudents` thêm `device_token`; thẻ HS có `device_token` → icon khóa + nút "Mở khóa" (xác nhận trước) gọi `unlockStudentSlotAction`.
+3. **Quy tắc phiên 3**: mỗi file sửa xong → commit + push + cập nhật NGAY file này (tiến độ + ghi chú) trước khi sửa file kế.
+4. Cuối phiên: `pnpm exec tsc --noEmit` + `pnpm exec eslint` toàn bộ; cập nhật TIẾN ĐỘ đánh dấu xong.
 

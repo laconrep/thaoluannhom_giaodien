@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { fetchClassGroups } from "@/lib/class-groups"
-import { leaderSwapSlotsAction, leaderUpdateGroupMembersAction, studentSetNameAction } from "@/app/actions"
+import {
+  leaderSwapSlotsAction,
+  leaderUpdateGroupMembersAction,
+  studentClaimSlotAction,
+} from "@/app/actions"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { AvatarInitials } from "@/components/avatar-initials"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useCountdown, formatClock } from "@/lib/use-countdown"
 import {
   ArrowRight,
@@ -19,10 +20,10 @@ import {
   ClipboardList,
   Lock,
   Users,
-  Minus,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { groupCardStyle } from "@/lib/group-colors"
 
 type Student = {
   id: string
@@ -74,26 +75,27 @@ export function ClassLobby({
   const [groups, setGroups] = useState<Group[]>(initialGroups)
   const [members, setMembers] = useState<GroupMember[]>(initialMembers)
   const [myStudentId, setMyStudentId] = useState<string | null>(null)
-  const [name, setName] = useState("")
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
-  const [leaderOpen, setLeaderOpen] = useState(false)
   const [dragStudentId, setDragStudentId] = useState<string | null>(null)
   const [saving, startTransition] = useTransition()
 
-  // Load identity from localStorage
+  // Load identity từ localStorage — chỉ vào thẳng nếu ô còn giữ đúng device_token của thiết bị mình.
+  // Nếu GV đã mở khóa hoặc thiết bị khác đã chiếm ô → quay về màn chọn ô để chọn lại.
   useEffect(() => {
     const dt = getDeviceToken()
     const saved = localStorage.getItem(`class_${classId}_student`)
     if (saved) {
       const st = students.find((s) => s.id === saved)
-      if (st) setMyStudentId(saved)
-    } else {
-      // cũng thử tìm qua device_token
-      const match = students.find((s) => s.device_token === dt)
-      if (match) {
-        setMyStudentId(match.id)
-        localStorage.setItem(`class_${classId}_student`, match.id)
+      if (st && st.device_token === dt) {
+        setMyStudentId(saved)
+        return
       }
+      localStorage.removeItem(`class_${classId}_student`)
+    }
+    // cũng thử tìm qua device_token
+    const match = students.find((s) => s.device_token === dt)
+    if (match) {
+      setMyStudentId(match.id)
+      localStorage.setItem(`class_${classId}_student`, match.id)
     }
   }, [classId, students])
 
@@ -170,29 +172,22 @@ export function ClassLobby({
   }, [classId])
 
   function claimSlot(studentId: string) {
-    if (!name.trim()) {
-      alert("Vui lòng nhập tên trước.")
-      return
-    }
-    setMyStudentId(studentId)
-    localStorage.setItem(`class_${classId}_student`, studentId)
-    startTransition(() => {
-      studentSetNameAction(studentId, name.trim(), getDeviceToken())
+    if (saving) return
+    startTransition(async () => {
+      const res = await studentClaimSlotAction(studentId, getDeviceToken())
+      if (!res.ok) {
+        toast.error(res.error ?? "Không chọn được ô.")
+        return
+      }
+      setMyStudentId(studentId)
+      localStorage.setItem(`class_${classId}_student`, studentId)
     })
   }
 
   function changeSlot() {
     localStorage.removeItem(`class_${classId}_student`)
     setMyStudentId(null)
-    setSelectedSlot(null)
   }
-
-  // Nhóm chứa mình (qua members)
-  const myGroup = useMemo(() => {
-    if (!myStudentId) return null
-    const m = members.find((x) => x.student_id === myStudentId)
-    return m ? groups.find((g) => g.id === m.class_group_id) ?? null : null
-  }, [myStudentId, members, groups])
 
   // Nhóm mà mình làm nhóm trưởng
   const myLeaderGroup = useMemo(
@@ -220,17 +215,6 @@ export function ClassLobby({
       action: "add",
     })
     if (!res.ok) toast.error(res.error ?? "Không thêm được")
-  }
-
-  async function leaderRemove(targetStudentId: string) {
-    const res = await leaderUpdateGroupMembersAction({
-      classId,
-      leaderStudentId: myStudentId!,
-      deviceToken: getDeviceToken(),
-      targetStudentId,
-      action: "remove",
-    })
-    if (!res.ok) toast.error(res.error ?? "Không gỡ được")
   }
 
   // Nhóm trưởng kéo thẻ HS trong nhóm mình đổi vị trí với bất kỳ HS nào.
@@ -281,40 +265,28 @@ export function ClassLobby({
               </div>
               <div>
                 <CardTitle>{className}</CardTitle>
-                <CardDescription>Chọn ô của em trong lớp</CardDescription>
+                <CardDescription>Bấm vào thẻ có tên của em để vào lớp</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="name">Tên của em</FieldLabel>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ví dụ: Nguyễn Văn An"
-                />
-              </Field>
-            </FieldGroup>
             <p className="text-sm text-muted-foreground">
-              Bấm vào ô có số của em (giáo viên đã xếp số theo lớp).
+              Bấm vào thẻ có tên của em (giáo viên đã xếp số theo lớp).
             </p>
             <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 max-h-[50vh] overflow-auto p-1">
               {students.map((s) => {
                 const taken = !!s.name?.trim()
-                const selected = selectedSlot === s.id
                 return (
                   <button
                     key={s.id}
-                    onClick={() => setSelectedSlot(s.id)}
+                    type="button"
+                    disabled={!taken || saving}
+                    onClick={() => claimSlot(s.id)}
                     className={
                       "aspect-square rounded-md border p-1 text-xs flex flex-col items-center justify-center gap-1 transition " +
-                      (selected
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : taken
-                          ? "bg-muted border-muted hover:bg-muted/70"
-                          : "bg-card hover:bg-muted/40")
+                      (taken
+                        ? "bg-card border-muted enabled:hover:bg-muted/40 enabled:cursor-pointer disabled:opacity-60"
+                        : "bg-card border-muted/60 opacity-50 cursor-not-allowed")
                     }
                   >
                     <span className="font-mono tabular-nums opacity-80">{s.slot_number}</span>
@@ -325,16 +297,6 @@ export function ClassLobby({
                 )
               })}
             </div>
-            {selectedSlot && (
-              <Button
-                onClick={() => claimSlot(selectedSlot)}
-                disabled={!name.trim() || saving}
-                size="lg"
-              >
-                Tôi là ô số{" "}
-                {students.find((s) => s.id === selectedSlot)?.slot_number}
-              </Button>
-            )}
           </CardContent>
         </Card>
       </main>
@@ -360,60 +322,184 @@ export function ClassLobby({
           </CardHeader>
         </Card>
 
-        {myLeaderGroup && (
-          <Card className="border-amber-300 bg-amber-50/60">
-            <CardHeader className="flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2 font-heading">
-                  <Crown className="size-5 text-amber-500" aria-hidden="true" />
-                  Nhóm trưởng {myLeaderGroup.name}
-                </CardTitle>
-                <CardDescription>
-                  {myGroup?.id === myLeaderGroup.id
-                    ? "Em đang ở nhóm của mình. Bấm để chọn thêm thành viên cho cả lớp."
-                    : "Em chưa nằm trong nhóm của mình. Bấm để chọn thành viên."}
-                </CardDescription>
-              </div>
-              <Button onClick={() => setLeaderOpen(true)}>
-                <Users className="size-4 mr-1" aria-hidden="true" />
-                Chọn thành viên
-              </Button>
-            </CardHeader>
-          </Card>
-        )}
+        <Tabs defaultValue="sessions">
+          <TabsList className="w-full">
+            <TabsTrigger value="sessions" className="flex-1">
+              Phiên thảo luận
+            </TabsTrigger>
+            {myLeaderGroup && (
+              <TabsTrigger value="mygroup" className="flex-1">
+                Nhóm của em
+              </TabsTrigger>
+            )}
+          </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-heading">Lớp của em</CardTitle>
-            <CardDescription>
-              {myLeaderGroup
-                ? "Kéo thẻ có viền màu (học sinh trong nhóm em) đè lên thẻ khác để đổi vị trí."
-                : "Sơ đồ vị trí các bạn trong lớp."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-              {[...students]
-                .sort((a, b) => a.slot_number - b.slot_number)
-                .map((s) => {
-                  const inMyGroup = myLeaderGroup
-                    ? studentToGroup.get(s.id)?.id === myLeaderGroup.id
-                    : false
-                  const isMe = s.id === myStudentId
-                  const hasName = !!s.name?.trim()
-                  return (
-                    <li
-                      key={s.id}
-                      draggable={inMyGroup}
-                      onDragStart={(e) => {
-                        if (!inMyGroup) {
-                          e.preventDefault()
-                          return
-                        }
-                        setDragStudentId(s.id)
-                        e.dataTransfer.effectAllowed = "move"
-                        e.dataTransfer.setData("text/plain", s.id)
-                      }}
+          <TabsContent value="sessions" className="mt-4 flex flex-col gap-4">
+            <h2 className="text-sm font-semibold text-muted-foreground">Các phiên đang mở</h2>
+            {sessions.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                  Hiện chưa có phiên nào mở. Chờ giáo viên bắt đầu.
+                </CardContent>
+              </Card>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {sessions.map((s) => (
+                  <SessionRow key={s.id} session={s} token={token} />
+                ))}
+              </ul>
+            )}
+
+            <div className="text-center mt-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/c/${token}/scores`} className="gap-2">
+                  <ClipboardList className="size-4" aria-hidden="true" />
+                  Xem điểm
+                </Link>
+              </Button>
+            </div>
+          </TabsContent>
+
+          {myLeaderGroup && (
+            <TabsContent value="mygroup" className="mt-4">
+              <div className="grid lg:grid-cols-[4fr_1fr] gap-5">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-heading">Học sinh trong lớp</CardTitle>
+                    <CardDescription>
+                      Kéo thẻ học sinh trong nhóm em (viền màu) đè lên thẻ khác để đổi vị trí, hoặc
+                      kéo học sinh chưa có nhóm thả vào nhóm của em bên phải để thêm thành viên.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      {[...students]
+                        .sort((a, b) => a.slot_number - b.slot_number)
+                        .map((s) => {
+                          const stuGroup = studentToGroup.get(s.id)
+                          const inMyGroup = stuGroup?.id === myLeaderGroup.id
+                          const unassigned = !stuGroup
+                          const isMe = s.id === myStudentId
+                          const hasName = !!s.name?.trim()
+                          const draggable = hasName && (inMyGroup || unassigned)
+                          return (
+                            <li
+                              key={s.id}
+                              draggable={draggable}
+                              onDragStart={(e) => {
+                                if (!draggable) {
+                                  e.preventDefault()
+                                  return
+                                }
+                                setDragStudentId(s.id)
+                                e.dataTransfer.effectAllowed = "move"
+                                e.dataTransfer.setData("text/plain", s.id)
+                              }}
+                              onDragOver={(e) => {
+                                if (!dragStudentId) return
+                                e.preventDefault()
+                                e.dataTransfer.dropEffect = "move"
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault()
+                                const sid = e.dataTransfer.getData("text/plain") || dragStudentId
+                                setDragStudentId(null)
+                                if (!sid) return
+                                const draggedInMyGroup =
+                                  studentToGroup.get(sid)?.id === myLeaderGroup.id
+                                if (draggedInMyGroup) {
+                                  handleLeaderSwapDrop(sid, s.id)
+                                } else if (!studentToGroup.has(sid)) {
+                                  leaderAdd(sid)
+                                }
+                              }}
+                              onDragEnd={() => setDragStudentId(null)}
+                              className={cn(
+                                "rounded-lg border bg-card px-2 py-2 flex items-center gap-2 transition",
+                                draggable
+                                  ? "cursor-grab active:cursor-grabbing"
+                                  : hasName
+                                    ? "opacity-90"
+                                    : "opacity-50",
+                                inMyGroup && "ring-1",
+                                dragStudentId === s.id && "opacity-40",
+                                isMe && "ring-2 ring-primary ring-offset-1",
+                              )}
+                              style={stuGroup ? groupCardStyle(stuGroup.color) : undefined}
+                              title={
+                                inMyGroup
+                                  ? `Kéo ${s.name ?? `ô ${s.slot_number}`} đè lên thẻ khác để đổi vị trí.`
+                                  : unassigned && hasName
+                                    ? `Kéo ${s.name} thả vào nhóm của em để thêm thành viên.`
+                                    : stuGroup
+                                      ? `${s.name ?? `Ô ${s.slot_number}`} — ${stuGroup.name}. Chỉ giáo viên mới đổi nhóm được.`
+                                      : undefined
+                              }
+                            >
+                              <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
+                                {s.slot_number}
+                              </span>
+                              <span className="flex-1 min-w-0 text-sm font-medium truncate">
+                                {hasName ? (
+                                  s.name
+                                ) : (
+                                  <span className="text-muted-foreground/70">Trống</span>
+                                )}
+                              </span>
+                              {isMe && (
+                                <span className="text-[10px] font-semibold text-primary shrink-0">
+                                  Em
+                                </span>
+                              )}
+                              {inMyGroup && (
+                                <Crown className="size-3.5 text-amber-500 shrink-0" aria-hidden="true" />
+                              )}
+                              {stuGroup && !inMyGroup && (
+                                <Lock className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
+                              )}
+                            </li>
+                          )
+                        })}
+                    </ul>
+                  </CardContent>
+                </Card>
+
+                <Card className="h-fit" style={{ borderColor: myLeaderGroup.color }}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 font-heading">
+                      <Crown className="size-4 text-amber-500" aria-hidden="true" />
+                      {myLeaderGroup.name}
+                    </CardTitle>
+                    <CardDescription>
+                      Kéo học sinh chưa có nhóm vào đây để thêm thành viên.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-1.5">
+                    {members
+                      .filter((m) => m.class_group_id === myLeaderGroup.id)
+                      .map((m) => {
+                        const s = students.find((x) => x.id === m.student_id)
+                        if (!s) return null
+                        return (
+                          <div
+                            key={m.student_id}
+                            className="flex items-center gap-2 rounded-md border bg-card px-2 py-1.5 text-sm"
+                          >
+                            <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
+                              {s.slot_number}
+                            </span>
+                            <span className="flex-1 min-w-0 truncate font-medium">
+                              {s.name?.trim() || "—"}
+                            </span>
+                            {s.id === myStudentId && (
+                              <span className="text-[10px] font-semibold text-primary shrink-0">
+                                Em
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    <div
                       onDragOver={(e) => {
                         if (!dragStudentId) return
                         e.preventDefault()
@@ -423,148 +509,22 @@ export function ClassLobby({
                         e.preventDefault()
                         const sid = e.dataTransfer.getData("text/plain") || dragStudentId
                         setDragStudentId(null)
-                        if (sid) handleLeaderSwapDrop(sid, s.id)
+                        if (sid && !studentToGroup.has(sid)) leaderAdd(sid)
                       }}
-                      onDragEnd={() => setDragStudentId(null)}
                       className={cn(
-                        "rounded-lg border bg-card px-2 py-2 flex items-center gap-2 transition",
-                        inMyGroup ? "cursor-grab active:cursor-grabbing ring-1" : "opacity-90",
-                        dragStudentId === s.id && "opacity-40",
-                        isMe && "ring-2 ring-primary ring-offset-1",
+                        "mt-2 rounded-lg border-2 border-dashed p-4 text-center text-sm text-muted-foreground transition",
+                        dragStudentId && "border-primary bg-primary/5",
                       )}
-                      style={
-                        inMyGroup && myLeaderGroup
-                          ? { borderColor: myLeaderGroup.color }
-                          : undefined
-                      }
-                      title={
-                        inMyGroup
-                          ? `Kéo ${s.name ?? `ô ${s.slot_number}`} đè lên thẻ khác để đổi vị trí.`
-                          : undefined
-                      }
                     >
-                      <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
-                        {s.slot_number}
-                      </span>
-                      <span className="flex-1 min-w-0 text-sm font-medium truncate">
-                        {hasName ? (
-                          s.name
-                        ) : (
-                          <span className="text-muted-foreground/70">Trống</span>
-                        )}
-                      </span>
-                      {isMe && (
-                        <span className="text-[10px] font-semibold text-primary shrink-0">
-                          Em
-                        </span>
-                      )}
-                      {inMyGroup && (
-                        <Crown className="size-3.5 text-amber-500 shrink-0" aria-hidden="true" />
-                      )}
-                    </li>
-                  )
-                })}
-            </ul>
-          </CardContent>
-        </Card>
-
-        <h2 className="text-sm font-semibold text-muted-foreground">Các phiên đang mở</h2>
-        {sessions.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              Hiện chưa có phiên nào mở. Chờ giáo viên bắt đầu.
-            </CardContent>
-          </Card>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {sessions.map((s) => (
-              <SessionRow key={s.id} session={s} token={token} />
-            ))}
-          </ul>
-        )}
-
-        <div className="text-center mt-6">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/c/${token}/scores`} className="gap-2">
-              <ClipboardList className="size-4" aria-hidden="true" />
-              Xem bảng điểm
-            </Link>
-          </Button>
-        </div>
+                      Thả học sinh vào đây
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
-
-      {/* Dialog chọn thành viên cho nhóm trưởng */}
-      <Dialog open={leaderOpen} onOpenChange={setLeaderOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-heading">
-              <Crown className="size-5 text-amber-500" aria-hidden="true" />
-              Chọn thành viên cho {myLeaderGroup?.name}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-1.5">
-            <p className="text-xs text-muted-foreground">
-              Bấm vào học sinh chưa có nhóm để thêm vào nhóm của em. Học sinh ở nhóm khác cần giáo
-              viên thay đổi.
-            </p>
-            {students.map((s) => {
-              const stuGroup = studentToGroup.get(s.id)
-              const inMine = stuGroup?.id === myLeaderGroup?.id
-              const isMe = s.id === myStudentId
-              return (
-                <div
-                  key={s.id}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-lg border px-2.5 py-2",
-                    inMine ? "border-amber-300 bg-amber-50/50" : "border-border bg-card",
-                  )}
-                >
-                  <AvatarInitials name={s.name} seed={`${classId}-${s.slot_number}`} size="xs" />
-                  <span className="text-[10px] tabular-nums font-semibold bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                    {s.slot_number}
-                  </span>
-                  <span className="flex-1 text-sm font-medium truncate">
-                    {s.name?.trim() || "—"}
-                  </span>
-                  {stuGroup ? (
-                    inMine ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="text-xs font-semibold text-amber-700">Nhóm em</span>
-                        {!isMe && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-6"
-                            aria-label={`Gỡ ${s.name} khỏi nhóm`}
-                            onClick={() => leaderRemove(s.id)}
-                          >
-                            <Minus className="size-3.5 text-destructive" aria-hidden="true" />
-                          </Button>
-                        )}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        <Lock className="size-3.5" aria-hidden="true" />
-                        {stuGroup.name}
-                      </span>
-                    )
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2.5"
-                      disabled={!s.name?.trim()}
-                      onClick={() => leaderAdd(s.id)}
-                    >
-                      Thêm vào nhóm
-                    </Button>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
     </main>
   )
 }
