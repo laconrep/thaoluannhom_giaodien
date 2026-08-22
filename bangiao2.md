@@ -111,7 +111,9 @@ Kiểm thử cuối: `tsc --noEmit` + `eslint`.
 
 - [x] **PHIÊN 1 — Server actions** (`app/actions.ts` + `student-submit.tsx`)
 - [x] **PHIÊN 2 — Phía HS** (`class-lobby.tsx`)
-- [ ] **PHIÊN 3 — Phía GV** (`roster/page.tsx` + `roster-view.tsx`)
+- [ ] **PHIÊN 3 — Phía GV** (`roster/page.tsx` + `roster-view.tsx`) — đang làm:
+  - [x] `roster/page.tsx`: select students thêm `device_token`
+  - [ ] `roster-view.tsx`: type Student + refreshStudents + badge khóa + nút Mở khóa
 
 ---
 
@@ -139,6 +141,13 @@ Trên nhánh `260822-feat-share-claim-unlock`:
     - Kéo thẻ HS **chưa có nhóm** thả vào thẻ bất kỳ hoặc vùng thả → `leaderAdd` (`leaderUpdateGroupMembersAction` "add").
   - Xóa UI cũ: Card "Nhóm trưởng" + Dialog chọn thành viên + `leaderRemove`, `myGroup`, `leaderOpen`, `selectedSlot`, `name`, imports `Input`/`Field`/`Dialog`/`AvatarInitials`/`Minus`; thêm imports `Tabs` + `groupCardStyle`.
 - Đã chạy `pnpm exec tsc --noEmit` (exit 0) + `pnpm exec eslint` trên `class-lobby.tsx` (exit 0).
+
+### Phiên 3 — Đang làm (Phía giáo viên)
+
+**3a — `roster/page.tsx`** (đã commit + push):
+- Select students đổi từ `"id, slot_number, name"` → `"id, slot_number, name, device_token"` để RosterView có data hiện badge khóa.
+
+**3b — `roster-view.tsx`** (chưa làm): type Student thêm `device_token`, refreshStudents thêm `device_token`, thẻ HS có device_token → icon Lock + nút "Mở khóa" (xác nhận trước) gọi `unlockStudentSlotAction`.
 
 ---
 
