@@ -36,7 +36,6 @@ import {
   X,
   Info,
   MoveRight,
-  GripVertical,
   FileSpreadsheet,
   Upload,
   FileCheck2,
@@ -883,19 +882,17 @@ export function RosterView({
                         : "Nhập tên trước khi phân nhóm."
                     }
                   >
-                    {hasName && (
-                      <GripVertical
-                        className="size-3.5 text-muted-foreground/50 shrink-0"
-                        aria-hidden="true"
-                      />
-                    )}
                     <div className="flex-1 min-w-0 flex flex-col">
                       <div className="flex items-center gap-1.5">
                         <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
                           {s.slot_number}
                         </span>
                         <Input
-                          className="h-7 border-0 shadow-none focus-visible:ring-1 focus-visible:bg-background px-1.5 text-sm font-medium flex-1"
+                          className={cn(
+                            "h-7 border-0 shadow-none focus-visible:ring-1 focus-visible:bg-background px-1.5 text-sm font-medium flex-1",
+                            isSelected && "read-only:opacity-80 cursor-not-allowed bg-muted/40",
+                          )}
+                          readOnly={isSelected}
                           value={s.name ?? ""}
                           placeholder="Chưa có tên"
                           onChange={(e) => onTypeName(s.id, e.target.value)}
