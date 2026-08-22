@@ -889,7 +889,6 @@ export function RosterView({
                         aria-hidden="true"
                       />
                     )}
-                    <AvatarInitials name={s.name} seed={`${classId}-${s.slot_number}`} size="md" />
                     <div className="flex-1 min-w-0 flex flex-col">
                       <div className="flex items-center gap-1.5">
                         <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
@@ -943,13 +942,11 @@ export function RosterView({
 
         {/* CỘT PHẢI: danh sách nhóm */}
         <Card className="float-card">
-          <CardHeader className="flex flex-row items-start justify-between">
-            <div>
-              <CardTitle className="font-heading">Nhóm cố định</CardTitle>
-              <CardDescription>
-                Kéo HS từ bên trái thả vào một nhóm. Dùng chung cho mọi phiên thảo luận.
-              </CardDescription>
-            </div>
+          <CardHeader className="flex flex-col items-start gap-2">
+            <CardTitle className="font-heading w-full">Nhóm cố định</CardTitle>
+            <CardDescription className="w-full">
+              Kéo HS từ bên trái thả vào một nhóm. Dùng chung cho mọi phiên thảo luận.
+            </CardDescription>
             <Button variant="outline" size="sm" onClick={onAddGroup}>
               <Plus className="size-4 mr-1" aria-hidden="true" />
               Thêm nhóm
@@ -1003,7 +1000,7 @@ export function RosterView({
                     "--tw-ring-color": g.color,
                   } as any}
                 >
-                  <div className="flex items-center justify-between gap-2 px-3 py-2">
+                  <div className="flex items-center gap-2 px-3 py-2">
                     <button
                       type="button"
                       onClick={() => setExpandedGroupId(expanded ? null : g.id)}
@@ -1020,24 +1017,15 @@ export function RosterView({
                         style={{ backgroundColor: g.color }}
                         aria-hidden="true"
                       />
-                      <p className="font-medium text-sm truncate">
-                        {g.name}
-                        {g.leader_student_id && (
-                          <span className="ml-1.5 inline-flex items-center gap-0.5 align-middle rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0 text-[10px] font-semibold text-amber-700">
-                            <Crown className="size-3" aria-hidden="true" />
-                            {students.find((s) => s.id === g.leader_student_id)?.name?.trim() ||
-                              "Trưởng nhóm"}
-                          </span>
-                        )}
-                      </p>
-                      <span
-                        className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium border shrink-0"
-                        style={groupPillStyle(g.color)}
-                      >
-                        {members.length} HS
-                      </span>
+                      <span className="font-medium text-sm truncate">{g.name}</span>
                     </button>
-                    <div className="flex items-center gap-1">
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded-full font-medium border shrink-0 whitespace-nowrap"
+                      style={groupPillStyle(g.color)}
+                    >
+                      {members.length} HS
+                    </span>
+                    <div className="flex items-center gap-0.5 shrink-0">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1107,34 +1095,47 @@ export function RosterView({
                         <ul className="flex flex-col gap-1">
                           {members
                             .sort((a, b) => a.slot_number - b.slot_number)
-                            .map((m) => (
-                              <li
-                                key={m.id}
-                                className="flex items-center gap-2 rounded-md border bg-background px-2 py-1.5"
-                                style={{ borderColor: `${g.color}44` }}
-                              >
-                                <AvatarInitials
-                                  name={m.name}
-                                  seed={`${classId}-${m.slot_number}`}
-                                  size="xs"
-                                />
-                                <span className="text-[10px] tabular-nums font-semibold bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                                  {m.slot_number}
-                                </span>
-                                <span className="flex-1 text-sm font-medium truncate">
-                                  {m.name?.trim() || "—"}
-                                </span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-6"
-                                  aria-label={`Gỡ ${m.name} khỏi ${g.name}`}
-                                  onClick={() => applyMove(m.id, null)}
+                            .map((m) => {
+                              const isLeaderMember = m.id === g.leader_student_id
+                              return (
+                                <li
+                                  key={m.id}
+                                  className={cn(
+                                    "flex items-center gap-2 rounded-md border bg-background px-2 py-1.5",
+                                    isLeaderMember &&
+                                      "bg-red-50 border-red-400 ring-1 ring-red-300",
+                                  )}
+                                  style={isLeaderMember ? undefined : { borderColor: `${g.color}44` }}
                                 >
-                                  <X className="size-3.5" />
-                                </Button>
-                              </li>
-                            ))}
+                                  <AvatarInitials
+                                    name={m.name}
+                                    seed={`${classId}-${m.slot_number}`}
+                                    size="xs"
+                                  />
+                                  <span className="text-[10px] tabular-nums font-semibold bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                    {m.slot_number}
+                                  </span>
+                                  <span className="flex-1 text-sm font-medium truncate">
+                                    {m.name?.trim() || "—"}
+                                  </span>
+                                  {isLeaderMember && (
+                                    <span className="inline-flex items-center gap-0.5 rounded-full bg-red-500 text-white px-1.5 py-0.5 text-[10px] font-semibold shrink-0">
+                                      <Crown className="size-3" aria-hidden="true" />
+                                      Nhóm trưởng
+                                    </span>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="size-6"
+                                    aria-label={`Gỡ ${m.name} khỏi ${g.name}`}
+                                    onClick={() => applyMove(m.id, null)}
+                                  >
+                                    <X className="size-3.5" />
+                                  </Button>
+                                </li>
+                              )
+                            })}
                         </ul>
                       )}
                     </div>
