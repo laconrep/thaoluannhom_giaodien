@@ -104,6 +104,7 @@ export function RosterView({
     toGroupId: string
   } | null>(null)
   const [, startTransition] = useTransition()
+  const [confirmUnlockId, setConfirmUnlockId] = useState<string | null>(null)
   const fileImportRef = useRef<HTMLInputElement | null>(null)
 
   // Map ngược: student_id -> group (để tô màu thẻ HS)
@@ -223,16 +224,9 @@ export function RosterView({
     if (data) setStudents(data as Student[])
   }
 
-  // GV mở khóa ô đã bị HS chiếm (xác nhận trước để tránh bấm nhầm)
-  function handleUnlock(studentId: string) {
-    const s = students.find((x) => x.id === studentId)
-    if (!s?.name) return
-    if (
-      !confirm(
-        `Mở khóa ô "${s.name}"? Học sinh trên thiết bị đó sẽ phải chọn lại ô (hoặc chọn trên thiết bị khác).`,
-      )
-    )
-      return
+  // GV mở khóa ô đã bị HS chiếm — xác nhận ngay trong thẻ (không dùng confirm() trình duyệt)
+  function doUnlock(studentId: string) {
+    setConfirmUnlockId(null)
     startTransition(() => {
       unlockStudentSlotAction(studentId).then((res) => {
         if (!res.ok) toast.error(res.error ?? "Không mở khóa được.")
@@ -963,19 +957,37 @@ export function RosterView({
                             aria-label="Nhóm trưởng"
                           />
                         )}
-                        {s.device_token && (
-                          <button
-                            type="button"
-                            onClick={() => handleUnlock(s.id)}
-                            title="Ô đang bị thiết bị khác giữ. Bấm để mở khóa."
-                            className="shrink-0 inline-flex items-center gap-0.5 text-muted-foreground hover:text-destructive transition"
-                          >
-                            <Lock className="size-3.5" aria-hidden="true" />
-                            <span className="hidden group-hover:inline text-[11px] font-medium">
-                              Mở khóa
+                        {s.device_token &&
+                          (confirmUnlockId === s.id ? (
+                            <span className="shrink-0 inline-flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => doUnlock(s.id)}
+                                className="text-[11px] font-semibold text-destructive"
+                              >
+                                Xác nhận
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmUnlockId(null)}
+                                className="text-[11px] font-medium text-muted-foreground"
+                              >
+                                Hủy
+                              </button>
                             </span>
-                          </button>
-                        )}
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmUnlockId(s.id)}
+                              title="Ô đang bị thiết bị khác giữ. Bấm để mở khóa."
+                              className="shrink-0 inline-flex items-center gap-0.5 text-muted-foreground hover:text-destructive transition"
+                            >
+                              <Lock className="size-3.5" aria-hidden="true" />
+                              <span className="hidden group-hover:inline text-[11px] font-medium">
+                                Mở khóa
+                              </span>
+                            </button>
+                          ))}
                       </div>
                       {g && (
                         <span

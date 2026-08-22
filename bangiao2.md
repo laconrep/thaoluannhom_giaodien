@@ -170,6 +170,17 @@ Trên nhánh `main` (sau khi merge PR #1):
 - **HS (`class-lobby.tsx` màn 1)**: thẻ bị thiết bị khác chiếm vẫn chỉ một khóa nhỏ (không có chữ "bị chiếm"); chỉ chỉnh khoảng cách như trên.
 - Đã chạy `pnpm exec tsc --noEmit` (exit 0) + `pnpm exec eslint` trên 2 file (exit 0).
 
+### Sửa lần 3 (thống nhất lưới thẻ GV + chọn thành viên bằng click + xác nhận mở khóa trong thẻ)
+
+- **Màn 1 HS (`class-lobby.tsx`)**: thẻ HS thêm **tô màu theo nhóm** (`groupCardStyle`), **pill tên nhóm** dưới tên (`groupPillStyle`), **Crown** cho nhóm trưởng — khớp thẻ GV. Giữ nguyên bấm chọn ô, khóa thiết bị, "Em", "Trống".
+- **Màn "Nhóm của em" nhóm trưởng (`class-lobby.tsx`)**:
+  - **Bỏ khung bên phải** (danh sách thành viên + vùng thả) — chỉ ở màn HS, màn GV giữ nguyên.
+  - **Chọn thành viên bằng click**: bấm thẻ chưa có nhóm → thêm ("add"); bấm lại thành viên trong nhóm em → gỡ ("remove", trừ chính mình). Thẻ vào nhóm sẽ đổi màu nhóm.
+  - **Chỉ thẻ trong nhóm em mới kéo được** để đổi vị trí (`handleLeaderSwapDrop`); kéo thả không còn thêm thành viên nữa.
+  - Lưới `grid-cols-1 sm:grid-cols-2 xl:grid-cols-4`, thẻ `px-1.5 py-2 gap-1.5`, thêm pill tên nhóm — khớp thẻ GV.
+- **Màn GV (`roster-view.tsx`)**: bỏ `confirm()` trình duyệt; thêm state `confirmUnlockId` — bấm khóa nhỏ → hiện **"Xác nhận / Hủy" ngay trong thẻ**, bấm Xác nhận mới gọi `unlockStudentSlotAction`.
+- Đã chạy `pnpm exec tsc --noEmit` (exit 0) + `pnpm exec eslint` trên 2 file (exit 0).
+
 ---
 
 ## YÊU CẦU PHIÊN SAU

@@ -23,7 +23,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { groupCardStyle } from "@/lib/group-colors"
+import { groupCardStyle, groupPillStyle } from "@/lib/group-colors"
 
 type Student = {
   id: string
@@ -218,6 +218,17 @@ export function ClassLobby({
     if (!res.ok) toast.error(res.error ?? "Không thêm được")
   }
 
+  async function leaderRemove(targetStudentId: string) {
+    const res = await leaderUpdateGroupMembersAction({
+      classId,
+      leaderStudentId: myStudentId!,
+      deviceToken: getDeviceToken(),
+      targetStudentId,
+      action: "remove",
+    })
+    if (!res.ok) toast.error(res.error ?? "Không gỡ được")
+  }
+
   // Nhóm trưởng kéo thẻ HS trong nhóm mình đổi vị trí với bất kỳ HS nào.
   // Cập nhật ngay tại chỗ (optimistic) rồi gọi action, sau đó refetch để đồng bộ chắc chắn.
   async function handleLeaderSwapDrop(draggedId: string, targetId: string) {
@@ -280,6 +291,8 @@ export function ClassLobby({
                 const isMine = s.device_token === deviceToken
                 const lockedByOther = !!s.device_token && s.device_token !== deviceToken
                 const clickable = hasName && !lockedByOther
+                const g = studentToGroup.get(s.id)
+                const isLeader = groups.some((x) => x.leader_student_id === s.id)
                 return (
                   <button
                     key={s.id}
@@ -291,6 +304,7 @@ export function ClassLobby({
                       clickable ? "cursor-pointer hover:bg-muted/40" : "opacity-60 cursor-not-allowed",
                       isMine && "ring-2 ring-primary ring-offset-1",
                     )}
+                    style={g ? groupCardStyle(g.color) : undefined}
                     title={
                       lockedByOther
                         ? "Ô này đã được thiết bị khác chọn"
@@ -301,22 +315,41 @@ export function ClassLobby({
                             : "Chưa có tên"
                     }
                   >
-                    <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
-                      {s.slot_number}
-                    </span>
-                    <span className="flex-1 min-w-0 text-sm font-medium truncate">
-                      {hasName ? (
-                        s.name
-                      ) : (
-                        <span className="text-muted-foreground/70">Trống</span>
+                    <div className="flex-1 min-w-0 flex flex-col">
+                      <div className="flex items-center gap-1">
+                        <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
+                          {s.slot_number}
+                        </span>
+                        <span className="flex-1 min-w-0 text-sm font-medium truncate">
+                          {hasName ? (
+                            s.name
+                          ) : (
+                            <span className="text-muted-foreground/70">Trống</span>
+                          )}
+                        </span>
+                        {isLeader && (
+                          <Crown className="size-4 shrink-0 text-amber-500" aria-label="Nhóm trưởng" />
+                        )}
+                        {isMine && (
+                          <span className="text-[10px] font-semibold text-primary shrink-0">Em</span>
+                        )}
+                        {lockedByOther && (
+                          <Lock className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
+                        )}
+                      </div>
+                      {g && (
+                        <span
+                          className="mt-0.5 inline-flex items-center gap-1 rounded-full text-[10px] font-medium border px-1.5 py-0 w-fit"
+                          style={groupPillStyle(g.color)}
+                        >
+                          <span
+                            className="size-1.5 rounded-full"
+                            style={{ backgroundColor: g.color }}
+                          />
+                          {g.name}
+                        </span>
                       )}
-                    </span>
-                    {isMine && (
-                      <span className="text-[10px] font-semibold text-primary shrink-0">Em</span>
-                    )}
-                    {lockedByOther && (
-                      <Lock className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
-                    )}
+                    </div>
                   </button>
                 )
               })}
@@ -386,165 +419,125 @@ export function ClassLobby({
 
           {myLeaderGroup && (
             <TabsContent value="mygroup" className="mt-4">
-              <div className="grid lg:grid-cols-[4fr_1fr] gap-5">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-heading">Học sinh trong lớp</CardTitle>
-                    <CardDescription>
-                      Kéo thẻ học sinh trong nhóm em (viền màu) đè lên thẻ khác để đổi vị trí, hoặc
-                      kéo học sinh chưa có nhóm thả vào nhóm của em bên phải để thêm thành viên.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                      {[...students]
-                        .sort((a, b) => a.slot_number - b.slot_number)
-                        .map((s) => {
-                          const stuGroup = studentToGroup.get(s.id)
-                          const inMyGroup = stuGroup?.id === myLeaderGroup.id
-                          const unassigned = !stuGroup
-                          const isMe = s.id === myStudentId
-                          const hasName = !!s.name?.trim()
-                          const draggable = hasName && (inMyGroup || unassigned)
-                          return (
-                            <li
-                              key={s.id}
-                              draggable={draggable}
-                              onDragStart={(e) => {
-                                if (!draggable) {
-                                  e.preventDefault()
-                                  return
-                                }
-                                setDragStudentId(s.id)
-                                e.dataTransfer.effectAllowed = "move"
-                                e.dataTransfer.setData("text/plain", s.id)
-                              }}
-                              onDragOver={(e) => {
-                                if (!dragStudentId) return
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-heading">Nhóm của em — {myLeaderGroup.name}</CardTitle>
+                  <CardDescription>
+                    Bấm vào thẻ học sinh chưa có nhóm để thêm vào nhóm em (thẻ sẽ đổi màu theo nhóm).
+                    Bấm lại một thành viên trong nhóm em để gỡ ra. Thành viên trong nhóm có thể kéo
+                    đè lên thẻ khác để đổi vị trí.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+                    {[...students]
+                      .sort((a, b) => a.slot_number - b.slot_number)
+                      .map((s) => {
+                        const stuGroup = studentToGroup.get(s.id)
+                        const inMyGroup = stuGroup?.id === myLeaderGroup.id
+                        const unassigned = !stuGroup
+                        const isMe = s.id === myStudentId
+                        const hasName = !!s.name?.trim()
+                        const draggable = hasName && inMyGroup
+                        return (
+                          <li
+                            key={s.id}
+                            draggable={draggable}
+                            onDragStart={(e) => {
+                              if (!draggable) {
                                 e.preventDefault()
-                                e.dataTransfer.dropEffect = "move"
-                              }}
-                              onDrop={(e) => {
-                                e.preventDefault()
-                                const sid = e.dataTransfer.getData("text/plain") || dragStudentId
-                                setDragStudentId(null)
-                                if (!sid) return
-                                const draggedInMyGroup =
-                                  studentToGroup.get(sid)?.id === myLeaderGroup.id
-                                if (draggedInMyGroup) {
-                                  handleLeaderSwapDrop(sid, s.id)
-                                } else if (!studentToGroup.has(sid)) {
-                                  leaderAdd(sid)
-                                }
-                              }}
-                              onDragEnd={() => setDragStudentId(null)}
-                              className={cn(
-                                "rounded-lg border bg-card px-2 py-2 flex items-center gap-2 transition",
-                                draggable
-                                  ? "cursor-grab active:cursor-grabbing"
-                                  : hasName
-                                    ? "opacity-90"
-                                    : "opacity-50",
-                                inMyGroup && "ring-1",
-                                dragStudentId === s.id && "opacity-40",
-                                isMe && "ring-2 ring-primary ring-offset-1",
-                              )}
-                              style={stuGroup ? groupCardStyle(stuGroup.color) : undefined}
-                              title={
-                                inMyGroup
-                                  ? `Kéo ${s.name ?? `ô ${s.slot_number}`} đè lên thẻ khác để đổi vị trí.`
-                                  : unassigned && hasName
-                                    ? `Kéo ${s.name} thả vào nhóm của em để thêm thành viên.`
-                                    : stuGroup
-                                      ? `${s.name ?? `Ô ${s.slot_number}`} — ${stuGroup.name}. Chỉ giáo viên mới đổi nhóm được.`
-                                      : undefined
+                                return
                               }
-                            >
-                              <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
-                                {s.slot_number}
-                              </span>
-                              <span className="flex-1 min-w-0 text-sm font-medium truncate">
-                                {hasName ? (
-                                  s.name
-                                ) : (
-                                  <span className="text-muted-foreground/70">Trống</span>
+                              setDragStudentId(s.id)
+                              e.dataTransfer.effectAllowed = "move"
+                              e.dataTransfer.setData("text/plain", s.id)
+                            }}
+                            onDragOver={(e) => {
+                              if (!dragStudentId) return
+                              e.preventDefault()
+                              e.dataTransfer.dropEffect = "move"
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              const sid = e.dataTransfer.getData("text/plain") || dragStudentId
+                              setDragStudentId(null)
+                              if (!sid || sid === s.id) return
+                              if (studentToGroup.get(sid)?.id === myLeaderGroup.id) {
+                                handleLeaderSwapDrop(sid, s.id)
+                              }
+                            }}
+                            onDragEnd={() => setDragStudentId(null)}
+                            onClick={() => {
+                              if (!hasName) return
+                              if (unassigned) leaderAdd(s.id)
+                              else if (inMyGroup && !isMe) leaderRemove(s.id)
+                            }}
+                            className={cn(
+                              "rounded-lg border bg-card transition px-1.5 py-2 flex items-center gap-1.5",
+                              draggable
+                                ? "cursor-grab active:cursor-grabbing"
+                                : hasName
+                                  ? "cursor-pointer hover:bg-muted/40"
+                                  : "opacity-70",
+                              dragStudentId === s.id && "opacity-40",
+                              isMe && "ring-2 ring-primary ring-offset-1",
+                            )}
+                            style={stuGroup ? groupCardStyle(stuGroup.color) : undefined}
+                            title={
+                              unassigned && hasName
+                                ? `Bấm để thêm ${s.name} vào nhóm em.`
+                                : inMyGroup && !isMe
+                                  ? `Bấm để gỡ ${s.name} khỏi nhóm em. Kéo đè lên thẻ khác để đổi vị trí.`
+                                  : isMe
+                                    ? "Đây là ô của em."
+                                    : stuGroup
+                                      ? `${s.name} — ${stuGroup.name}. Chỉ giáo viên mới đổi nhóm được.`
+                                      : "Chưa có tên"
+                            }
+                          >
+                            <div className="flex-1 min-w-0 flex flex-col">
+                              <div className="flex items-center gap-1">
+                                <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
+                                  {s.slot_number}
+                                </span>
+                                <span className="flex-1 min-w-0 text-sm font-medium truncate">
+                                  {hasName ? (
+                                    s.name
+                                  ) : (
+                                    <span className="text-muted-foreground/70">Trống</span>
+                                  )}
+                                </span>
+                                {isMe && (
+                                  <span className="text-[10px] font-semibold text-primary shrink-0">
+                                    Em
+                                  </span>
                                 )}
-                              </span>
-                              {isMe && (
-                                <span className="text-[10px] font-semibold text-primary shrink-0">
-                                  Em
+                                {inMyGroup && (
+                                  <Crown className="size-4 shrink-0 text-amber-500" aria-hidden="true" />
+                                )}
+                                {stuGroup && !inMyGroup && (
+                                  <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                )}
+                              </div>
+                              {stuGroup && (
+                                <span
+                                  className="mt-0.5 inline-flex items-center gap-1 rounded-full text-[10px] font-medium border px-1.5 py-0 w-fit"
+                                  style={groupPillStyle(stuGroup.color)}
+                                >
+                                  <span
+                                    className="size-1.5 rounded-full"
+                                    style={{ backgroundColor: stuGroup.color }}
+                                  />
+                                  {stuGroup.name}
                                 </span>
                               )}
-                              {inMyGroup && (
-                                <Crown className="size-3.5 text-amber-500 shrink-0" aria-hidden="true" />
-                              )}
-                              {stuGroup && !inMyGroup && (
-                                <Lock className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
-                              )}
-                            </li>
-                          )
-                        })}
-                    </ul>
-                  </CardContent>
-                </Card>
-
-                <Card className="h-fit" style={{ borderColor: myLeaderGroup.color }}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 font-heading">
-                      <Crown className="size-4 text-amber-500" aria-hidden="true" />
-                      {myLeaderGroup.name}
-                    </CardTitle>
-                    <CardDescription>
-                      Kéo học sinh chưa có nhóm vào đây để thêm thành viên.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-1.5">
-                    {members
-                      .filter((m) => m.class_group_id === myLeaderGroup.id)
-                      .map((m) => {
-                        const s = students.find((x) => x.id === m.student_id)
-                        if (!s) return null
-                        return (
-                          <div
-                            key={m.student_id}
-                            className="flex items-center gap-2 rounded-md border bg-card px-2 py-1.5 text-sm"
-                          >
-                            <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
-                              {s.slot_number}
-                            </span>
-                            <span className="flex-1 min-w-0 truncate font-medium">
-                              {s.name?.trim() || "—"}
-                            </span>
-                            {s.id === myStudentId && (
-                              <span className="text-[10px] font-semibold text-primary shrink-0">
-                                Em
-                              </span>
-                            )}
-                          </div>
+                            </div>
+                          </li>
                         )
                       })}
-                    <div
-                      onDragOver={(e) => {
-                        if (!dragStudentId) return
-                        e.preventDefault()
-                        e.dataTransfer.dropEffect = "move"
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        const sid = e.dataTransfer.getData("text/plain") || dragStudentId
-                        setDragStudentId(null)
-                        if (sid && !studentToGroup.has(sid)) leaderAdd(sid)
-                      }}
-                      className={cn(
-                        "mt-2 rounded-lg border-2 border-dashed p-4 text-center text-sm text-muted-foreground transition",
-                        dragStudentId && "border-primary bg-primary/5",
-                      )}
-                    >
-                      Thả học sinh vào đây
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                  </ul>
+                </CardContent>
+              </Card>
             </TabsContent>
           )}
         </Tabs>
