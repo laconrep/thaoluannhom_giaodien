@@ -287,7 +287,7 @@ export function ClassLobby({
                     disabled={!clickable || saving}
                     onClick={() => claimSlot(s.id)}
                     className={cn(
-                      "rounded-lg border bg-card px-2.5 py-2 flex items-center gap-2.5 transition text-left w-full",
+                      "rounded-lg border bg-card px-1.5 py-2 flex items-center gap-1.5 transition text-left w-full",
                       clickable ? "cursor-pointer hover:bg-muted/40" : "opacity-60 cursor-not-allowed",
                       isMine && "ring-2 ring-primary ring-offset-1",
                     )}

@@ -926,7 +926,7 @@ export function RosterView({
                       }
                     }}
                     className={cn(
-                      "group rounded-lg border bg-card transition px-2.5 py-2 flex items-center gap-2.5",
+                      "group rounded-lg border bg-card transition px-1.5 py-2 flex items-center gap-1.5",
                       hasName ? "cursor-grab active:cursor-grabbing" : "opacity-70",
                       dragStudentId === s.id && "opacity-40",
                       !g && "hover:bg-muted/30",
@@ -942,13 +942,13 @@ export function RosterView({
                     }
                   >
                     <div className="flex-1 min-w-0 flex flex-col">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1">
                         <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
                           {s.slot_number}
                         </span>
                         <Input
                           className={cn(
-                            "h-7 border-0 shadow-none focus-visible:ring-1 focus-visible:bg-background px-1.5 text-sm font-medium flex-1",
+                            "h-7 border-0 shadow-none focus-visible:ring-1 focus-visible:bg-background px-1 text-sm font-medium flex-1",
                             isSelected && "read-only:opacity-80 cursor-not-allowed bg-muted/40",
                           )}
                           readOnly={isSelected}
@@ -963,6 +963,19 @@ export function RosterView({
                             aria-label="Nhóm trưởng"
                           />
                         )}
+                        {s.device_token && (
+                          <button
+                            type="button"
+                            onClick={() => handleUnlock(s.id)}
+                            title="Ô đang bị thiết bị khác giữ. Bấm để mở khóa."
+                            className="shrink-0 inline-flex items-center gap-0.5 text-muted-foreground hover:text-destructive transition"
+                          >
+                            <Lock className="size-3.5" aria-hidden="true" />
+                            <span className="hidden group-hover:inline text-[11px] font-medium">
+                              Mở khóa
+                            </span>
+                          </button>
+                        )}
                       </div>
                       {g && (
                         <span
@@ -975,22 +988,6 @@ export function RosterView({
                           />
                           {g.name}
                         </span>
-                      )}
-                      {s.device_token && (
-                        <div className="mt-1 inline-flex items-center gap-1.5">
-                          <span className="inline-flex items-center gap-1 rounded-full border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            <Lock className="size-3" aria-hidden="true" />
-                            Đang bị chiếm
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 px-2 text-[11px] text-destructive hover:text-destructive"
-                            onClick={() => handleUnlock(s.id)}
-                          >
-                            Mở khóa
-                          </Button>
-                        </div>
                       )}
                     </div>
                   </li>

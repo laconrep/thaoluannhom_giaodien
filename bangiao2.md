@@ -163,6 +163,13 @@ Trên nhánh `main` (sau khi merge PR #1):
 - Giữ nguyên guard `.or()` server-side ở `studentClaimSlotAction` làm lớp bảo vệ cuối.
 - Đã chạy `pnpm exec tsc --noEmit` (exit 0) + `pnpm exec eslint` trên `class-lobby.tsx` (exit 0).
 
+### Sửa lần 2 (thu gọn trạng thái khóa + rút khoảng cách thẻ) — cả GV và HS
+
+- **GV (`roster-view.tsx`)**: bỏ cụm "Đang bị chiếm" (pill chữ) + nút "Mở khóa" dưới tên; thay bằng **một khóa nhỏ ngay hàng tên** (sau Crown) — bình thường chỉ thấy khóa nhỏ, hover thẻ mới hiện chữ "Mở khóa" (bấm → confirm → `unlockStudentSlotAction`). Thẻ giữ nguyên kích thước như thẻ chưa chọn.
+- **GV + HS**: rút khoảng cách thẻ HS — `px-2.5 gap-2.5 → px-1.5 gap-1.5` (roster-view còn rút thêm hàng tên `gap-1` và Input `px-1`), số thứ tự + tên sát mép trái, tên hiện được nhiều chữ hơn.
+- **HS (`class-lobby.tsx` màn 1)**: thẻ bị thiết bị khác chiếm vẫn chỉ một khóa nhỏ (không có chữ "bị chiếm"); chỉ chỉnh khoảng cách như trên.
+- Đã chạy `pnpm exec tsc --noEmit` (exit 0) + `pnpm exec eslint` trên 2 file (exit 0).
+
 ---
 
 ## YÊU CẦU PHIÊN SAU
