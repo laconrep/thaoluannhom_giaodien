@@ -1064,7 +1064,7 @@ export async function studentClaimGroupAction(
   return { ok: true }
 }
 
-export async function studentClaimSlotAction(
+export async function studentClaimSessionSlotAction(
   sessionSlotId: string,
   _deviceToken: string,
   studentId: string | null,
@@ -1087,6 +1087,51 @@ export async function studentClaimSlotAction(
     .maybeSingle()
   if (error) return { ok: false, error: error.message }
   if (!updated) return { ok: false, error: "Ô này vừa được chọn bởi người khác." }
+  return { ok: true }
+}
+
+// HS chọn ô của mình trong lớp (màn 1 khi mở link chia sẻ): liên kết device_token với ô đó.
+// Chỉ set device_token, KHÔNG đụng cột name. Guard .or() chống 2 thiết bị claim cùng lúc.
+export async function studentClaimSlotAction(
+  studentId: string,
+  deviceToken: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient()
+  if (!studentId || !deviceToken) return { ok: false, error: "Thông tin chọn ô không hợp lệ." }
+  const { data: updated, error } = await supabase
+    .from("students")
+    .update({ device_token: deviceToken })
+    .eq("id", studentId)
+    .or(`device_token.is.null,device_token.eq.${deviceToken}`)
+    .select("id")
+    .maybeSingle()
+  if (error) return { ok: false, error: error.message }
+  if (!updated) return { ok: false, error: "Ô này đã được thiết bị khác chọn" }
+  return { ok: true }
+}
+
+// GV mở khóa ô đã bị HS chiếm: xóa device_token để HS (thiết bị khác) chọn lại được.
+export async function unlockStudentSlotAction(studentId: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: "Chỉ giáo viên mới thực hiện được." }
+  const { data: stu } = await supabase
+    .from("students")
+    .select("id, class_id, classes!inner(teacher_id)")
+    .eq("id", studentId)
+    .maybeSingle()
+  if (!stu) return { ok: false, error: "Không tìm thấy học sinh." }
+  if ((stu as any).classes?.teacher_id !== user.id) {
+    return { ok: false, error: "Bạn không có quyền với học sinh này." }
+  }
+  const { error } = await supabase
+    .from("students")
+    .update({ device_token: null })
+    .eq("id", studentId)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath(`/classes/${stu.class_id}/roster`)
   return { ok: true }
 }
 
