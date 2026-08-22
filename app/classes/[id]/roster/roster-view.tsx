@@ -823,13 +823,13 @@ export function RosterView({
             <div className="rounded-xl border bg-muted/30 p-3">
               <div className="mb-2 text-center">
                 <span className="text-[11px] font-bold tracking-wider text-muted-foreground">
-                  CUỐI LỚP
+                  GIÁO VIÊN
                 </span>
               </div>
               <div className="flex items-stretch gap-2">
                 <div className="flex items-center justify-center">
                   <span className="text-[11px] font-bold tracking-wider text-muted-foreground [writing-mode:vertical-rl] rotate-180">
-                    TRÁI
+                    PHẢI
                   </span>
                 </div>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 flex-1 min-w-0">
@@ -924,13 +924,13 @@ export function RosterView({
                 </ul>
                 <div className="flex items-center justify-center">
                   <span className="text-[11px] font-bold tracking-wider text-muted-foreground [writing-mode:vertical-rl]">
-                    PHẢI
+                    TRÁI
                   </span>
                 </div>
               </div>
               <div className="mt-2 text-center">
                 <span className="text-[11px] font-bold tracking-wider text-primary">
-                  GIÁO VIÊN
+                  CUỐI LỚP
                 </span>
               </div>
             </div>
