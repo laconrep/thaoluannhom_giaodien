@@ -11,6 +11,7 @@ import {
   setCapacityAction,
   setGroupLeaderAction,
   swapStudentSlotsAction,
+  unlockStudentSlotAction,
   updateStudentNameAction,
 } from "@/app/actions"
 import { Button } from "@/components/ui/button"
@@ -30,6 +31,7 @@ import {
   Trash2,
   Users,
   ListPlus,
+  Lock,
   Save,
   Minus,
   ChevronDown,
@@ -52,7 +54,7 @@ import * as XLSX from "xlsx"
 import { Spinner } from "@/components/ui/spinner"
 import { useRef } from "react"
 
-type Student = { id: string; slot_number: number; name: string | null }
+type Student = { id: string; slot_number: number; name: string | null; device_token: string | null }
 type Group = {
   id: string
   group_number: number
@@ -215,10 +217,27 @@ export function RosterView({
     const supabase = createClient()
     const { data } = await supabase
       .from("students")
-      .select("id, slot_number, name")
+      .select("id, slot_number, name, device_token")
       .eq("class_id", classId)
       .order("slot_number")
     if (data) setStudents(data as Student[])
+  }
+
+  // GV mở khóa ô đã bị HS chiếm (xác nhận trước để tránh bấm nhầm)
+  function handleUnlock(studentId: string) {
+    const s = students.find((x) => x.id === studentId)
+    if (!s?.name) return
+    if (
+      !confirm(
+        `Mở khóa ô "${s.name}"? Học sinh trên thiết bị đó sẽ phải chọn lại ô (hoặc chọn trên thiết bị khác).`,
+      )
+    )
+      return
+    startTransition(() => {
+      unlockStudentSlotAction(studentId).then((res) => {
+        if (!res.ok) toast.error(res.error ?? "Không mở khóa được.")
+      })
+    })
   }
 
   function onBulkPaste() {
@@ -956,6 +975,22 @@ export function RosterView({
                           />
                           {g.name}
                         </span>
+                      )}
+                      {s.device_token && (
+                        <div className="mt-1 inline-flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-full border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            <Lock className="size-3" aria-hidden="true" />
+                            Đang bị chiếm
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-[11px] text-destructive hover:text-destructive"
+                            onClick={() => handleUnlock(s.id)}
+                          >
+                            Mở khóa
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </li>

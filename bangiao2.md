@@ -111,9 +111,9 @@ Kiểm thử cuối: `tsc --noEmit` + `eslint`.
 
 - [x] **PHIÊN 1 — Server actions** (`app/actions.ts` + `student-submit.tsx`)
 - [x] **PHIÊN 2 — Phía HS** (`class-lobby.tsx`)
-- [ ] **PHIÊN 3 — Phía GV** (`roster/page.tsx` + `roster-view.tsx`) — đang làm:
+- [x] **PHIÊN 3 — Phía GV** (`roster/page.tsx` + `roster-view.tsx`)
   - [x] `roster/page.tsx`: select students thêm `device_token`
-  - [ ] `roster-view.tsx`: type Student + refreshStudents + badge khóa + nút Mở khóa
+  - [x] `roster-view.tsx`: type Student + refreshStudents + badge khóa + nút Mở khóa
 
 ---
 
@@ -142,33 +142,27 @@ Trên nhánh `260822-feat-share-claim-unlock`:
   - Xóa UI cũ: Card "Nhóm trưởng" + Dialog chọn thành viên + `leaderRemove`, `myGroup`, `leaderOpen`, `selectedSlot`, `name`, imports `Input`/`Field`/`Dialog`/`AvatarInitials`/`Minus`; thêm imports `Tabs` + `groupCardStyle`.
 - Đã chạy `pnpm exec tsc --noEmit` (exit 0) + `pnpm exec eslint` trên `class-lobby.tsx` (exit 0).
 
-### Phiên 3 — Đang làm (Phía giáo viên)
+### Phiên 3 — Đã hoàn thành Phần 3 (Phía giáo viên)
 
-**3a — `roster/page.tsx`** (đã commit + push):
-- Select students đổi từ `"id, slot_number, name"` → `"id, slot_number, name, device_token"` để RosterView có data hiện badge khóa.
+Trên nhánh `main` (sau khi merge PR #1):
+- `app/classes/[id]/roster/page.tsx`: select students đổi từ `"id, slot_number, name"` → `"id, slot_number, name, device_token"`.
+- `app/classes/[id]/roster/roster-view.tsx`:
+  - Type `Student` thêm `device_token: string | null`.
+  - `refreshStudents` select thêm `device_token`.
+  - Thêm import `unlockStudentSlotAction` (từ `@/app/actions`) + icon `Lock` (từ `lucide-react`).
+  - Thêm handler `handleUnlock(studentId)`: `confirm()` trước, gọi `unlockStudentSlotAction(studentId)`, fail → `toast.error`.
+  - Thẻ HS có `device_token` → hiện badge "Đang bị chiếm" (icon Lock) + nút "Mở khóa"; trạng thái đồng bộ realtime qua subscribe `students UPDATE` (merge `...payload.new`).
+- Đã chạy `pnpm exec tsc --noEmit` (exit 0) + `pnpm exec eslint` trên 2 file roster (exit 0).
 
-**3b — `roster-view.tsx`** (chưa làm): type Student thêm `device_token`, refreshStudents thêm `device_token`, thẻ HS có device_token → icon Lock + nút "Mở khóa" (xác nhận trước) gọi `unlockStudentSlotAction`.
+**Tổng kết: cả 3 phiên đã hoàn thành.** Tính năng Link chia sẻ claim ô bằng `device_token` + mở khóa cho GV đã chạy đủ 3 phần (actions → phía HS → phía GV).
 
 ---
 
 ## YÊU CẦU PHIÊN SAU
 
-### Phiên 3 — Phía giáo viên (`app/classes/[id]/roster/page.tsx` + `roster-view.tsx`)
+Không còn công việc bắt buộc — cả 3 phiên đã hoàn thành.
 
-Trước khi code, đọc:
-- `app/classes/[id]/roster/page.tsx` (40 dòng): select students đang là `"id, slot_number, name"` → **thêm `device_token`**.
-- `app/classes/[id]/roster/roster-view.tsx` (1193 dòng):
-  - `type Student` (dòng 55): `{ id, slot_number, name }` → **thêm `device_token: string | null`**.
-  - `refreshStudents` (dòng ~214-222): select `"id, slot_number, name"` → thêm `device_token`.
-  - Realtime subscribe `students` (dòng ~144-164) đã merge `...payload.new` khi UPDATE → badge khóa sẽ tự đồng bộ.
-  - Thẻ HS trái (dòng ~863-963): bên trong `<li>` có khối `flex-1 flex flex-col` chứa Input tên + badge Crown. **Thêm**: nếu `s.device_token` → hiện icon `Lock` + nút "Mở khóa" (xác nhận trước bằng `confirm()` hoặc dialog) → gọi `unlockStudentSlotAction(s.id)` từ `@/app/actions` → toast lỗi nếu fail.
-- `app/actions.ts` — Phiên 1 đã thêm `unlockStudentSlotAction(studentId)` trả `{ ok, error? }`, xác thực GV đăng nhập + sở hữu lớp.
-
-Những thứ ĐÃ CÓ sẵn (không tạo lại): realtime roster (students UPDATE), `Lock` icon (đã import ở roster-view dòng 30), `Button`, `toast` (sonner).
-
-Công việc cần làm:
-1. `roster/page.tsx`: select students thêm `device_token`.
-2. `roster-view.tsx`: type `Student` thêm `device_token`; `refreshStudents` thêm `device_token`; thẻ HS có `device_token` → icon khóa + nút "Mở khóa" (xác nhận trước) gọi `unlockStudentSlotAction`.
-3. **Quy tắc phiên 3**: mỗi file sửa xong → commit + push + cập nhật NGAY file này (tiến độ + ghi chú) trước khi sửa file kế.
-4. Cuối phiên: `pnpm exec tsc --noEmit` + `pnpm exec eslint` toàn bộ; cập nhật TIẾN ĐỘ đánh dấu xong.
+Các hạng mục tự chọn (nếu muốn làm tiếp ở phiên sau):
+- Kiểm thử end-to-end luồng HS chọn ô → GV mở khóa → HS chọn lại trên cùng/khác thiết bị.
+- Nếu cần, thêm hiển thị tên thiết bị (thay vì chỉ badge "Đang bị chiếm") để GV dễ nhận diện.
 
