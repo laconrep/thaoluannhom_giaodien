@@ -10,6 +10,7 @@ import {
   removeClassGroupAction,
   setCapacityAction,
   setGroupLeaderAction,
+  swapStudentSlotsAction,
   updateStudentNameAction,
 } from "@/app/actions"
 import { Button } from "@/components/ui/button"
@@ -146,7 +147,9 @@ export function RosterView({
         (payload: any) => {
           if (payload.eventType === "UPDATE" && payload.new) {
             setStudents((cur) =>
-              cur.map((s) => (s.id === payload.new.id ? { ...s, name: payload.new.name } : s)),
+              cur
+                .map((s) => (s.id === payload.new.id ? { ...s, ...payload.new } : s))
+                .sort((a, b) => a.slot_number - b.slot_number),
             )
           } else if (payload.eventType === "INSERT" && payload.new) {
             setStudents((cur) =>
@@ -409,6 +412,16 @@ export function RosterView({
     setSelectedStudentIds((cur) =>
       cur.includes(studentId) ? cur.filter((x) => x !== studentId) : [...cur, studentId],
     )
+  }
+
+  // Kéo thả đổi vị trí trong lưới HS: thả lên thẻ khác → hoán đổi; thả vào ô trống → di chuyển
+  function handleSwapDrop(draggedId: string, targetId: string) {
+    if (!draggedId || draggedId === targetId) return
+    startTransition(() => {
+      swapStudentSlotsAction(classId, draggedId, targetId).then((res) => {
+        if (!res.ok) toast.error(res.error ?? "Không đổi được vị trí")
+      })
+    })
   }
 
   // Thả nhiều HS vào nhóm: HS đang ở nhóm khác → xác nhận; còn lại thêm thẳng
@@ -859,6 +872,19 @@ export function RosterView({
                     onDragEnd={() => {
                       setDragStudentId(null)
                       setDragOverGroupId(null)
+                    }}
+                    onDragOver={(e) => {
+                      if (!dragStudentId) return
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = "move"
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      setDragStudentId(null)
+                      const manyRaw = e.dataTransfer.getData("application/x-student-ids")
+                      if (manyRaw) return
+                      const sid = e.dataTransfer.getData("text/plain") || dragStudentId
+                      if (sid) handleSwapDrop(sid, s.id)
                     }}
                     onClick={(e) => {
                       if (e.ctrlKey || e.metaKey) {

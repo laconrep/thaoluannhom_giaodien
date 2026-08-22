@@ -435,6 +435,131 @@ export async function leaderUpdateGroupMembersAction(input: {
   return { ok: true }
 }
 
+// Hoán đổi vị trí (slot_number) của 2 học sinh trong cùng 1 lớp.
+// Tránh vi phạm unique (class_id, slot_number) bằng cách đổi qua giá trị tạm -1.
+async function swapStudentSlots(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  classId: string,
+  studentAId: string,
+  studentBId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!studentAId || !studentBId || studentAId === studentBId) {
+    return { ok: false, error: "Thông tin học sinh không hợp lệ." }
+  }
+  const { data: a } = await supabase
+    .from("students")
+    .select("id, slot_number")
+    .eq("id", studentAId)
+    .eq("class_id", classId)
+    .maybeSingle()
+  const { data: b } = await supabase
+    .from("students")
+    .select("id, slot_number")
+    .eq("id", studentBId)
+    .eq("class_id", classId)
+    .maybeSingle()
+  if (!a || !b) return { ok: false, error: "Không tìm thấy học sinh." }
+  if (a.slot_number === b.slot_number) return { ok: true }
+
+  const { error: e1 } = await supabase
+    .from("students")
+    .update({ slot_number: -1 })
+    .eq("id", a.id)
+    .eq("class_id", classId)
+  if (e1) return { ok: false, error: e1.message }
+
+  const { error: e2 } = await supabase
+    .from("students")
+    .update({ slot_number: a.slot_number })
+    .eq("id", b.id)
+    .eq("class_id", classId)
+  if (e2) {
+    await supabase
+      .from("students")
+      .update({ slot_number: a.slot_number })
+      .eq("id", a.id)
+      .eq("class_id", classId)
+    return { ok: false, error: e2.message }
+  }
+
+  const { error: e3 } = await supabase
+    .from("students")
+    .update({ slot_number: b.slot_number })
+    .eq("id", a.id)
+    .eq("class_id", classId)
+  if (e3) {
+    // Rollback best-effort: a về -1 (chưa đổi), b về b.slot gốc
+    await supabase
+      .from("students")
+      .update({ slot_number: b.slot_number })
+      .eq("id", b.id)
+      .eq("class_id", classId)
+    await supabase
+      .from("students")
+      .update({ slot_number: a.slot_number })
+      .eq("id", a.id)
+      .eq("class_id", classId)
+    return { ok: false, error: e3.message }
+  }
+  return { ok: true }
+}
+
+// Giáo viên (đã đăng nhập) hoán đổi vị trí 2 học sinh
+export async function swapStudentSlotsAction(
+  classId: string,
+  studentAId: string,
+  studentBId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient()
+  const res = await swapStudentSlots(supabase, classId, studentAId, studentBId)
+  if (res.ok) revalidatePath(`/classes/${classId}/roster`)
+  return res
+}
+
+// Nhóm trưởng kéo thẻ HS trong nhóm mình đổi vị trí với bất kỳ HS nào trong lớp
+// (xác thực qua device_token + quyền nhóm trưởng; chỉ thẻ được kéo phải thuộc nhóm trưởng)
+export async function leaderSwapSlotsAction(input: {
+  classId: string
+  leaderStudentId: string
+  deviceToken: string
+  draggedStudentId: string
+  targetStudentId: string
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  // Xác thực leader + device_token
+  const { data: leader } = await supabase
+    .from("students")
+    .select("id")
+    .eq("id", input.leaderStudentId)
+    .eq("class_id", input.classId)
+    .eq("device_token", input.deviceToken)
+    .maybeSingle()
+  if (!leader) return { ok: false, error: "Không xác thực được nhóm trưởng" }
+
+  // Tìm nhóm của leader
+  const { data: leaderGroup } = await supabase
+    .from("class_group_members")
+    .select("class_group_id, class_groups!inner(leader_student_id)")
+    .eq("student_id", input.leaderStudentId)
+    .eq("class_groups.leader_student_id", input.leaderStudentId)
+    .maybeSingle()
+  if (!leaderGroup) return { ok: false, error: "Bạn không phải nhóm trưởng của nhóm nào" }
+
+  // Thẻ được kéo phải thuộc nhóm của nhóm trưởng (thẻ đích thì bất kỳ)
+  const { data: dragged } = await supabase
+    .from("class_group_members")
+    .select("student_id")
+    .eq("class_group_id", leaderGroup.class_group_id)
+    .eq("student_id", input.draggedStudentId)
+    .maybeSingle()
+  if (!dragged) return { ok: false, error: "Chỉ được kéo học sinh trong nhóm của em" }
+
+  const res = await swapStudentSlots(supabase, input.classId, input.draggedStudentId, input.targetStudentId)
+  if (res.ok) revalidatePath(`/c/${input.classId}`)
+  return res
+}
+
 export async function removeClassGroupAction(classGroupId: string, classId: string) {
   const supabase = await createClient()
   const { error } = await supabase.from("class_groups").delete().eq("id", classGroupId)

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { fetchClassGroups } from "@/lib/class-groups"
-import { leaderUpdateGroupMembersAction, studentSetNameAction } from "@/app/actions"
+import { leaderSwapSlotsAction, leaderUpdateGroupMembersAction, studentSetNameAction } from "@/app/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -77,6 +77,7 @@ export function ClassLobby({
   const [name, setName] = useState("")
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [leaderOpen, setLeaderOpen] = useState(false)
+  const [dragStudentId, setDragStudentId] = useState<string | null>(null)
   const [saving, startTransition] = useTransition()
 
   // Load identity from localStorage
@@ -107,7 +108,9 @@ export function ClassLobby({
         (p: any) => {
           if (p.eventType === "UPDATE" && p.new) {
             setStudents((cur) =>
-              cur.map((s) => (s.id === p.new.id ? (p.new as Student) : s)),
+              cur
+                .map((s) => (s.id === p.new.id ? (p.new as Student) : s))
+                .sort((a, b) => a.slot_number - b.slot_number),
             )
           }
         },
@@ -230,6 +233,19 @@ export function ClassLobby({
     if (!res.ok) toast.error(res.error ?? "Không gỡ được")
   }
 
+  // Nhóm trưởng kéo thẻ HS trong nhóm mình đổi vị trí với bất kỳ HS nào
+  async function handleLeaderSwapDrop(draggedId: string, targetId: string) {
+    if (!myStudentId || !draggedId || draggedId === targetId) return
+    const res = await leaderSwapSlotsAction({
+      classId,
+      leaderStudentId: myStudentId,
+      deviceToken: getDeviceToken(),
+      draggedStudentId: draggedId,
+      targetStudentId: targetId,
+    })
+    if (!res.ok) toast.error(res.error ?? "Không đổi được vị trí")
+  }
+
   if (!myStudentId) {
     return (
       <main className="min-h-svh bg-muted/40 flex items-center justify-center p-4">
@@ -341,6 +357,92 @@ export function ClassLobby({
             </CardHeader>
           </Card>
         )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-heading">Lớp của em</CardTitle>
+            <CardDescription>
+              {myLeaderGroup
+                ? "Kéo thẻ có viền màu (học sinh trong nhóm em) đè lên thẻ khác để đổi vị trí."
+                : "Sơ đồ vị trí các bạn trong lớp."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {[...students]
+                .sort((a, b) => a.slot_number - b.slot_number)
+                .map((s) => {
+                  const inMyGroup = myLeaderGroup
+                    ? studentToGroup.get(s.id)?.id === myLeaderGroup.id
+                    : false
+                  const isMe = s.id === myStudentId
+                  const hasName = !!s.name?.trim()
+                  return (
+                    <li
+                      key={s.id}
+                      draggable={inMyGroup}
+                      onDragStart={(e) => {
+                        if (!inMyGroup) {
+                          e.preventDefault()
+                          return
+                        }
+                        setDragStudentId(s.id)
+                        e.dataTransfer.effectAllowed = "move"
+                        e.dataTransfer.setData("text/plain", s.id)
+                      }}
+                      onDragOver={(e) => {
+                        if (!dragStudentId) return
+                        e.preventDefault()
+                        e.dataTransfer.dropEffect = "move"
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        const sid = e.dataTransfer.getData("text/plain") || dragStudentId
+                        setDragStudentId(null)
+                        if (sid) handleLeaderSwapDrop(sid, s.id)
+                      }}
+                      onDragEnd={() => setDragStudentId(null)}
+                      className={cn(
+                        "rounded-lg border bg-card px-2 py-2 flex items-center gap-2 transition",
+                        inMyGroup ? "cursor-grab active:cursor-grabbing ring-1" : "opacity-90",
+                        dragStudentId === s.id && "opacity-40",
+                        isMe && "ring-2 ring-primary ring-offset-1",
+                      )}
+                      style={
+                        inMyGroup && myLeaderGroup
+                          ? { borderColor: myLeaderGroup.color }
+                          : undefined
+                      }
+                      title={
+                        inMyGroup
+                          ? `Kéo ${s.name ?? `ô ${s.slot_number}`} đè lên thẻ khác để đổi vị trí.`
+                          : undefined
+                      }
+                    >
+                      <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
+                        {s.slot_number}
+                      </span>
+                      <span className="flex-1 min-w-0 text-sm font-medium truncate">
+                        {hasName ? (
+                          s.name
+                        ) : (
+                          <span className="text-muted-foreground/70">Trống</span>
+                        )}
+                      </span>
+                      {isMe && (
+                        <span className="text-[10px] font-semibold text-primary shrink-0">
+                          Em
+                        </span>
+                      )}
+                      {inMyGroup && (
+                        <Crown className="size-3.5 text-amber-500 shrink-0" aria-hidden="true" />
+                      )}
+                    </li>
+                  )
+                })}
+            </ul>
+          </CardContent>
+        </Card>
 
         <h2 className="text-sm font-semibold text-muted-foreground">Các phiên đang mở</h2>
         {sessions.length === 0 ? (
