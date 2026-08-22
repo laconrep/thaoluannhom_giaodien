@@ -32,7 +32,7 @@ import { fireConfetti } from "@/lib/confetti"
 import {
   studentClaimGroupAction,
   submitGroupReportAction,
-  studentClaimSlotAction,
+  studentClaimSessionSlotAction,
   submitIndividualReportAction,
 } from "@/app/actions"
 import type {
@@ -230,7 +230,7 @@ export function StudentSubmit({
   async function pickSlot(slotId: string, studentId?: string | null) {
     setBusy(true)
     try {
-      const res = await studentClaimSlotAction(slotId, deviceId(), studentId ?? null)
+      const res = await studentClaimSessionSlotAction(slotId, deviceId(), studentId ?? null)
       if (!res.ok) toast.error(res.error ?? "Không thể chọn ô.")
       else {
         setSelectedId(slotId)
