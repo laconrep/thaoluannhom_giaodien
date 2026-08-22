@@ -414,12 +414,26 @@ export function RosterView({
     )
   }
 
-  // Kéo thả đổi vị trí trong lưới HS: thả lên thẻ khác → hoán đổi; thả vào ô trống → di chuyển
+  // Kéo thả đổi vị trí trong lưới HS: thả lên thẻ khác → hoán đổi; thả vào ô trống → di chuyển.
+  // Cập nhật ngay tại chỗ (optimistic) rồi gọi action, sau đó refetch để đồng bộ chắc chắn.
   function handleSwapDrop(draggedId: string, targetId: string) {
     if (!draggedId || draggedId === targetId) return
+    setStudents((cur) => {
+      const a = cur.find((x) => x.id === draggedId)
+      const b = cur.find((x) => x.id === targetId)
+      if (!a || !b) return cur
+      return cur
+        .map((s) => {
+          if (s.id === a.id) return { ...s, slot_number: b.slot_number }
+          if (s.id === b.id) return { ...s, slot_number: a.slot_number }
+          return s
+        })
+        .sort((x, y) => x.slot_number - y.slot_number)
+    })
     startTransition(() => {
       swapStudentSlotsAction(classId, draggedId, targetId).then((res) => {
         if (!res.ok) toast.error(res.error ?? "Không đổi được vị trí")
+        refreshStudents()
       })
     })
   }

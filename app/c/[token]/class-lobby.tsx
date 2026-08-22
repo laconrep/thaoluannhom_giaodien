@@ -109,7 +109,7 @@ export function ClassLobby({
           if (p.eventType === "UPDATE" && p.new) {
             setStudents((cur) =>
               cur
-                .map((s) => (s.id === p.new.id ? (p.new as Student) : s))
+                .map((s) => (s.id === p.new.id ? { ...s, ...p.new } : s))
                 .sort((a, b) => a.slot_number - b.slot_number),
             )
           }
@@ -233,9 +233,22 @@ export function ClassLobby({
     if (!res.ok) toast.error(res.error ?? "Không gỡ được")
   }
 
-  // Nhóm trưởng kéo thẻ HS trong nhóm mình đổi vị trí với bất kỳ HS nào
+  // Nhóm trưởng kéo thẻ HS trong nhóm mình đổi vị trí với bất kỳ HS nào.
+  // Cập nhật ngay tại chỗ (optimistic) rồi gọi action, sau đó refetch để đồng bộ chắc chắn.
   async function handleLeaderSwapDrop(draggedId: string, targetId: string) {
     if (!myStudentId || !draggedId || draggedId === targetId) return
+    setStudents((cur) => {
+      const a = cur.find((x) => x.id === draggedId)
+      const b = cur.find((x) => x.id === targetId)
+      if (!a || !b) return cur
+      return cur
+        .map((s) => {
+          if (s.id === a.id) return { ...s, slot_number: b.slot_number }
+          if (s.id === b.id) return { ...s, slot_number: a.slot_number }
+          return s
+        })
+        .sort((x, y) => x.slot_number - y.slot_number)
+    })
     const res = await leaderSwapSlotsAction({
       classId,
       leaderStudentId: myStudentId,
@@ -244,6 +257,17 @@ export function ClassLobby({
       targetStudentId: targetId,
     })
     if (!res.ok) toast.error(res.error ?? "Không đổi được vị trí")
+    await refreshStudents()
+  }
+
+  async function refreshStudents() {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("students")
+      .select("id, slot_number, name, device_token")
+      .eq("class_id", classId)
+      .order("slot_number")
+    if (data) setStudents(data as Student[])
   }
 
   if (!myStudentId) {
