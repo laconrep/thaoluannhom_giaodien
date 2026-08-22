@@ -285,7 +285,7 @@ export function ClassLobby({
             <p className="text-sm text-muted-foreground">
               Bấm vào thẻ có tên của em (giáo viên đã xếp số theo lớp).
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 max-h-[60vh] overflow-auto p-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 max-h-[60vh] overflow-auto p-1">
               {students.map((s) => {
                 const hasName = !!s.name?.trim()
                 const isMine = s.device_token === deviceToken
@@ -429,7 +429,7 @@ export function ClassLobby({
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
                     {[...students]
                       .sort((a, b) => a.slot_number - b.slot_number)
                       .map((s) => {

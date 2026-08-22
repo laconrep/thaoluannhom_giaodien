@@ -1119,11 +1119,16 @@ export async function unlockStudentSlotAction(studentId: string): Promise<{ ok: 
   if (!user) return { ok: false, error: "Chỉ giáo viên mới thực hiện được." }
   const { data: stu } = await supabase
     .from("students")
-    .select("id, class_id, classes!inner(teacher_id)")
+    .select("id, class_id")
     .eq("id", studentId)
     .maybeSingle()
   if (!stu) return { ok: false, error: "Không tìm thấy học sinh." }
-  if ((stu as any).classes?.teacher_id !== user.id) {
+  const { data: cls } = await supabase
+    .from("classes")
+    .select("teacher_id")
+    .eq("id", stu.class_id)
+    .maybeSingle()
+  if (!cls || cls.teacher_id !== user.id) {
     return { ok: false, error: "Bạn không có quyền với học sinh này." }
   }
   const { error } = await supabase

@@ -225,13 +225,18 @@ export function RosterView({
   }
 
   // GV mở khóa ô đã bị HS chiếm — xác nhận ngay trong thẻ (không dùng confirm() trình duyệt)
-  function doUnlock(studentId: string) {
+  async function doUnlock(studentId: string) {
     setConfirmUnlockId(null)
-    startTransition(() => {
-      unlockStudentSlotAction(studentId).then((res) => {
-        if (!res.ok) toast.error(res.error ?? "Không mở khóa được.")
-      })
-    })
+    try {
+      const res = await unlockStudentSlotAction(studentId)
+      if (!res.ok) {
+        toast.error(res.error ?? "Không mở khóa được.")
+        return
+      }
+      toast.success("Đã mở khóa ô này.")
+    } catch {
+      toast.error("Không mở khóa được.")
+    }
   }
 
   function onBulkPaste() {
@@ -872,7 +877,7 @@ export function RosterView({
                     PHẢI
                   </span>
                 </div>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 flex-1 min-w-0">
+                <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 flex-1 min-w-0">
               {students.map((s) => {
                 const g = studentToGroup.get(s.id)
                 const hasName = !!s.name?.trim()
