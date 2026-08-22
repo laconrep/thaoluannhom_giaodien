@@ -156,6 +156,13 @@ Trên nhánh `main` (sau khi merge PR #1):
 
 **Tổng kết: cả 3 phiên đã hoàn thành.** Tính năng Link chia sẻ claim ô bằng `device_token` + mở khóa cho GV đã chạy đủ 3 phần (actions → phía HS → phía GV).
 
+### Sửa sau khi duyệt (màn 1 cho giống roster + khóa thiết bị hiển thị) — `class-lobby.tsx`
+
+- Màn 1 đổi từ lưới ô vuông nhỏ (`grid-cols-6 sm:grid-cols-8` + `aspect-square`) sang **đúng kiểu thẻ roster GV**: thẻ ngang `flex items-center gap-2.5` (badge số ô + tên + trạng thái), lưới `grid-cols-1 sm:grid-cols-2 xl:grid-cols-4`, Card rộng `max-w-3xl`.
+- Khóa thiết bị hiển thị ngay trên thẻ: thêm `const [deviceToken] = useState(() => getDeviceToken())`; thẻ ô của mình (`device_token === deviceToken`) → viền `ring-primary` + nhãn "Em"; thẻ bị thiết bị khác giữ (`device_token` khác token mình) → icon `Lock` + **disabled, không bấm được** + title "Ô này đã được thiết bị khác chọn"; thẻ trống → "Trống" mờ + disabled.
+- Giữ nguyên guard `.or()` server-side ở `studentClaimSlotAction` làm lớp bảo vệ cuối.
+- Đã chạy `pnpm exec tsc --noEmit` (exit 0) + `pnpm exec eslint` trên `class-lobby.tsx` (exit 0).
+
 ---
 
 ## YÊU CẦU PHIÊN SAU

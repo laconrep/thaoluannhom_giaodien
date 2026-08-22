@@ -77,6 +77,7 @@ export function ClassLobby({
   const [myStudentId, setMyStudentId] = useState<string | null>(null)
   const [dragStudentId, setDragStudentId] = useState<string | null>(null)
   const [saving, startTransition] = useTransition()
+  const [deviceToken] = useState(() => getDeviceToken())
 
   // Load identity từ localStorage — chỉ vào thẳng nếu ô còn giữ đúng device_token của thiết bị mình.
   // Nếu GV đã mở khóa hoặc thiết bị khác đã chiếm ô → quay về màn chọn ô để chọn lại.
@@ -257,7 +258,7 @@ export function ClassLobby({
   if (!myStudentId) {
     return (
       <main className="min-h-svh bg-muted/40 flex items-center justify-center p-4">
-        <Card className="w-full max-w-2xl">
+        <Card className="w-full max-w-3xl">
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="size-10 rounded-md bg-primary text-primary-foreground grid place-items-center">
@@ -273,26 +274,49 @@ export function ClassLobby({
             <p className="text-sm text-muted-foreground">
               Bấm vào thẻ có tên của em (giáo viên đã xếp số theo lớp).
             </p>
-            <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 max-h-[50vh] overflow-auto p-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 max-h-[60vh] overflow-auto p-1">
               {students.map((s) => {
-                const taken = !!s.name?.trim()
+                const hasName = !!s.name?.trim()
+                const isMine = s.device_token === deviceToken
+                const lockedByOther = !!s.device_token && s.device_token !== deviceToken
+                const clickable = hasName && !lockedByOther
                 return (
                   <button
                     key={s.id}
                     type="button"
-                    disabled={!taken || saving}
+                    disabled={!clickable || saving}
                     onClick={() => claimSlot(s.id)}
-                    className={
-                      "aspect-square rounded-md border p-1 text-xs flex flex-col items-center justify-center gap-1 transition " +
-                      (taken
-                        ? "bg-card border-muted enabled:hover:bg-muted/40 enabled:cursor-pointer disabled:opacity-60"
-                        : "bg-card border-muted/60 opacity-50 cursor-not-allowed")
+                    className={cn(
+                      "rounded-lg border bg-card px-2.5 py-2 flex items-center gap-2.5 transition text-left w-full",
+                      clickable ? "cursor-pointer hover:bg-muted/40" : "opacity-60 cursor-not-allowed",
+                      isMine && "ring-2 ring-primary ring-offset-1",
+                    )}
+                    title={
+                      lockedByOther
+                        ? "Ô này đã được thiết bị khác chọn"
+                        : isMine
+                          ? `${s.name} — ô của em`
+                          : hasName
+                            ? `Bấm để chọn ô ${s.slot_number}`
+                            : "Chưa có tên"
                     }
                   >
-                    <span className="font-mono tabular-nums opacity-80">{s.slot_number}</span>
-                    <span className="text-[10px] line-clamp-2 text-center">
-                      {s.name?.trim() || <span className="opacity-60">Trống</span>}
+                    <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
+                      {s.slot_number}
                     </span>
+                    <span className="flex-1 min-w-0 text-sm font-medium truncate">
+                      {hasName ? (
+                        s.name
+                      ) : (
+                        <span className="text-muted-foreground/70">Trống</span>
+                      )}
+                    </span>
+                    {isMine && (
+                      <span className="text-[10px] font-semibold text-primary shrink-0">Em</span>
+                    )}
+                    {lockedByOther && (
+                      <Lock className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
+                    )}
                   </button>
                 )
               })}
