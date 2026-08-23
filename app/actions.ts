@@ -617,19 +617,31 @@ export async function createSessionAction(
         .select("id, group_number, label, name")
         .eq("class_id", classId)
         .order("group_number")
-      if (cgs) {
-        await supabase.from("session_groups").insert(
+      if (cgs && cgs.length > 0) {
+        const { error: groupError } = await supabase.from("session_groups").insert(
           cgs.map((g) => ({
             session_id: session.id,
             class_group_id: g.id,
             group_number: g.group_number,
-            label: g.name ?? g.label,
+            label: g.name ?? g.label ?? `Nhóm ${g.group_number}`,
           })),
         )
+        if (groupError) throw new Error(`Không tạo được nhóm cho phiên: ${groupError.message}`)
+      } else {
+        // Lớp chưa có nhóm cố định: tạo lưới mặc định để học sinh vẫn chọn được nhóm.
+        const count = Math.max(2, Math.min(12, input.groupCount ?? 8))
+        const rows = Array.from({ length: count }, (_, i) => ({
+          session_id: session.id,
+          class_group_id: null,
+          group_number: i + 1,
+          label: `Nhóm ${i + 1}`,
+        }))
+        const { error: groupError } = await supabase.from("session_groups").insert(rows)
+        if (groupError) throw new Error(`Không tạo được nhóm cho phiên: ${groupError.message}`)
       }
     } else {
       // Chia lại nhóm tạm cho phiên này
-      const count = Math.max(2, Math.min(12, input.groupCount ?? 6))
+      const count = Math.max(2, Math.min(12, input.groupCount ?? 8))
       const rows = Array.from({ length: count }, (_, i) => ({
         session_id: session.id,
         class_group_id: null,

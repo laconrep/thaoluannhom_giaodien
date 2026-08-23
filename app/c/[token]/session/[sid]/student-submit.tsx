@@ -219,6 +219,13 @@ export function StudentSubmit({
       const res = await studentClaimGroupAction(gid, deviceId(), selfStudentId)
       if (!res.ok) toast.error(res.error ?? "Không thể chọn nhóm.")
       else {
+        // Cập nhật ngay state cục bộ. Nếu chờ Realtime/polling, effect bảo vệ bên dưới
+        // sẽ thấy nhóm vẫn chưa claimed và xóa selectedId ngay sau khi click.
+        setGroups((prev) =>
+          prev.map((g) =>
+            g.id === gid ? { ...g, claimed: true, claimed_at: new Date().toISOString() } : g,
+          ),
+        )
         setSelectedId(gid)
         if (typeof window !== "undefined") localStorage.setItem(selectedKey(session.id), gid)
       }
