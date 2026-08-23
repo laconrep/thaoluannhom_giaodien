@@ -338,4 +338,24 @@ create policy presentations_storage_update on storage.objects for update to auth
   using (bucket_id = 'presentations') with check (bucket_id = 'presentations');
 
 notify pgrst, 'reload schema';
+-- ============ STORAGE BÀI NỘP HỌC SINH ============
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'submissions', 'submissions', false, 52428800,
+  array['image/jpeg','image/png','image/heic','image/heif','image/webp','image/gif','application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.openxmlformats-officedocument.presentationml.presentation']
+)
+on conflict (id) do update set
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists submissions_storage_insert on storage.objects;
+create policy submissions_storage_insert on storage.objects for insert to anon, authenticated
+  with check (bucket_id = 'submissions');
+drop policy if exists submissions_storage_select on storage.objects;
+create policy submissions_storage_select on storage.objects for select to anon, authenticated
+  using (bucket_id = 'submissions');
+drop policy if exists submissions_storage_update on storage.objects;
+create policy submissions_storage_update on storage.objects for update to anon, authenticated
+  using (bucket_id = 'submissions') with check (bucket_id = 'submissions');
+
 -- Setup complete.

@@ -31,7 +31,8 @@ File SQL có thể chạy lại an toàn và tự cài đặt:
 - Bảng upload PowerPoint và slide.
 - RLS policies, index và trigger cần thiết.
 - Realtime publication.
-- Storage bucket `presentations` với giới hạn 50 MB.
+- Storage bucket `presentations` cho slide giáo viên với giới hạn 50 MB.
+- Storage bucket `submissions` cho bài nộp học sinh với giới hạn 50 MB.
 - Schema cache PostgREST reload.
 
 ## 3. Kiểm tra nhanh sau khi chạy
@@ -55,7 +56,8 @@ Kết quả cần có đủ 9 bảng. Kiểm tra bucket upload:
 ```sql
 select id, name, public, file_size_limit
 from storage.buckets
-where id = 'presentations';
+where id in ('presentations', 'submissions')
+order by id;
 ```
 
 Bucket cần có `file_size_limit = 52428800`.
@@ -82,7 +84,7 @@ Sau khi schema chạy thành công:
 - Nếu đổi Supabase project, phải chạy lại file SQL trên project mới.
 - Nếu phiên cũ không có nhóm, tạo phiên mới sau khi chạy schema; phiên cũ có thể cần đồng bộ nhóm thủ công.
 - Nếu thấy lỗi `could not find table`, kiểm tra đúng Supabase project và chạy lại toàn bộ file SQL.
-- Nếu thấy lỗi upload, kiểm tra bucket `presentations`, MIME types và giới hạn dung lượng.
+- Nếu thấy lỗi upload slide, kiểm tra bucket `presentations`; bài nộp học sinh dùng bucket `submissions`. Kiểm tra MIME types và giới hạn dung lượng.
 - Nếu schema đã chạy nhưng API vẫn không thấy bảng, chạy lại câu lệnh:
 
 ```sql
