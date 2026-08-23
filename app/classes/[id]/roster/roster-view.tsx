@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import {
   addClassGroupAction,
   bulkSetNamesAction,
@@ -107,6 +107,38 @@ export function RosterView({
   const [confirmUnlockId, setConfirmUnlockId] = useState<string | null>(null)
   const fileImportRef = useRef<HTMLInputElement | null>(null)
 
+  // Đồng bộ dữ liệu từ DB (dùng cho Realtime event + polling fallback + sau các action).
+  // Dùng useCallback để ổn định tham chiếu, tránh chạy lại effect liên tục.
+  const refreshStudents = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("students")
+      .select("id, slot_number, name, device_token")
+      .eq("class_id", classId)
+      .order("slot_number")
+    if (data) setStudents(data as Student[])
+  }, [classId])
+
+  const refreshGroups = useCallback(async () => {
+    const supabase = createClient()
+    const data = await fetchClassGroups(supabase, classId)
+    setGroups(data)
+  }, [classId])
+
+  const refreshMembers = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("class_group_members")
+      .select("class_group_id, student_id, class_groups!inner(class_id)")
+      .eq("class_groups.class_id", classId)
+    const m: Record<string, string[]> = {}
+    for (const row of (data as any[]) ?? []) {
+      m[row.class_group_id] ??= []
+      m[row.class_group_id].push(row.student_id)
+    }
+    setMemberMap(m)
+  }, [classId])
+
   // Map ngược: student_id -> group (để tô màu thẻ HS)
   const studentToGroup = useMemo(() => {
     const m = new Map<string, Group>()
@@ -170,38 +202,33 @@ export function RosterView({
         { event: "*", schema: "public", table: "class_groups", filter: `class_id=eq.${classId}` },
         () => {
           // Reload nhóm từ server (đơn giản, ít phát sinh)
-          refetchGroups()
+          refreshGroups()
         },
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "class_group_members" },
         () => {
-          refetchMembers()
+          refreshMembers()
         },
       )
       .subscribe()
 
-    async function refetchGroups() {
-      const data = await fetchClassGroups(supabase, classId)
-      setGroups(data)
-    }
-    async function refetchMembers() {
-      const { data } = await supabase
-        .from("class_group_members")
-        .select("class_group_id, student_id, class_groups!inner(class_id)")
-        .eq("class_groups.class_id", classId)
-      const m: Record<string, string[]> = {}
-      for (const row of (data as any[]) ?? []) {
-        m[row.class_group_id] ??= []
-        m[row.class_group_id].push(row.student_id)
-      }
-      setMemberMap(m)
-    }
     return () => {
       supabase.removeChannel(ch)
     }
-  }, [classId])
+  }, [classId, refreshGroups, refreshMembers])
+
+  // Fallback đồng bộ định kỳ: nếu Realtime không gửi sự kiện, vẫn tự làm mới
+  // danh sách HS/nhóm/member để không phải F5.
+  useEffect(() => {
+    const id = setInterval(() => {
+      refreshStudents()
+      refreshGroups()
+      refreshMembers()
+    }, 5000)
+    return () => clearInterval(id)
+  }, [classId, refreshStudents, refreshGroups, refreshMembers])
 
   function onRenameStudent(id: string, name: string) {
     setStudents((cur) => cur.map((s) => (s.id === id ? { ...s, name } : s)))
@@ -214,16 +241,6 @@ export function RosterView({
     setStudents((cur) => cur.map((s) => (s.id === id ? { ...s, name } : s)))
   }
 
-  async function refreshStudents() {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from("students")
-      .select("id, slot_number, name, device_token")
-      .eq("class_id", classId)
-      .order("slot_number")
-    if (data) setStudents(data as Student[])
-  }
-
   // GV mở khóa ô đã bị HS chiếm — xác nhận ngay trong thẻ (không dùng confirm() trình duyệt)
   async function doUnlock(studentId: string) {
     setConfirmUnlockId(null)
@@ -234,6 +251,7 @@ export function RosterView({
         return
       }
       toast.success("Đã mở khóa ô này.")
+      await refreshStudents()
     } catch {
       toast.error("Không mở khóa được.")
     }

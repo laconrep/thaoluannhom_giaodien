@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { fetchClassGroups } from "@/lib/class-groups"
@@ -79,6 +79,33 @@ export function ClassLobby({
   const [saving, startTransition] = useTransition()
   const [deviceToken] = useState(() => getDeviceToken())
 
+  // Đồng bộ dữ liệu từ DB (dùng cho Realtime event + polling fallback + sau các action).
+  // Dùng useCallback để ổn định tham chiếu, tránh chạy lại effect liên tục.
+  const refreshStudents = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("students")
+      .select("id, slot_number, name, device_token")
+      .eq("class_id", classId)
+      .order("slot_number")
+    if (data) setStudents(data as Student[])
+  }, [classId])
+
+  const refreshGroups = useCallback(async () => {
+    const supabase = createClient()
+    const data = await fetchClassGroups(supabase, classId)
+    setGroups(data)
+  }, [classId])
+
+  const refreshMembers = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("class_group_members")
+      .select("class_group_id, student_id, class_groups!inner(class_id)")
+      .eq("class_groups.class_id", classId)
+    if (data) setMembers(data as GroupMember[])
+  }, [classId])
+
   // Load identity từ localStorage — chỉ vào thẳng nếu ô còn giữ đúng device_token của thiết bị mình.
   // Nếu GV đã mở khóa hoặc thiết bị khác đã chiếm ô → quay về màn chọn ô để chọn lại.
   useEffect(() => {
@@ -144,33 +171,33 @@ export function ClassLobby({
         "postgres_changes",
         { event: "*", schema: "public", table: "class_groups", filter: `class_id=eq.${classId}` },
         () => {
-          refetchGroups()
+          refreshGroups()
         },
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "class_group_members" },
         () => {
-          refetchMembers()
+          refreshMembers()
         },
       )
       .subscribe()
 
-    async function refetchGroups() {
-      const data = await fetchClassGroups(supabase, classId)
-      setGroups(data)
-    }
-    async function refetchMembers() {
-      const { data } = await supabase
-        .from("class_group_members")
-        .select("class_group_id, student_id, class_groups!inner(class_id)")
-        .eq("class_groups.class_id", classId)
-      if (data) setMembers(data as GroupMember[])
-    }
     return () => {
       supabase.removeChannel(ch)
     }
-  }, [classId])
+  }, [classId, refreshGroups, refreshMembers])
+
+  // Fallback đồng bộ định kỳ: nếu Realtime không gửi sự kiện, vẫn tự làm mới
+  // nhóm/trạng thái leader/member để không phải F5.
+  useEffect(() => {
+    const id = setInterval(() => {
+      refreshStudents()
+      refreshGroups()
+      refreshMembers()
+    }, 5000)
+    return () => clearInterval(id)
+  }, [classId, refreshStudents, refreshGroups, refreshMembers])
 
   function claimSlot(studentId: string) {
     if (saving) return
@@ -215,7 +242,11 @@ export function ClassLobby({
       targetStudentId,
       action: "add",
     })
-    if (!res.ok) toast.error(res.error ?? "Không thêm được")
+    if (!res.ok) {
+      toast.error(res.error ?? "Không thêm được")
+      return
+    }
+    await Promise.all([refreshGroups(), refreshMembers()])
   }
 
   async function leaderRemove(targetStudentId: string) {
@@ -226,7 +257,11 @@ export function ClassLobby({
       targetStudentId,
       action: "remove",
     })
-    if (!res.ok) toast.error(res.error ?? "Không gỡ được")
+    if (!res.ok) {
+      toast.error(res.error ?? "Không gỡ được")
+      return
+    }
+    await Promise.all([refreshGroups(), refreshMembers()])
   }
 
   // Nhóm trưởng kéo thẻ HS trong nhóm mình đổi vị trí với bất kỳ HS nào.
@@ -254,16 +289,6 @@ export function ClassLobby({
     })
     if (!res.ok) toast.error(res.error ?? "Không đổi được vị trí")
     await refreshStudents()
-  }
-
-  async function refreshStudents() {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from("students")
-      .select("id, slot_number, name, device_token")
-      .eq("class_id", classId)
-      .order("slot_number")
-    if (data) setStudents(data as Student[])
   }
 
   if (!myStudentId) {
