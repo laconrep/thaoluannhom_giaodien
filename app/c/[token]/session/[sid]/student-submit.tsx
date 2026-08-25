@@ -286,6 +286,13 @@ export function StudentSubmit({
 
   async function uploadAll(): Promise<SubmissionFile[]> {
     if (!staged.length) return []
+    try {
+      const res = await fetch("/api/storage/ensure-bucket", { method: "POST" })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body?.ok) console.warn("ensure submissions bucket failed:", body?.error)
+    } catch (e) {
+      console.warn("ensure submissions bucket skipped:", e)
+    }
     const uploaded: SubmissionFile[] = []
     for (const s of staged) {
       const ext = s.file.name.split(".").pop() ?? "bin"
@@ -638,7 +645,7 @@ export function StudentSubmit({
                       onClick={() => cameraInputRef.current?.click()}
                     >
                       <Camera className="w-5 h-5" />
-                      <span className="text-xs">Chụp / chọn ảnh</span>
+                      <span className="text-xs">Chụp ảnh</span>
                     </Button>
                     <Button
                       variant="outline"
@@ -647,7 +654,7 @@ export function StudentSubmit({
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <Upload className="w-5 h-5" />
-                      <span className="text-xs">Word / PPT / PDF</span>
+                      <span className="text-xs">Word / PPT / PDF / Ảnh</span>
                     </Button>
                   </div>
                 </div>

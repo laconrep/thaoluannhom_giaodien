@@ -337,5 +337,24 @@ drop policy if exists presentations_storage_update on storage.objects;
 create policy presentations_storage_update on storage.objects for update to authenticated
   using (bucket_id = 'presentations') with check (bucket_id = 'presentations');
 
+-- ============ STORAGE BÀI NỘP CỦA HỌC SINH ============
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('submissions', 'submissions', false, 52428800)
+on conflict (id) do update set
+  file_size_limit = excluded.file_size_limit;
+
+drop policy if exists submissions_storage_insert on storage.objects;
+create policy submissions_storage_insert on storage.objects
+  for insert to anon, authenticated with check (bucket_id = 'submissions');
+drop policy if exists submissions_storage_select on storage.objects;
+create policy submissions_storage_select on storage.objects
+  for select to anon, authenticated using (bucket_id = 'submissions');
+drop policy if exists submissions_storage_update on storage.objects;
+create policy submissions_storage_update on storage.objects
+  for update to anon, authenticated using (bucket_id = 'submissions') with check (bucket_id = 'submissions');
+drop policy if exists submissions_storage_delete on storage.objects;
+create policy submissions_storage_delete on storage.objects
+  for delete to anon, authenticated using (bucket_id = 'submissions');
+
 notify pgrst, 'reload schema';
 -- Setup complete.
