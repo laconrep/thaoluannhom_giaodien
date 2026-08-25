@@ -299,16 +299,38 @@ export function StudentSubmit({
       const path = `${session.id}/${selectedId}/${Date.now()}-${Math.random()
         .toString(36)
         .slice(2, 8)}.${ext}`
-      const { error: upErr } = await supabase.storage
-        .from("submissions")
-        .upload(path, s.file, { upsert: true, contentType: s.file.type || undefined })
-      if (upErr) throw new Error(upErr.message)
-      const { data: signed, error: signedError } = await supabase.storage
-        .from("submissions")
-        .createSignedUrl(path, 60 * 60 * 24 * 7)
-      if (signedError || !signed?.signedUrl) throw new Error(signedError?.message ?? "Không tạo được link tệp")
+      const urlRes = await fetch("/api/submissions/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+      })
+      const urlBody = await urlRes.json().catch(() => ({}))
+      if (!urlRes.ok || !urlBody?.upload?.token) {
+        throw new Error(urlBody?.error ?? "Không tạo được đường dẫn tải lên.")
+      }
+      const uploadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/upload/sign/submissions/${urlBody.upload.path}?token=${encodeURIComponent(urlBody.upload.token)}`
+      const putRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": s.file.type || "application/octet-stream",
+          "x-upsert": "true",
+        },
+        body: s.file,
+      })
+      if (!putRes.ok) {
+        throw new Error(`Không tải được tệp ${s.file.name}. Vui lòng thử lại.`)
+      }
+      const signedRes = await fetch("/api/submissions/signed-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+      })
+      const signedBody = await signedRes.json().catch(() => ({}))
+      if (!signedRes.ok || !signedBody?.signedUrl) {
+        throw new Error(signedBody?.error ?? "Không tạo được link tệp.")
+      }
       uploaded.push({
-        url: signed.signedUrl,
+        url: signedBody.signedUrl,
         name: s.file.name,
         kind: s.kind,
         mime: s.file.type || "application/octet-stream",
