@@ -1,11 +1,11 @@
-const PRODUCTION_ORIGIN = "https://thaoluannhom-giaodien-lj41nd8dd-nguyen-dang-s-projects1.vercel.app"
+const PRODUCTION_ORIGIN = "https://thaoluannhom-giaodien.vercel.app"
 
 /**
  * QR/link chia sẻ phải trỏ tới ứng dụng production, không lấy origin của
  * v0 preview nơi giáo viên đang mở bảng điều khiển.
  */
 export function getShareOrigin() {
-  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || PRODUCTION_ORIGIN
+  return PRODUCTION_ORIGIN
 }
 
 export function getClassShareUrl(token: string) {
