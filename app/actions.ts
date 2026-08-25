@@ -1172,40 +1172,45 @@ export async function submitGroupReportAction(args: {
   textContent: string | null
   files: unknown
   isAuto?: boolean
-}) {
-  const supabase = await createClient()
-  await assertSessionAcceptsSubmission(supabase, args.sessionId)
-  const { data: existing } = await supabase
-    .from("submissions")
-    .select("id")
-    .eq("session_group_id", args.sessionGroupId)
-    .maybeSingle()
-  const filesArr = Array.isArray(args.files) ? args.files : []
-  const firstImage = filesArr.find(
-    (f: any) => f && typeof f === "object" && f.kind === "image" && typeof f.url === "string",
-  ) as { url?: string } | undefined
-  if (existing) {
-    const { error } = await supabase
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const supabase = await createClient()
+    await assertSessionAcceptsSubmission(supabase, args.sessionId)
+    const { data: existing } = await supabase
       .from("submissions")
-      .update({
+      .select("id")
+      .eq("session_group_id", args.sessionGroupId)
+      .maybeSingle()
+    const filesArr = Array.isArray(args.files) ? args.files : []
+    const firstImage = filesArr.find(
+      (f: any) => f && typeof f === "object" && f.kind === "image" && typeof f.url === "string",
+    ) as { url?: string } | undefined
+    if (existing) {
+      const { error } = await supabase
+        .from("submissions")
+        .update({
+          text_content: args.textContent,
+          files: filesArr,
+          image_url: firstImage?.url ?? null,
+          submitted_at: new Date().toISOString(),
+          is_auto_submitted: args.isAuto ?? false,
+        })
+        .eq("id", existing.id)
+      if (error) return { ok: false, error: error.message }
+    } else {
+      const { error } = await supabase.from("submissions").insert({
+        session_id: args.sessionId,
+        session_group_id: args.sessionGroupId,
         text_content: args.textContent,
         files: filesArr,
         image_url: firstImage?.url ?? null,
-        submitted_at: new Date().toISOString(),
         is_auto_submitted: args.isAuto ?? false,
       })
-      .eq("id", existing.id)
-    if (error) throw new Error(error.message)
-  } else {
-    const { error } = await supabase.from("submissions").insert({
-      session_id: args.sessionId,
-      session_group_id: args.sessionGroupId,
-      text_content: args.textContent,
-      files: filesArr,
-      image_url: firstImage?.url ?? null,
-      is_auto_submitted: args.isAuto ?? false,
-    })
-    if (error) throw new Error(error.message)
+      if (error) return { ok: false, error: error.message }
+    }
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? "Có lỗi khi nộp bài." }
   }
 }
 
@@ -1215,40 +1220,45 @@ export async function submitIndividualReportAction(args: {
   textContent: string | null
   files: unknown
   isAuto?: boolean
-}) {
-  const supabase = await createClient()
-  await assertSessionAcceptsSubmission(supabase, args.sessionId)
-  const { data: existing } = await supabase
-    .from("submissions")
-    .select("id")
-    .eq("session_slot_id", args.sessionSlotId)
-    .maybeSingle()
-  const filesArr = Array.isArray(args.files) ? args.files : []
-  const firstImage = filesArr.find(
-    (f: any) => f && typeof f === "object" && f.kind === "image" && typeof f.url === "string",
-  ) as { url?: string } | undefined
-  if (existing) {
-    const { error } = await supabase
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const supabase = await createClient()
+    await assertSessionAcceptsSubmission(supabase, args.sessionId)
+    const { data: existing } = await supabase
       .from("submissions")
-      .update({
+      .select("id")
+      .eq("session_slot_id", args.sessionSlotId)
+      .maybeSingle()
+    const filesArr = Array.isArray(args.files) ? args.files : []
+    const firstImage = filesArr.find(
+      (f: any) => f && typeof f === "object" && f.kind === "image" && typeof f.url === "string",
+    ) as { url?: string } | undefined
+    if (existing) {
+      const { error } = await supabase
+        .from("submissions")
+        .update({
+          text_content: args.textContent,
+          files: filesArr,
+          image_url: firstImage?.url ?? null,
+          submitted_at: new Date().toISOString(),
+          is_auto_submitted: args.isAuto ?? false,
+        })
+        .eq("id", existing.id)
+      if (error) return { ok: false, error: error.message }
+    } else {
+      const { error } = await supabase.from("submissions").insert({
+        session_id: args.sessionId,
+        session_slot_id: args.sessionSlotId,
         text_content: args.textContent,
         files: filesArr,
         image_url: firstImage?.url ?? null,
-        submitted_at: new Date().toISOString(),
         is_auto_submitted: args.isAuto ?? false,
       })
-      .eq("id", existing.id)
-    if (error) throw new Error(error.message)
-  } else {
-    const { error } = await supabase.from("submissions").insert({
-      session_id: args.sessionId,
-      session_slot_id: args.sessionSlotId,
-      text_content: args.textContent,
-      files: filesArr,
-      image_url: firstImage?.url ?? null,
-      is_auto_submitted: args.isAuto ?? false,
-    })
-    if (error) throw new Error(error.message)
+      if (error) return { ok: false, error: error.message }
+    }
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? "Có lỗi khi nộp bài." }
   }
 }
 

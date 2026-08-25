@@ -345,8 +345,9 @@ export function StudentSubmit({
     setBusy(true)
     try {
       const files = await uploadAll()
+      let res: { ok: boolean; error?: string }
       if (kind === "group") {
-        await submitGroupReportAction({
+        res = await submitGroupReportAction({
           sessionId: session.id,
           sessionGroupId: selectedId,
           textContent: text.trim() || null,
@@ -354,7 +355,7 @@ export function StudentSubmit({
           isAuto: auto,
         })
       } else {
-        await submitIndividualReportAction({
+        res = await submitIndividualReportAction({
           sessionId: session.id,
           sessionSlotId: selectedId,
           textContent: text.trim() || null,
@@ -362,10 +363,16 @@ export function StudentSubmit({
           isAuto: auto,
         })
       }
+      if (!res.ok) throw new Error(res.error ?? "Không nộp được bài.")
       setSubmitted(true)
       if (!auto) fireConfetti()
     } catch (e: any) {
-      toast.error(e?.message ?? "Có lỗi xảy ra.")
+      const msg = e?.message ?? ""
+      if (/bucket|storage|row-level security|RLS|denied/i.test(msg)) {
+        toast.error("Kho lưu trữ bài nộp chưa được cấu hình. Giáo viên cần chạy lại script cấu hình Supabase.")
+      } else {
+        toast.error(msg || "Có lỗi xảy ra.")
+      }
     } finally {
       setBusy(false)
     }
