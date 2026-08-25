@@ -18,6 +18,7 @@ import { TimerPanel } from "@/components/timer-panel"
 import { Switch } from "@/components/ui/switch"
 import { AvatarInitials } from "@/components/avatar-initials"
 import { toast } from "sonner"
+import { getSessionShareUrl } from "@/lib/share-url"
 import {
   ArrowLeft,
   Link as LinkIcon,
@@ -153,7 +154,7 @@ export function IndividualBoard({
   const openAnn = openSlot ? annsBySlot[openSlot.id] : null
 
   function copyShareLink() {
-    const url = `${window.location.origin}/c/${shareToken}/session/${session.id}`
+    const url = getSessionShareUrl(shareToken, session.id)
     navigator.clipboard.writeText(url)
     toast.success("Đã sao chép liên kết cho học sinh")
   }

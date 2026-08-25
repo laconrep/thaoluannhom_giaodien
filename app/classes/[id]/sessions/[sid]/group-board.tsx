@@ -26,6 +26,7 @@ import { getFiles } from "@/lib/submission-files"
 import { TimerPanel } from "@/components/timer-panel"
 import { Switch } from "@/components/ui/switch"
 import { sounds, isSoundEnabled, setSoundEnabled } from "@/lib/sounds"
+import { getSessionShareUrl, getResultsShareUrl } from "@/lib/share-url"
 import { PresentationUpload } from "@/components/presentation-upload"
 import { PresentationViewer, startPresentationMode } from "@/components/presentation-viewer"
 import { QRCodeSVG } from "qrcode.react"
@@ -414,13 +415,13 @@ export function GroupSessionBoard({
   }, [slideshowIdx, groups.length])
 
   function copyShareLink() {
-    const url = `${window.location.origin}/c/${shareToken}/session/${displaySession.id}`
+    const url = getSessionShareUrl(shareToken, displaySession.id)
     navigator.clipboard.writeText(url)
     toast.success("Đã sao chép link cho HS", { duration: 2000 })
   }
 
   function copyResultsLink() {
-    const url = `${window.location.origin}/c/${shareToken}/session/${displaySession.id}/results`
+    const url = getResultsShareUrl(shareToken, displaySession.id)
     navigator.clipboard.writeText(url)
     toast.success("Đã sao chép link xem kết quả", { duration: 2000 })
   }
@@ -911,9 +912,9 @@ export function GroupSessionBoard({
         onClick={(e) => e.stopPropagation()}
       >
         <p className="font-heading font-semibold">Quét QR để HS mở link nộp bài</p>
-        <QRCodeSVG value={`${window.location.origin}/c/${shareToken}/session/${displaySession.id}`} size={220} />
+        <QRCodeSVG value={getSessionShareUrl(shareToken, displaySession.id)} size={220} />
         <p className="text-xs text-muted-foreground break-all text-center max-w-[280px]">
-          {`${window.location.origin}/c/${shareToken}/session/${displaySession.id}`}
+{getSessionShareUrl(shareToken, displaySession.id)}
         </p>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="gap-1" onClick={copyShareLink}>
@@ -953,7 +954,7 @@ export function GroupSessionBoard({
           groups={displayGroups}
           submissions={displaySubs}
           annotations={displayAnns}
-          shareLink={`${window.location.origin}/c/${shareToken}/session/${displaySession.id}`}
+          shareLink={getSessionShareUrl(shareToken, displaySession.id)}
           liveMap={liveMap}
           status={displaySession.status}
           endsAt={displaySession.ends_at}
