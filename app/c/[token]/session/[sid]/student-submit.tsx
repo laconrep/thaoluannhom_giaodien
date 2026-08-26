@@ -96,7 +96,7 @@ function iconFor(kind: SubmissionFileKind) {
 }
 
 const ACCEPT =
-  "image/*,.pdf,.docx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+  ".pdf,.docx,.pptx,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 type StagedFile = {
   id: string
@@ -623,7 +623,6 @@ export function StudentSubmit({
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  multiple
                   className="hidden"
                   onChange={(e) => addFiles(e.target.files)}
                 />

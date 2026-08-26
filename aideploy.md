@@ -4,6 +4,51 @@
 
 ---
 
+## 0. Deploy sang tài khoản v0.app MỚI (giữ nguyên mọi cài đặt)
+
+> Dùng mục này khi deploy cùng repo/nhánh này lên một **tài khoản v0.app khác** mà **KHÔNG muốn cấu hình lại từ đầu**. Quan trọng: toàn bộ schema/dữ liệu/bucket nằm trong **Supabase project**, không nằm trong tài khoản v0 — chỉ cần trỏ lại đúng project đó là mọi thứ được giữ nguyên.
+
+### 0.1 Các bước
+
+1. **Import repo GitHub** vào tài khoản v0 mới (như mục 1).
+2. **Chọn đúng nhánh**: `v0/duchandiadu5-5427-a706ddfd` (nhánh đã chạy ổn định).
+3. **Connect Supabase** → chọn **Supabase project CŨ** (project đang chạy hiện tại).
+4. v0 tự điền lại các env var — **kiểm tra** bằng **Bảng 2.1** để đảm bảo đủ và đúng.
+5. Nếu tài khoản v0 mới chưa liên kết được Supabase project cũ: mở **Supabase Dashboard > Settings > API** của project cũ, copy `Project URL`, `anon/publishable key`, `service_role key` → điền tay theo **Bảng 2.1**.
+6. **KHÔNG chạy lại SQL** mục 3 nếu project cũ đã có đủ bảng/bucket (kiểm tra mục 7 để chắc chắn). SQL idempotent nên nếu chạy lại cũng an toàn.
+7. Bấm **Deploy**, đợi build xong, chạy checklist mục 5.
+
+### 0.2 Những gì phải set lại thủ công (ít)
+
+- Domain / custom domain trên v0 mới (nếu có).
+- Build setting tùy chỉnh trong giao diện v0 (mặc định `pnpm build` là đủ).
+- Các biến env **không** nằm trong Supabase (nếu app có thêm env khác ngoài danh sách mục 2).
+
+### 0.3 Cách xác nhận không cần chạy lại SQL
+
+Chạy trong Supabase SQL Editor của project cũ:
+
+```sql
+select table_name from information_schema.tables
+where table_schema = 'public'
+  and table_name in (
+    'classes','students','class_groups','class_group_members',
+    'sessions','session_groups','session_group_members',
+    'presentations','presentation_slides'
+  )
+order by table_name;
+```
+
+```sql
+select id, name, public, file_size_limit from storage.buckets
+where id in ('presentations','submissions');
+```
+
+- Có đủ **9 bảng** + **2 bucket** → không cần chạy lại SQL.
+- Thiếu bảng/bucket nào → chạy lại **toàn bộ** SQL mục 3 trên project đó.
+
+---
+
 ## 0. Nhận diện project
 
 - **App**: Next.js 16 (App Router), tạo từ v0.dev.
@@ -31,10 +76,25 @@
    - `SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `SUPABASE_SECRET_KEY`
-4. **Kiểm tra lại** các biến đã tồn tại trong Environment Variables, ở cả **Preview** và **Production**. Nếu thiếu biến nào trong bảng trên → tự thêm với giá trị lấy từ Supabase:
+4. **Kiểm tra lại** các biến đã tồn tại trong Environment Variables, ở cả **Preview** và **Production**. Nếu thiếu biến nào trong **Bảng 2.1** → tự thêm với giá trị lấy từ Supabase:
    - Project URL: Supabase > Settings > API > Project URL.
    - anon key / publishable key: Supabase > Settings > API.
    - service role key: Supabase > Settings > API (mục `service_role`, bí mật).
+
+### Bảng 2.1 — Toàn bộ biến môi trường của app (rá soát từ code)
+
+| # | Tên biến | Bắt buộc | Ghi chú |
+|---|----------|----------|---------|
+| 1 | `NEXT_PUBLIC_SUPABASE_URL` | Có | Project URL |
+| 2 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Có (1 trong 2 biến 2/3) | anon publishable key |
+| 3 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Có (1 trong 2 biến 2/3) | anon public key |
+| 4 | `SUPABASE_URL` | Không | dự phòng server |
+| 5 | `SUPABASE_ANON_KEY` | Không | dự phòng server |
+| 6 | `SUPABASE_SERVICE_ROLE_KEY` | Không (nên có) | admin API |
+| 7 | `SUPABASE_SERVICE_KEY` | Không | bí danh của #6 |
+| 8 | `SUPABASE_SECRET_KEY` | Không | bí danh của #6 |
+| 9 | `NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL` | Không | URL sau sign-up (có fallback) |
+| 10 | `NODE_ENV` | Không | built-in |
 
 > Không được deploy khi thiếu `NEXT_PUBLIC_SUPABASE_URL` và key anon/publishable — app sẽ crash khi build.
 

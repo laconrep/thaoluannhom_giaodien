@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { QRCodeSVG } from "qrcode.react"
 import { Copy, RotateCw, QrCode, ExternalLink } from "lucide-react"
+import { getClassShareUrl } from "@/lib/share-url"
 
 export function ShareView({
   classId,
@@ -19,9 +20,8 @@ export function ShareView({
   const [copied, setCopied] = useState<string | null>(null)
   const [, startTransition] = useTransition()
 
-  const origin = typeof window !== "undefined" ? window.location.origin : ""
-  const classUrl = `${origin}/c/${shareToken}`
-  const gradesUrl = `${origin}/c/${shareToken}/grades`
+  const classUrl = getClassShareUrl(shareToken)
+  const gradesUrl = `${classUrl}/grades`
 
   function copy(url: string, key: string) {
     navigator.clipboard.writeText(url)
