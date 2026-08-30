@@ -7,6 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { formatDateShort } from "@/lib/utils-format"
 import { Download, Share2 } from "lucide-react"
+import { TeacherTour } from "@/components/tour/teacher-tour"
+import { gradebookTourSteps } from "@/components/tour/tour-config"
+import { classTourSeenKey, getSeen, TOUR_ONBOARDING_SEEN_KEY } from "@/components/tour/tour-store"
 
 type Session = {
   id: string
@@ -84,7 +87,14 @@ export function GradebookView({
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
+      <TeacherTour
+        tourId="gradebook"
+        steps={gradebookTourSteps(classId)}
+        seenKey={classTourSeenKey("gradebook", classId)}
+        autoStart
+        autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+      />
+      <Card data-tour="gradebook-table">
         <CardHeader className="flex-row items-start justify-between flex-wrap gap-3">
           <div>
             <CardTitle>Bảng điểm</CardTitle>
@@ -93,7 +103,13 @@ export function GradebookView({
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={exportCSV} className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportCSV}
+              className="gap-2"
+              data-tour="gradebook-export"
+            >
               <Download className="size-4" aria-hidden="true" />
               Xuất CSV
             </Button>

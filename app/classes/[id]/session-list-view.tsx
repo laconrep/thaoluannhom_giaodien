@@ -23,6 +23,9 @@ import {
   Shuffle,
 } from "lucide-react"
 import { formatDate } from "@/lib/utils-format"
+import { TeacherTour } from "@/components/tour/teacher-tour"
+import { sessionsTourSteps } from "@/components/tour/tour-config"
+import { classTourSeenKey, getSeen, TOUR_ONBOARDING_SEEN_KEY } from "@/components/tour/tour-store"
 
 type Kind = "group" | "individual"
 type Session = {
@@ -96,6 +99,13 @@ export function SessionListView({
 
   return (
     <div className="flex flex-col gap-6">
+      <TeacherTour
+        tourId="sessions"
+        steps={sessionsTourSteps(classId)}
+        seenKey={classTourSeenKey("sessions", classId)}
+        autoStart
+        autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+      />
       <Card className="overflow-hidden border-0 shadow-sm ring-1 ring-border">
         <CardHeader className="flex-row items-start justify-between bg-gradient-to-br from-primary/5 to-accent/5">
           <div>
@@ -106,7 +116,11 @@ export function SessionListView({
             <CardDescription>{title2}</CardDescription>
           </div>
           {!open && (
-            <Button onClick={() => setOpen(true)} className="gap-2 shadow-sm">
+            <Button
+              data-tour="session-create"
+              onClick={() => setOpen(true)}
+              className="gap-2 shadow-sm"
+            >
               <Plus className="size-4" aria-hidden="true" />
               Tạo phiên mới
             </Button>
@@ -260,7 +274,7 @@ export function SessionListView({
         )}
       </Card>
 
-      <div>
+      <div data-tour="session-list">
         <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
           <span>{sessions.length} phiên</span>
           {sessions.some((s) => s.status === "running") && (

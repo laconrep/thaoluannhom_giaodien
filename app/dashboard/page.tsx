@@ -7,6 +7,9 @@ import { Users, ArrowRight, CalendarRange, Trash2, School } from "lucide-react"
 import { deleteClassAction } from "@/app/actions"
 import { formatDateShort } from "@/lib/utils-format"
 import { EmptyState } from "@/components/empty-state"
+import { TeacherTour } from "@/components/tour/teacher-tour"
+import { dashboardTourSteps } from "@/components/tour/tour-config"
+import { TOUR_DASHBOARD_SEEN_KEY } from "@/components/tour/tour-store"
 
 type ClassWithCounts = {
   id: string
@@ -35,7 +38,7 @@ export default async function DashboardPage() {
   return (
     <TeacherShell email={user.email}>
       <section className="mx-auto max-w-5xl px-4 py-8 flex flex-col gap-6">
-        <header className="flex flex-col gap-1">
+        <header data-tour="dashboard-header" className="flex flex-col gap-1">
           <h1 className="font-heading text-2xl md:text-3xl font-bold">Lớp của tôi</h1>
           <p className="text-sm text-muted-foreground text-pretty">
             Mỗi lớp có danh sách học sinh, nhóm cố định và nhiều phiên thảo luận.
@@ -44,7 +47,7 @@ export default async function DashboardPage() {
 
         <CreateClassCard />
 
-        <div className="flex flex-col gap-2">
+        <div data-tour="class-list" className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between">
             <h2 className="text-sm font-semibold text-muted-foreground">
               Tổng cộng {list.length} lớp
@@ -118,6 +121,13 @@ export default async function DashboardPage() {
             </ul>
           )}
         </div>
+
+        <TeacherTour
+          tourId="dashboard"
+          steps={dashboardTourSteps}
+          seenKey={TOUR_DASHBOARD_SEEN_KEY}
+          autoStart
+        />
       </section>
     </TeacherShell>
   )

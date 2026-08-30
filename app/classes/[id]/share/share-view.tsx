@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { QRCodeSVG } from "qrcode.react"
 import { Copy, RotateCw, QrCode, ExternalLink } from "lucide-react"
+import { TeacherTour } from "@/components/tour/teacher-tour"
+import { shareTourSteps } from "@/components/tour/tour-config"
+import { getSeen, TOUR_ONBOARDING_SEEN_KEY } from "@/components/tour/tour-store"
 
 export function ShareView({
   classId,
@@ -37,8 +40,15 @@ export function ShareView({
   }
 
   return (
-    <div className="grid md:grid-cols-2 gap-4">
-      <Card>
+    <div data-tour="share-done" className="grid md:grid-cols-2 gap-4">
+      <TeacherTour
+        tourId="share"
+        steps={shareTourSteps(classId)}
+        seenKey={TOUR_ONBOARDING_SEEN_KEY}
+        autoStart
+        autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+      />
+      <Card data-tour="share-link">
         <CardHeader>
           <CardTitle>Link vào lớp cho học sinh</CardTitle>
           <CardDescription>
@@ -75,7 +85,7 @@ export function ShareView({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour="share-grades">
         <CardHeader>
           <CardTitle>Link xem điểm</CardTitle>
           <CardDescription>
