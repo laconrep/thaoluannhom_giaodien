@@ -2,7 +2,7 @@
 
 import { Joyride, EVENTS, STATUS, type EventData, type Step } from "react-joyride"
 import { useRouter } from "next/navigation"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { getSeen, setSeen, RESTART_EVENT } from "./tour-store"
 import { tourLocale, tourOptions } from "./tour-config"
 
@@ -13,6 +13,8 @@ type TeacherTourProps = {
   autoStart?: boolean
   autoStartWhen?: boolean
   onComplete?: () => void
+  isSeen?: () => boolean
+  markSeen?: () => void
 }
 
 export function TeacherTour({
@@ -22,16 +24,20 @@ export function TeacherTour({
   autoStart = false,
   autoStartWhen = true,
   onComplete,
+  isSeen,
+  markSeen,
 }: TeacherTourProps) {
   const router = useRouter()
   const [run, setRun] = useState(false)
   const firstStepRef = useRef(false)
+  const seen = useMemo(() => isSeen ?? (() => getSeen(seenKey)), [isSeen, seenKey])
+  const markAsSeen = useMemo(() => markSeen ?? (() => setSeen(seenKey)), [markSeen, seenKey])
 
   // Tour theo ngữ cảnh: tự bật khi người dùng chưa xem + điều kiện sẵn sàng.
   useEffect(() => {
     if (typeof window === "undefined") return
     if (!autoStart) return
-    if (getSeen(seenKey)) return
+    if (seen()) return
     if (!autoStartWhen) return
     if (firstStepRef.current) return
     const timer = setTimeout(() => {
@@ -39,7 +45,7 @@ export function TeacherTour({
       setRun(true)
     }, 500)
     return () => clearTimeout(timer)
-  }, [autoStart, autoStartWhen, seenKey])
+  }, [autoStart, autoStartWhen, seen])
 
   // Nút "Hướng dẫn" ở header: mở lại tour của trang hiện tại.
   useEffect(() => {
@@ -53,7 +59,7 @@ export function TeacherTour({
     if (data.type === EVENTS.STEP_AFTER) {
       const navigateTo = (data.step.data as { navigateTo?: string } | undefined)?.navigateTo
       if (navigateTo) {
-        setSeen(seenKey)
+        markAsSeen()
         setRun(false)
         router.push(navigateTo)
       }
@@ -61,7 +67,7 @@ export function TeacherTour({
     if (data.type === EVENTS.TOUR_END) {
       setRun(false)
       if (data.status === STATUS.FINISHED) {
-        setSeen(seenKey)
+        markAsSeen()
         onComplete?.()
       }
     }

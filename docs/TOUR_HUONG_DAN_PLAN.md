@@ -114,10 +114,11 @@ Mỗi màn hình sẽ được gắn thuộc tính `data-tour="..."` vào các e
 
 ### 4.3 Persistence (lưu trạng thái)
 
-- Key: `teacher_tour_seen_v1` (theo user, không theo class).
-- Giá trị: `"1"` khi đã hoàn thành tour onboarding lần đầu.
-- Tour theo ngữ cảnh (ví dụ tour "Phân nhóm") dùng key riêng: `teacher_tour_roster_seen_<classId>`.
-- Cách này **đồng nhất với pattern hiện có** tại `app/classes/[id]/roster/roster-view.tsx:161` (cờ `roster_intro_seen_<classId>`).
+- Key tổng: `teacher_tour_seen_v1` — set khi hoàn tất tour cuối (Chia sẻ), đánh dấu đã xong onboarding.
+- Tour Dashboard: `teacher_tour_dashboard_seen_v1` (toàn cục, chỉ hiện lần đầu).
+- Tour Phân nhóm: `teacher_tour_roster_seen_v1` (**toàn cục, chỉ hiện lần đầu** — không theo lớp). Vẫn quét cờ cũ `roster_intro_seen_<classId>` để tương thích người đã xem modal cũ.
+- Tour Phiên thảo luận / Bảng điểm: `teacher_tour_<tour>_<classId>` (theo lớp) nhưng chỉ tự hiện khi `teacher_tour_seen_v1` chưa set.
+- Giá trị cờ: `"1"` khi đã xem/hoàn thành.
 
 ### 4.4 Nút mở lại tour
 
@@ -182,7 +183,7 @@ Sau bước cuối: lưu cờ `teacher_tour_seen_v1 = 1`.
 ## 6. Trạng thái hoàn thành & replay
 
 - **Lần đầu**: tour onboarding tự động hiện ở Dashboard khi `teacher_tour_seen_v1` chưa tồn tại.
-- **Tour cục bộ** (Roster): tự hiện khi lớp đã có nhóm và chưa xem cờ `teacher_tour_roster_seen_<classId>` (giữ logic cũ, chỉ đổi từ modal sang spotlight).
+- **Tour cục bộ** (Roster): tự hiện **lần đầu tiên duy nhất** (cờ toàn cục `teacher_tour_roster_seen_v1`) khi lớp đã có nhóm và chưa xem cờ; không hiện lại khi tạo lớp mới (vẫn quét cờ cũ `roster_intro_seen_*` để tương thích người đã xem modal cũ).
 - **Replay**: nút "Hướng dẫn" trên header (mở lại tour từ đầu, không ghi đè cờ đã xem).
 - **Bỏ qua**: nút "Bỏ qua" cho phép kết thúc sớm; lần sau vẫn hiện lại (trừ khi đã hoàn thành).
 

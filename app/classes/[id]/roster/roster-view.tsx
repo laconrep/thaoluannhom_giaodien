@@ -54,7 +54,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { useRef } from "react"
 import { TeacherTour } from "@/components/tour/teacher-tour"
 import { rosterTourSteps } from "@/components/tour/tour-config"
-import { rosterSeenKey } from "@/components/tour/tour-store"
+import { TOUR_ROSTER_SEEN_KEY, rosterTourSeen, setRosterTourSeen } from "@/components/tour/tour-store"
 
 type Student = { id: string; slot_number: number; name: string | null; device_token: string | null }
 type Group = {
@@ -503,7 +503,9 @@ export function RosterView({
       <TeacherTour
         tourId="roster"
         steps={rosterTourSteps(classId)}
-        seenKey={rosterSeenKey(classId)}
+        seenKey={TOUR_ROSTER_SEEN_KEY}
+        isSeen={rosterTourSeen}
+        markSeen={setRosterTourSeen}
         autoStart
         autoStartWhen={groups.length > 0}
       />
