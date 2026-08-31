@@ -17,7 +17,7 @@ export function CreateClassCard() {
   if (!open) {
     return (
       <div>
-        <Button size="lg" onClick={() => setOpen(true)} className="gap-2">
+        <Button size="lg" onClick={() => setOpen(true)} className="gap-2" data-tour="create-class">
           <Plus className="size-4" aria-hidden="true" />
           Tạo lớp mới
         </Button>

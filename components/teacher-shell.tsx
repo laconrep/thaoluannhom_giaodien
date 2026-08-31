@@ -4,6 +4,7 @@ import { signOutAction } from "@/app/actions"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { AvatarInitials } from "@/components/avatar-initials"
+import { TourReplayButton } from "@/components/tour/tour-replay-button"
 
 export function TeacherShell({
   children,
@@ -35,6 +36,7 @@ export function TeacherShell({
             </Link>
           </Button>
           <div className="ml-auto flex items-center gap-1.5">
+            <TourReplayButton />
             <ThemeToggle compact />
             {email && (
               <div className="flex items-center gap-2 pl-1.5 border-l ml-1">

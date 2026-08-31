@@ -37,7 +37,6 @@ import {
   ChevronDown,
   ChevronRight,
   X,
-  Info,
   MoveRight,
   FileSpreadsheet,
   Upload,
@@ -53,6 +52,9 @@ import { cn } from "@/lib/utils"
 import * as XLSX from "xlsx"
 import { Spinner } from "@/components/ui/spinner"
 import { useRef } from "react"
+import { TeacherTour } from "@/components/tour/teacher-tour"
+import { rosterTourSteps } from "@/components/tour/tour-config"
+import { TOUR_ROSTER_SEEN_KEY, rosterTourSeen, setRosterTourSeen } from "@/components/tour/tour-store"
 
 type Student = { id: string; slot_number: number; name: string | null; device_token: string | null }
 type Group = {
@@ -88,7 +90,6 @@ export function RosterView({
   const [importMerged, setImportMerged] = useState(false)
   const [importBusy, setImportBusy] = useState(false)
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null)
-  const [introOpen, setIntroOpen] = useState(false)
   const [dragStudentId, setDragStudentId] = useState<string | null>(null)
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null)
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([])
@@ -154,22 +155,6 @@ export function RosterView({
     () => students.filter((s) => s.name?.trim() && !studentToGroup.has(s.id)).length,
     [students, studentToGroup],
   )
-
-  // Modal hướng dẫn: hiện lần đầu khi lớp đã có nhóm + chưa xem cờ
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const key = `roster_intro_seen_${classId}`
-    if (groups.length > 0 && !localStorage.getItem(key)) {
-      setIntroOpen((current) => (current ? current : true))
-    }
-  }, [classId, groups.length])
-
-  function closeIntro() {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(`roster_intro_seen_${classId}`, "1")
-    }
-    setIntroOpen(false)
-  }
 
   // Realtime HS + nhóm
   useEffect(() => {
@@ -514,75 +499,16 @@ export function RosterView({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Modal hướng dẫn */}
-      <Dialog open={introOpen} onOpenChange={(v) => !v && closeIntro()}>
-        <DialogContent
-          className="sm:max-w-lg"
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-        >
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-heading">
-              <Info className="size-5 text-primary" />
-              Cách phân học sinh vào nhóm
-            </DialogTitle>
-            <DialogDescription>Thầy cô đọc qua 5 bước trước khi bắt đầu.</DialogDescription>
-          </DialogHeader>
-          <ol className="space-y-3 text-sm leading-relaxed">
-            <li className="flex gap-3">
-              <span className="size-6 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-bold">
-                1
-              </span>
-              <span>
-                <strong>Kéo thẻ học sinh</strong> ở khung danh sách chính (bên trái) và{" "}
-                <strong>thả vào nhóm</strong> tương ứng ở cột nhóm (bên phải).
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <span className="size-6 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-bold">
-                2
-              </span>
-              <span>
-                <strong>Bấm vào tên nhóm</strong> ở cột phải để mở ra, xem danh sách học sinh trong
-                nhóm đó. Bấm dấu × để gỡ khỏi nhóm.
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <span className="size-6 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-bold">
-                3
-              </span>
-              <span>
-                <strong>Gán nhóm trưởng:</strong> bấm nút vương miện 👑 cạnh tên nhóm, chọn 1 học
-                sinh làm nhóm trưởng. Nhóm trưởng được tự chọn thêm thành viên cho nhóm mình.
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <span className="size-6 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-bold">
-                4
-              </span>
-              <span>
-                <strong>Chọn nhiều học sinh:</strong> giữ <strong>Ctrl/Cmd</strong> rồi bấm vào thẻ
-                để chọn cùng lúc, sau đó kéo cụm thả vào nhóm. Bấm <strong>Bỏ chọn</strong> để xóa
-                vùng chọn.
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <span className="size-6 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-bold">
-                5
-              </span>
-              <span>
-                Học sinh ở nhóm khác khi kéo theo cụm sẽ có <strong>hộp thoại xác nhận</strong>{" "}
-                trước khi chuyển nhóm.
-              </span>
-            </li>
-          </ol>
-          <DialogFooter>
-            <Button onClick={closeIntro} className="w-full sm:w-auto">
-              Đã hiểu, bắt đầu phân nhóm
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Tour hướng dẫn phân nhóm */}
+      <TeacherTour
+        tourId="roster"
+        steps={rosterTourSteps(classId)}
+        seenKey={TOUR_ROSTER_SEEN_KEY}
+        isSeen={rosterTourSeen}
+        markSeen={setRosterTourSeen}
+        autoStart
+        autoStartWhen={groups.length > 0}
+      />
 
       {/* Dialog xác nhận đổi nhóm */}
       <Dialog open={!!moveConfirm} onOpenChange={(v) => !v && setMoveConfirm(null)}>
@@ -735,7 +661,10 @@ export function RosterView({
       <div className="grid lg:grid-cols-[4fr_1fr] gap-5">
         {/* KHUNG CHÍNH: danh sách HS */}
         <Card className="float-card">
-          <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <CardHeader
+            data-tour="roster-list"
+            className="flex flex-row items-center justify-between gap-2"
+          >
             <div className="min-w-0">
               <CardTitle className="flex items-center gap-2 font-heading whitespace-nowrap">
                 <Users className="size-4" aria-hidden="true" />
@@ -751,7 +680,7 @@ export function RosterView({
                 )}
               </CardDescription>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div data-tour="bulk-select" className="flex items-center gap-1.5 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -1045,7 +974,7 @@ export function RosterView({
         </Card>
 
         {/* CỘT PHẢI: danh sách nhóm */}
-        <Card className="float-card">
+        <Card className="float-card" data-tour="roster-groups">
           <CardHeader className="flex flex-col items-start gap-2">
             <CardTitle className="font-heading w-full">Nhóm cố định</CardTitle>
             <CardDescription className="w-full">
@@ -1133,6 +1062,7 @@ export function RosterView({
                       <Button
                         variant="ghost"
                         size="icon"
+                        data-tour="group-leader"
                         onClick={() => setLeaderDialogGroupId(g.id)}
                         aria-label="Gán nhóm trưởng"
                         title="Gán nhóm trưởng"

@@ -15,7 +15,7 @@ export function ClassTabs({ classId }: { classId: string }) {
     { href: `/classes/${classId}/share`, label: "Chia sẻ", icon: Share2 },
   ]
   return (
-    <nav className="flex items-center gap-0 overflow-x-auto mt-4 -mb-px no-scrollbar">
+    <nav data-tour="class-tabs" className="flex items-center gap-0 overflow-x-auto mt-4 -mb-px no-scrollbar">
       {tabs.map((t) => {
         const active = pathname?.startsWith(t.href)
         const Icon = t.icon
