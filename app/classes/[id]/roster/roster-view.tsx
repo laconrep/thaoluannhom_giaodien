@@ -52,9 +52,7 @@ import { cn } from "@/lib/utils"
 import * as XLSX from "xlsx"
 import { Spinner } from "@/components/ui/spinner"
 import { useRef } from "react"
-import { TeacherTour } from "@/components/tour/teacher-tour"
-import { rosterTourSteps } from "@/components/tour/tour-config"
-import { TOUR_ROSTER_SEEN_KEY, rosterTourSeen, setRosterTourSeen } from "@/components/tour/tour-store"
+import { RosterTour } from "@/components/tour/roster-tour"
 
 type Student = { id: string; slot_number: number; name: string | null; device_token: string | null }
 type Group = {
@@ -155,6 +153,13 @@ export function RosterView({
     () => students.filter((s) => s.name?.trim() && !studentToGroup.has(s.id)).length,
     [students, studentToGroup],
   )
+
+  // Trạng thái dùng cho tour progressive: đã kéo ≥1 HS vào nhóm, đã gán nhóm trưởng.
+  const hasMembers = useMemo(
+    () => groups.some((g) => (memberMap[g.id] ?? []).length > 0),
+    [groups, memberMap],
+  )
+  const hasLeader = useMemo(() => groups.some((g) => g.leader_student_id), [groups])
 
   // Realtime HS + nhóm
   useEffect(() => {
@@ -499,16 +504,8 @@ export function RosterView({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Tour hướng dẫn phân nhóm */}
-      <TeacherTour
-        tourId="roster"
-        steps={rosterTourSteps(classId)}
-        seenKey={TOUR_ROSTER_SEEN_KEY}
-        isSeen={rosterTourSeen}
-        markSeen={setRosterTourSeen}
-        autoStart
-        autoStartWhen={groups.length > 0}
-      />
+      {/* Tour hướng dẫn phân nhóm — progressive theo hành động của giáo viên */}
+      <RosterTour ready={groups.length > 0} hasMembers={hasMembers} hasLeader={hasLeader} />
 
       {/* Dialog xác nhận đổi nhóm */}
       <Dialog open={!!moveConfirm} onOpenChange={(v) => !v && setMoveConfirm(null)}>

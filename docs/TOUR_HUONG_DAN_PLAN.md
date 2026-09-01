@@ -79,6 +79,7 @@ npm install react-joyride
 - `components/tour/tour-store.ts` — keys + tiện ích đọc/ghi localStorage/sessionStorage (`getSeen/setSeen`, `rosterTourSeen`, `setGradebookTourPending`, `consumeGradebookTourPending`, …).
 - `components/tour/tour-replay-button.tsx` — nút "Hướng dẫn" trên header, dispatch `RESTART_EVENT`.
 - `components/tour/presentation-tour.tsx` — tour màn chiếu PowerPoint (state machine `idle → edge → drawer → all-sessions → create-session → done`), progressive theo hành động thật.
+- `components/tour/roster-tour.tsx` — tour phân nhóm (state machine `idle → list → leader → next → done`), progressive theo hành động thật (kéo HS vào nhóm → gán nhóm trưởng).
 
 Luồng chạy:
 
@@ -143,17 +144,24 @@ Mục tiêu: giới thiệu bức tranh tổng thể, dẫn dắt sang bước t
 
 Ghi chú: bước 3 cần lấy `classId` vừa tạo — component tour sẽ lắng nghe URL thay đổi (`usePathname`) để bắt đầu tour màn hình tiếp theo.
 
-### 5.2 Tour "Danh sách & nhóm" — Roster
+### 5.2 Tour "Danh sách & nhóm" — Roster (progressive)
 
 Mục tiêu: dạy thao tác phân học sinh vào nhóm. Đây là màn hình phức tạp nhất nên có tour riêng, đồng thời **thay thế modal hướng dẫn 5 bước hiện có** (`roster-view.tsx:517-585`) bằng spotlight trực quan hơn.
 
-| Bước | Target | Nội dung |
-|------|--------|----------|
-| 1 | `data-tour="roster-list"` (khung danh sách HS bên trái) | "Đây là danh sách học sinh. Mỗi em có một ô riêng." |
-| 2 | `data-tour="roster-groups"` (cột nhóm bên phải) | "Kéo thả thẻ học sinh vào nhóm tương ứng." |
-| 3 | `data-tour="group-leader"` (nút vương miện) | "Gán nhóm trưởng — nhóm trưởng có thể tự chọn thêm thành viên." |
-| 4 | `data-tour="bulk-select"` | "Giữ Ctrl/Cmd + bấm để chọn nhiều học sinh, kéo cụm vào nhóm." |
-| 5 | `data-tour="class-tabs"` (thanh tabs) | "Chuyển sang tab Thảo luận nhóm để bắt đầu phiên đầu tiên." → `navigateTo: /classes/[id]/sessions` |
+Triển khai bằng **state machine `components/tour/roster-tour.tsx`** (`idle → list → leader → next → done`). **Từng hint xuất hiện theo hành động thật** của giáo viên, không chạy liên tục một mạch:
+
+| Hint | Target | Nội dung | Kích hoạt |
+|------|--------|----------|-----------|
+| 1. Danh sách HS | `data-tour="roster-list"` (khung danh sách HS bên trái) | "Đây là danh sách học sinh... Kéo thẻ học sinh từ bên trái thả vào một nhóm bên phải." | Vào trang khi lớp đã có nhóm + chưa xem cờ roster |
+| 2. Nhóm trưởng | `data-tour="group-leader"` (nút vương miện) | "Bấm vương miện bên cạnh tên nhóm để gán nhóm trưởng." | Giáo viên **kéo ≥1 HS vào nhóm** (`groups.some(g => g.members.length > 0)`) |
+| 3. Chuyển tab | `data-tour="class-tabs"` (thanh tabs) | "Phân nhóm xong, bấm tab Thảo luận nhóm..." | Giáo viên **đã gán nhóm trưởng** (`groups.some(g => g.leaderId)`) |
+
+Ghi chú:
+
+- Bỏ bước `bulk-select` và `navigateTo` ở bước cuối (giáo viên tự bấm tab "Thảo luận nhóm").
+- Hint tắt khi giáo viên bấm "Tiếp"/"Đóng" tại một hint nhưng chỉ tiến sang hint sau khi có hành động thật.
+- Hoàn tất hint cuối (hoặc bấm "Hoàn tất") → `setRosterTourSeen()` (cờ toàn cục).
+- Hỗ trợ replay qua `RESTART_EVENT` (nút "Hướng dẫn" trên header).
 
 ### 5.3 Tour "Phiên thảo luận nhóm" — Sessions
 
@@ -213,10 +221,10 @@ Ghi chú kỹ thuật:
 ## 6. Trạng thái hoàn thành & replay
 
 - **Lần đầu**: tour onboarding tự động hiện ở Dashboard khi `teacher_tour_seen_v1` chưa tồn tại.
-- **Tour cục bộ** (Roster): tự hiện **lần đầu tiên duy nhất** (cờ toàn cục `teacher_tour_roster_seen_v1`) khi lớp đã có nhóm và chưa xem cờ; không hiện lại khi tạo lớp mới (vẫn quét cờ cũ `roster_intro_seen_*` để tương thích người đã xem modal cũ).
+- **Tour cục bộ** (Roster): tự hiện **lần đầu tiên duy nhất** (cờ toàn cục `teacher_tour_roster_seen_v1`) khi lớp đã có nhóm và chưa xem cờ; không hiện lại khi tạo lớp mới (vẫn quét cờ cũ `roster_intro_seen_*` để tương thích người đã xem modal cũ). **Progressive theo hành động**: hint danh sách HS → (kéo ≥1 HS vào nhóm) → hint nhóm trưởng → (gán leader) → hint chuyển tab.
 - **Tour màn chiếu PowerPoint**: tự hiện khi onboarding chưa xong + chưa xem cờ `teacher_tour_presentation_seen_v1`; tiến theo hành động thật (xem 5.6), set cờ khi bấm "Tạo phiên mới".
 - **Tour Bảng điểm**: chỉ tự chạy khi giáo viên bấm tab "Bảng điểm" (marker sessionStorage), không tự hiện khi mở trang trực tiếp.
-- **Replay**: nút "Hướng dẫn" trên header (dispatch `RESTART_EVENT`) mở lại tour TeacherTour của trang hiện tại từ đầu, không ghi đè cờ đã xem. **Lưu ý**: `PresentationTour` hiện chưa lắng nghe `RESTART_EVENT` (xem tồn đọng).
+- **Replay**: nút "Hướng dẫn" trên header (dispatch `RESTART_EVENT`) mở lại tour của trang hiện tại từ đầu, không ghi đè cờ đã xem. TeacherTour và **RosterTour** đều lắng nghe `RESTART_EVENT`. **Lưu ý**: `PresentationTour` hiện chưa lắng nghe `RESTART_EVENT` (xem tồn đọng).
 - **Bỏ qua**: nút "Bỏ qua" cho phép kết thúc sớm; lần sau vẫn hiện lại (trừ khi đã hoàn thành).
 
 ## 7. Rủi ro & lưu ý kỹ thuật
@@ -236,6 +244,7 @@ Ghi chú kỹ thuật:
 - [x] Tạo `components/tour/tour-store.ts`: tiện ích localStorage/sessionStorage + keys.
 - [x] Tạo `components/tour/teacher-tour.tsx`: `<Joyride>` + logic điều hướng theo pathname.
 - [x] Tạo `components/tour/presentation-tour.tsx`: tour màn chiếu PowerPoint (state machine).
+- [x] Tạo `components/tour/roster-tour.tsx`: tour phân nhóm progressive (state machine).
 
 **Giai đoạn 2 — Gắn vào UI hiện có** (đã xong)
 - [x] `components/teacher-shell.tsx`: thêm nút "Hướng dẫn" (replay, dispatch `RESTART_EVENT`).

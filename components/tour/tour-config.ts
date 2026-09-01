@@ -34,44 +34,37 @@ export const dashboardTourSteps: Step[] = [
   },
 ]
 
-export function rosterTourSteps(classId: string): Step[] {
-  return [
-    {
-      target: "[data-tour='roster-list']",
-      placement: "right",
-      title: "Danh sách học sinh",
-      content:
-        "Đây là danh sách học sinh của lớp. Nhập tên vào từng ô, hoặc dùng \"Dán danh sách\" và \"Import Excel\" để nhập hàng loạt.",
-    },
-    {
-      target: "[data-tour='roster-groups']",
-      placement: "left",
-      title: "Nhóm cố định",
-      content:
-        "Kéo thẻ học sinh từ bên trái thả vào một nhóm bên phải. Nhóm này dùng chung cho mọi phiên thảo luận.",
-    },
-    {
-      target: "[data-tour='group-leader']",
-      placement: "top",
-      title: "Nhóm trưởng",
-      content:
-        "Bấm vương miện bên cạnh tên nhóm để gán nhóm trưởng. Nhóm trưởng có thể tự chọn thêm thành viên cho nhóm.",
-    },
-    {
-      target: "[data-tour='bulk-select']",
-      placement: "top",
-      title: "Chọn nhiều học sinh",
-      content:
-        "Giữ Ctrl (Cmd trên Mac) và bấm vào thẻ để chọn nhiều em cùng lúc, sau đó kéo cụm thả vào nhóm.",
-    },
-    {
-      target: "[data-tour='class-tabs']",
-      placement: "bottom",
-      title: "Bước tiếp theo",
-      content: "Phân nhóm xong, bấm tab \"Thảo luận nhóm\" để tạo phiên thảo luận đầu tiên.",
-      data: { navigateTo: `/classes/${classId}/sessions` } satisfies TourStepData,
-    },
-  ]
+// Roster tour progressive — từng hint xuất hiện theo hành động thật của giáo viên:
+// vào trang (danh sách HS) → kéo ≥1 HS vào nhóm (hint nhóm trưởng) → gán leader
+// (hint chuyển tab). Không dùng navigateTo — bước cuối chỉ nhắc bấm tab.
+export function rosterListStep(): Step {
+  return {
+    target: "[data-tour='roster-list']",
+    placement: "right",
+    title: "Danh sách học sinh",
+    content:
+      "Đây là danh sách học sinh của lớp. Nhập tên vào từng ô, hoặc dùng \"Dán danh sách\" và \"Import Excel\" để nhập hàng loạt. Kéo thẻ học sinh từ bên trái thả vào một nhóm bên phải.",
+  }
+}
+
+export function rosterLeaderStep(): Step {
+  return {
+    target: "[data-tour='group-leader']",
+    placement: "top",
+    title: "Nhóm trưởng",
+    content:
+      "Bấm vương miện bên cạnh tên nhóm để gán nhóm trưởng. Nhóm trưởng có thể tự chọn thêm thành viên cho nhóm.",
+  }
+}
+
+export function rosterNextStep(): Step {
+  return {
+    target: "[data-tour='class-tabs']",
+    placement: "bottom",
+    title: "Bước tiếp theo",
+    content:
+      "Phân nhóm xong, bấm tab \"Thảo luận nhóm\" để tạo phiên thảo luận đầu tiên — tour sẽ tự hướng dẫn bạn.",
+  }
 }
 
 export function sessionsTourSteps(_classId: string): Step[] {
