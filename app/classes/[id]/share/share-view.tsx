@@ -7,8 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { QRCodeSVG } from "qrcode.react"
 import { Copy, RotateCw, QrCode, ExternalLink } from "lucide-react"
 import { TeacherTour } from "@/components/tour/teacher-tour"
-import { shareTourSteps } from "@/components/tour/tour-config"
-import { getSeen, TOUR_ONBOARDING_SEEN_KEY } from "@/components/tour/tour-store"
+import { shareGradesStep, shareLinkStep } from "@/components/tour/tour-config"
+import {
+  classTourSeenKey,
+  getSeen,
+  setSeen,
+  STOP_EVENT,
+  TOUR_ONBOARDING_SEEN_KEY,
+} from "@/components/tour/tour-store"
 
 export function ShareView({
   classId,
@@ -21,15 +27,42 @@ export function ShareView({
 }) {
   const [copied, setCopied] = useState<string | null>(null)
   const [, startTransition] = useTransition()
+  const [linkDismissed, setLinkDismissed] = useState(false)
+  const [showGradesHint, setShowGradesHint] = useState(false)
+
+  const linkSeenKey = classTourSeenKey("share-link", classId)
+  const gradesSeenKey = classTourSeenKey("share-grades", classId)
+  const onboardingOpen = !getSeen(TOUR_ONBOARDING_SEEN_KEY)
 
   const origin = typeof window !== "undefined" ? window.location.origin : ""
   const classUrl = `${origin}/c/${shareToken}`
   const gradesUrl = `${origin}/c/${shareToken}/grades`
 
+  function stopLinkHint() {
+    setSeen(linkSeenKey)
+    setLinkDismissed(true)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(STOP_EVENT))
+    }
+  }
+
+  function stopGradesHint() {
+    setSeen(gradesSeenKey)
+    setShowGradesHint(false)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(STOP_EVENT))
+    }
+  }
+
   function copy(url: string, key: string) {
     navigator.clipboard.writeText(url)
     setCopied(key)
     setTimeout(() => setCopied(null), 2000)
+    if (key === "class") {
+      stopLinkHint()
+      if (onboardingOpen && !getSeen(gradesSeenKey)) setShowGradesHint(true)
+    }
+    if (key === "grades") stopGradesHint()
   }
 
   function rotate() {
@@ -42,12 +75,29 @@ export function ShareView({
   return (
     <div data-tour="share-done" className="grid md:grid-cols-2 gap-4">
       <TeacherTour
-        tourId="share"
-        steps={shareTourSteps(classId)}
-        seenKey={TOUR_ONBOARDING_SEEN_KEY}
+        tourId="share-link"
+        steps={[shareLinkStep()]}
+        seenKey={linkSeenKey}
         autoStart
-        autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+        autoStartWhen={onboardingOpen && !linkDismissed}
+        onEnd={() => {
+          setLinkDismissed(true)
+          setSeen(linkSeenKey)
+        }}
       />
+      {showGradesHint && (
+        <TeacherTour
+          tourId="share-grades"
+          steps={[shareGradesStep()]}
+          seenKey={gradesSeenKey}
+          autoStart
+          autoStartWhen={onboardingOpen}
+          onEnd={() => {
+            setShowGradesHint(false)
+            setSeen(gradesSeenKey)
+          }}
+        />
+      )}
       <Card data-tour="share-link">
         <CardHeader>
           <CardTitle>Link vào lớp cho học sinh</CardTitle>

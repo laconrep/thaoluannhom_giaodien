@@ -117,30 +117,28 @@ export function gradebookTourSteps(classId: string): Step[] {
   ]
 }
 
-export function shareTourSteps(classId: string): Step[] {
-  return [
-    {
-      target: "[data-tour='share-link']",
-      placement: "right",
-      title: "Link vào lớp",
-      content:
-        "Copy link này gửi cho học sinh. Các em dùng link để vào lớp, điền tên và tham gia phiên thảo luận.",
-    },
-    {
-      target: "[data-tour='share-grades']",
-      placement: "left",
-      title: "Link xem điểm",
-      content:
-        "Học sinh dùng link này để xem điểm của cả lớp (chỉ xem, không sửa được).",
-    },
-    {
-      target: "[data-tour='share-done']",
-      placement: "top",
-      title: "Hoàn tất",
-      content:
-        "Bạn đã sẵn sàng sử dụng Lớp học thảo luận. Bấm \"Hoàn tất\" để kết thúc tour hướng dẫn.",
-    },
-  ]
+export function shareLinkStep(): Step {
+  return {
+    target: "[data-tour='share-link']",
+    placement: "right",
+    title: "Link vào lớp",
+    content:
+      "Copy link này gửi cho học sinh. Các em dùng link để vào lớp, điền tên và tham gia phiên thảo luận.",
+  }
+}
+
+export function shareGradesStep(): Step {
+  return {
+    target: "[data-tour='share-grades']",
+    placement: "left",
+    title: "Link xem điểm",
+    content:
+      "Học sinh dùng link này để xem điểm của cả lớp (chỉ xem, không sửa được).",
+  }
+}
+
+export function shareTourSteps(_classId: string): Step[] {
+  return [shareLinkStep(), shareGradesStep()]
 }
 
 export function presentationStartStep(): Step {
