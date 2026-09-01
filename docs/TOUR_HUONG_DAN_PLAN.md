@@ -184,15 +184,17 @@ Mục tiêu: tạo và chạy phiên đầu tiên.
 | 2 | `data-tour="gradebook-export"` | "Xuất bảng điểm cuối kỳ ra file." |
 | 3 | `data-tour="class-tabs"` | "Cuối cùng, tự bấm tab \"Chia sẻ\" để gửi link cho học sinh xem điểm." (không `navigateTo` — nhắc GV tự bấm tab) |
 
-### 5.5 Tour "Chia sẻ" — Share (bước kết thúc)
+### 5.5 Tour "Chia sẻ" — Share (bước kết thúc, progressive)
 
-| Bước | Target | Nội dung |
-|------|--------|----------|
-| 1 | `data-tour="share-link"` | "Copy link này gửi cho học sinh. Học sinh dùng link để vào lớp và nộp bài." |
-| 2 | `data-tour="share-scores"` | "Bật chia sẻ điểm để học sinh xem điểm (chỉ xem)." |
-| 3 | `data-tour="share-done"` | "Chúc mừng! Bạn đã sẵn sàng dạy. Bấm 'Hoàn tất' để kết thúc tour." |
+> **Mốc kết thúc onboarding**: tour Chia sẻ là bước cuối của onboarding. Khi hint cuối (`share-grades`) kết thúc — giáo viên copy link điểm (`stopGradesHint`) hoặc đóng/hoàn tất hint (`onEnd`) — gọi `setSeen(TOUR_ONBOARDING_SEEN_KEY)`.
 
-Sau bước cuối: lưu cờ `teacher_tour_seen_v1 = 1`.
+| Bước | Target | Nội dung | Kích hoạt |
+|------|--------|----------|-----------|
+| 1 | `data-tour="share-link"` | "Copy link này gửi cho học sinh. Học sinh dùng link để vào lớp và nộp bài." | Vào trang + onboarding chưa xong + chưa dismiss |
+| 2 | `data-tour="share-grades"` | "Copy link này để học sinh xem điểm (chỉ xem)." | Copy link lớp (`STOP_EVENT` link → hiện hint grades) |
+| Xong | — | Kết thúc | Copy link điểm / `onEnd` hint grades → `setSeen(teacher_tour_seen_v1)` |
+
+Sau khi `teacher_tour_seen_v1` được set, các tour màn chiếu / phiên / bảng điểm **không còn auto-start** (đều gate `!getSeen(TOUR_ONBOARDING_SEEN_KEY)`).
 
 ### 5.6 Tour "Màn chiếu PowerPoint" — Presentation (progressive)
 

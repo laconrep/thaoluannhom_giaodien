@@ -49,6 +49,7 @@ export function ShareView({
   function stopGradesHint() {
     setSeen(gradesSeenKey)
     setShowGradesHint(false)
+    setSeen(TOUR_ONBOARDING_SEEN_KEY)
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(STOP_EVENT))
     }
@@ -95,6 +96,7 @@ export function ShareView({
           onEnd={() => {
             setShowGradesHint(false)
             setSeen(gradesSeenKey)
+            setSeen(TOUR_ONBOARDING_SEEN_KEY)
           }}
         />
       )}
