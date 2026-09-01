@@ -21,6 +21,8 @@ import { getFiles } from "@/lib/submission-files"
 import { useCountdown, formatClock } from "@/lib/use-countdown"
 import { endSessionAction, saveAnnotationAction } from "@/app/actions"
 import type { AnnotationItem, AnnotationRow, SubmissionRow } from "@/lib/types"
+import { PresentationTour } from "@/components/tour/presentation-tour"
+import { setSeen, PRESENTATION_START_SEEN_KEY } from "@/components/tour/tour-store"
 
 export interface PresentationViewerProps {
   presentationId: string
@@ -39,6 +41,8 @@ export interface PresentationViewerProps {
   board?: (openGroup: (groupNumber: number) => void) => React.ReactNode
   barsOnCollapse?: boolean
   onSessionChanged?: (session: any) => void
+  sessionPickerOpen?: boolean
+  createSessionOpen?: boolean
 }
 
 function colsFor(count: number): string {
@@ -64,6 +68,8 @@ export function PresentationViewer({
   board,
   barsOnCollapse = false,
   onSessionChanged,
+  sessionPickerOpen = false,
+  createSessionOpen = false,
 }: PresentationViewerProps) {
   const [presentation, setPresentation] = useState<any>(null)
   const [active, setActive] = useState(false)
@@ -261,6 +267,7 @@ export function PresentationViewer({
 
   function startPresentation() {
     setActive(true)
+    setSeen(PRESENTATION_START_SEEN_KEY)
     const p = document.documentElement.requestFullscreen?.()
     if (p) p.catch(() => undefined)
     supabase
@@ -404,8 +411,15 @@ export function PresentationViewer({
 
       {isTeacher && (
         <>
+          <PresentationTour
+            active={active}
+            drawerOpen={drawerOpen}
+            sessionPickerOpen={sessionPickerOpen}
+            createSessionOpen={createSessionOpen}
+          />
           {/* Left hover zone */}
           <div
+            data-tour="presentation-edge"
             className="absolute left-0 top-0 bottom-0 w-10 z-10"
             onMouseEnter={() => {
               if (openGroupId) return
@@ -456,7 +470,7 @@ export function PresentationViewer({
                     <LinkIcon className="size-3.5" />
                     Link HS làm bài
                   </Button>
-                  <Button variant="outline" size="sm" className="gap-1" onClick={() => setShowQr(true)}>
+                  <Button variant="outline" size="sm" className="gap-1" onClick={() => setShowQr(true)} data-tour="presentation-qr">
                     <QrCode className="size-3.5" />
                     QR code
                   </Button>

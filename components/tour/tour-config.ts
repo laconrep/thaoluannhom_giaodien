@@ -86,7 +86,7 @@ export function rosterTourSteps(classId: string): Step[] {
   ]
 }
 
-export function sessionsTourSteps(classId: string): Step[] {
+export function sessionsTourSteps(_classId: string): Step[] {
   return [
     {
       target: "[data-tour='session-create']",
@@ -106,8 +106,8 @@ export function sessionsTourSteps(classId: string): Step[] {
       target: "[data-tour='class-tabs']",
       placement: "bottom",
       title: "Bước tiếp theo",
-      content: "Khi phiên có bài nộp, mở tab \"Bảng điểm\" để chấm và theo dõi điểm.",
-      data: { navigateTo: `/classes/${classId}/gradebook` } satisfies TourStepData,
+      content:
+        "Khi phiên có bài nộp, bấm tab \"Bảng điểm\" để chấm và theo dõi điểm — tour sẽ tự hướng dẫn bạn.",
     },
   ]
 }
@@ -162,4 +162,64 @@ export function shareTourSteps(classId: string): Step[] {
         "Bạn đã sẵn sàng sử dụng Lớp học thảo luận. Bấm \"Hoàn tất\" để kết thúc tour hướng dẫn.",
     },
   ]
+}
+
+export function presentationStartStep(): Step {
+  return {
+    target: "[data-tour='presentation-start']",
+    placement: "top",
+    title: "Trình chiếu PowerPoint",
+    content:
+      "Bấm \"Chế độ chiếu lớp\" để mở PowerPoint ra toàn màn hình. Học sinh chỉ thấy màn chiếu, các nút điều khiển của bạn nằm gọn trong bảng điều khiển ẩn bên trái.",
+  }
+}
+
+export function presentationEdgeStep(): Step {
+  return {
+    target: "[data-tour='presentation-edge']",
+    placement: "right",
+    title: "Bảng điều khiển ẩn",
+    content:
+      "Di chuột sát mép trái màn hình (hoặc bấm vào mép trái) để mở bảng điều khiển. Không chiếu bảng này lên màn hình học sinh.",
+  }
+}
+
+export function presentationTimerStep(): Step {
+  return {
+    target: "[data-tour='presentation-timer']",
+    placement: "right",
+    title: "Chỉnh thời gian",
+    content:
+      "Trong bảng điều khiển, bạn chỉnh thời gian phiên tại đây — bắt đầu, tạm dừng hay gia hạn.",
+  }
+}
+
+export function presentationQrStep(): Step {
+  return {
+    target: "[data-tour='presentation-qr']",
+    placement: "bottom",
+    title: "QR cho học sinh",
+    content:
+      "Bấm \"QR\" để tạo mã QR. Học sinh quét mã là vào thẳng phiên nộp bài, không cần gõ link.",
+  }
+}
+
+export function presentationAllSessionsStep(): Step {
+  return {
+    target: "[data-tour='presentation-all-sessions']",
+    placement: "right",
+    title: "Chuyển phiên",
+    content:
+      "Bấm \"Tất cả phiên\" để xem danh sách phiên thảo luận của lớp, chọn phiên khác hoặc tạo phiên mới ngay trong lúc chiếu.",
+  }
+}
+
+export function presentationCreateSessionStep(): Step {
+  return {
+    target: "[data-tour='presentation-create-session']",
+    placement: "bottom",
+    title: "Tạo phiên mới",
+    content:
+      "Bấm \"Tạo phiên mới\" để mở một phiên thảo luận mới ngay trên bảng điều khiển mà không cần thoát màn chiếu.",
+  }
 }

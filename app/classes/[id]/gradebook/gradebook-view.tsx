@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useMemo, useState, useTransition, useEffect, useRef } from "react"
 import { overrideStudentScoreAction, toggleShareScoresAction } from "@/app/actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,7 +9,7 @@ import { formatDateShort } from "@/lib/utils-format"
 import { Download, Share2 } from "lucide-react"
 import { TeacherTour } from "@/components/tour/teacher-tour"
 import { gradebookTourSteps } from "@/components/tour/tour-config"
-import { classTourSeenKey, getSeen, TOUR_ONBOARDING_SEEN_KEY } from "@/components/tour/tour-store"
+import { classTourSeenKey, getSeen, TOUR_ONBOARDING_SEEN_KEY, GRADEBOOK_TOUR_PENDING_KEY } from "@/components/tour/tour-store"
 
 type Session = {
   id: string
@@ -35,6 +35,18 @@ export function GradebookView({
 }) {
   const [scoreMap, setScoreMap] = useState(initialMap)
   const [pending, startTransition] = useTransition()
+
+  // Tour bảng điểm chỉ chạy khi giáo viên chủ động bấm tab "Bảng điểm"
+  // (tab click đặt marker trong sessionStorage trước khi navigate).
+  const [tabTriggered, setTabTriggered] = useState(false)
+  const pendingRef = useRef(false)
+  useEffect(() => {
+    if (typeof window === "undefined" || pendingRef.current) return
+    pendingRef.current = true
+    const pending = window.sessionStorage.getItem(GRADEBOOK_TOUR_PENDING_KEY) === "1"
+    window.sessionStorage.removeItem(GRADEBOOK_TOUR_PENDING_KEY)
+    if (pending) setTabTriggered(true)
+  }, [])
 
   const anyShared = useMemo(() => sessions.some((s) => s.scores_shared), [sessions])
 
@@ -92,7 +104,7 @@ export function GradebookView({
         steps={gradebookTourSteps(classId)}
         seenKey={classTourSeenKey("gradebook", classId)}
         autoStart
-        autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+        autoStartWhen={tabTriggered && !getSeen(TOUR_ONBOARDING_SEEN_KEY)}
       />
       <Card data-tour="gradebook-table">
         <CardHeader className="flex-row items-start justify-between flex-wrap gap-3">

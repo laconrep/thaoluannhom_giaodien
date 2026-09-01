@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Users, PresentationIcon, ClipboardCheck, Table, Share2 } from "lucide-react"
+import { setGradebookTourPending } from "@/components/tour/tour-store"
 
 export function ClassTabs({ classId }: { classId: string }) {
   const pathname = usePathname()
@@ -23,6 +24,9 @@ export function ClassTabs({ classId }: { classId: string }) {
           <Link
             key={t.href}
             href={t.href}
+            onClick={() => {
+              if (t.href.includes("/gradebook")) setGradebookTourPending()
+            }}
             className={cn(
               "inline-flex items-center gap-2 px-3.5 py-2.5 text-sm whitespace-nowrap border-b-2 transition relative",
               active
