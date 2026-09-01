@@ -98,8 +98,8 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 
 ## 4. Việc CHƯA LÀM / Tồn đọng
 
-1. **Build chưa chạy lại** sau thay đổi cuối gradebook-view (typecheck đã pass).
-2. `docs/TOUR_HUONG_DAN_PLAN.md` **chưa cập nhật**: thêm mục tour màn chiếu PowerPoint, ghi chú trigger tab Bảng điểm, mục 5.2 (roster global).
+1. ✅ (Đã xong) Build đã chạy lại sau thay đổi gradebook-view — **pass** (`pnpm run build`). Typecheck pass, lint chỉ còn 9 warning pre-existing.
+2. ✅ (Đã xong) `docs/TOUR_HUONG_DAN_PLAN.md` **đã cập nhật**: thêm mục 5.6 (tour màn chiếu PowerPoint), sửa 4.1/4.3/5.4/6/8 cho khớp (roster global, gradebook tab-trigger, replay, checklist).
 3. Ảnh demo `docs/tour-screenshots/` **chưa có** cho tour màn chiếu PowerPoint + thay đổi bảng điểm.
 4. **Progressive refactor chưa làm cho Dashboard/Roster/Sessions/Share** — hiện các tour này vẫn là multi-step liên tục (chạy hết một lượt, có `navigateTo` xuyên trang ở Roster → sessions, Gradebook → share). Yêu cầu của user: "giáo viên thao tác xong bước n thì hint bước n+1 mới xuất hiện".
 5. **Replay màn chiếu**: `PresentationTour` **không lắng nghe** `RESTART_EVENT` (nút "Hướng dẫn" header chỉ replay các tour TeacherTour).
@@ -166,7 +166,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 
 | Phiên | Nội dung | Trạng thái | Ghi chú |
 |-------|----------|-----------|---------|
-| 1 | Xác minh build + cập nhật docs/TOUR_HUONG_DAN_PLAN.md | ⏳ Chưa làm | |
+| 1 | Xác minh build + cập nhật docs/TOUR_HUONG_DAN_PLAN.md | ✅ Xong | Build pass (`pnpm run build`), typecheck pass, lint chỉ còn 9 warning `<img>` pre-existing. Đã thêm mục 5.6 (tour màn chiếu PowerPoint), sửa 4.1/4.3/5.4/6/8 cho khớp hiện trạng. |
 | 2 | Progressive Dashboard tour | ⏳ Chưa làm | |
 | 3 | Progressive Roster tour | ⏳ Chưa làm | |
 | 4 | Progressive Sessions tour | ⏳ Chưa làm | |

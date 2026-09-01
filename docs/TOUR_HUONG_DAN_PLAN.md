@@ -74,10 +74,11 @@ npm install react-joyride
 
 ### 4.1 Thành phần đề xuất
 
-- `components/tour/teacher-tour.tsx` — component chứa `<Joyride>` + logic chạy tour.
-- `components/tour/tour-config.ts` — định nghĩa các tour và bước (steps) dạng dữ liệu tĩnh.
-- `components/tour/tour-store.ts` — tiện ích đọc/ghi trạng thái localStorage.
-- `hooks/use-teacher-tour.ts` — hook điều khiển: bắt đầu / dừng / đánh dấu hoàn thành.
+- `components/tour/teacher-tour.tsx` — component chứa `<Joyride>` + logic chạy tour (props: `tourId`, `steps`, `seenKey`, `autoStart?`, `autoStartWhen?`, `onComplete?`, `isSeen?`, `markSeen?`). Xử lý `STEP_AFTER` + `step.data.navigateTo` → `router.push`; `TOUR_END` + `FINISHED` → `markSeen()`; lắng nghe `RESTART_EVENT` để replay.
+- `components/tour/tour-config.ts` — định nghĩa các tour và bước (steps), locale VN + options (zIndex 200). Gồm factory cho Dashboard, Roster, Sessions, Gradebook, Share và các step hint màn chiếu PowerPoint.
+- `components/tour/tour-store.ts` — keys + tiện ích đọc/ghi localStorage/sessionStorage (`getSeen/setSeen`, `rosterTourSeen`, `setGradebookTourPending`, `consumeGradebookTourPending`, …).
+- `components/tour/tour-replay-button.tsx` — nút "Hướng dẫn" trên header, dispatch `RESTART_EVENT`.
+- `components/tour/presentation-tour.tsx` — tour màn chiếu PowerPoint (state machine `idle → edge → drawer → all-sessions → create-session → done`), progressive theo hành động thật.
 
 Luồng chạy:
 
@@ -114,10 +115,13 @@ Mỗi màn hình sẽ được gắn thuộc tính `data-tour="..."` vào các e
 
 ### 4.3 Persistence (lưu trạng thái)
 
-- Key tổng: `teacher_tour_seen_v1` — set khi hoàn tất tour cuối (Chia sẻ), đánh dấu đã xong onboarding.
+- Key tổng: `teacher_tour_seen_v1` — set khi hoàn tất tour cuối (Chia sẻ), đánh dấu đã xong onboarding. Các tour màn chiếu / phiên / bảng điểm chỉ tự hiện khi key này **chưa** set.
 - Tour Dashboard: `teacher_tour_dashboard_seen_v1` (toàn cục, chỉ hiện lần đầu).
 - Tour Phân nhóm: `teacher_tour_roster_seen_v1` (**toàn cục, chỉ hiện lần đầu** — không theo lớp). Vẫn quét cờ cũ `roster_intro_seen_<classId>` để tương thích người đã xem modal cũ.
 - Tour Phiên thảo luận / Bảng điểm: `teacher_tour_<tour>_<classId>` (theo lớp) nhưng chỉ tự hiện khi `teacher_tour_seen_v1` chưa set.
+- Tour Bảng điểm: chỉ tự chạy khi giáo viên **chủ động bấm tab "Bảng điểm"** — tab click đặt marker `teacher_tour_gradebook_pending_v1` (sessionStorage) trước khi navigate; `gradebook-view` đọc + xoá marker khi mount rồi mới bật tour.
+- Hint màn chiếu: `teacher_tour_presentation_start_seen_v1` (hint "Chế độ chiếu lớp" trên board) và `teacher_tour_presentation_seen_v1` (tour màn chiếu PowerPoint, set khi bấm "Tạo phiên mới").
+- `RESTART_EVENT = "teacher-tour:restart"` — event replay từ nút "Hướng dẫn" trên header.
 - Giá trị cờ: `"1"` khi đã xem/hoàn thành.
 
 ### 4.4 Nút mở lại tour
@@ -164,6 +168,8 @@ Mục tiêu: tạo và chạy phiên đầu tiên.
 
 ### 5.4 Tour "Bảng điểm" — Gradebook
 
+> **Trigger đặc biệt**: tour chỉ tự chạy khi giáo viên **chủ động bấm tab "Bảng điểm"** (xem 4.3). Không tự hiện khi vào trang bằng đường dẫn trực tiếp.
+
 | Bước | Target | Nội dung |
 |------|--------|----------|
 | 1 | `data-tour="gradebook-table"` | "Mỗi cột là một phiên, mỗi hàng là một học sinh. Điểm tự động tổng hợp." |
@@ -180,11 +186,37 @@ Mục tiêu: tạo và chạy phiên đầu tiên.
 
 Sau bước cuối: lưu cờ `teacher_tour_seen_v1 = 1`.
 
+### 5.6 Tour "Màn chiếu PowerPoint" — Presentation (progressive)
+
+Tour màn hình chiếu lớp khi giáo viên đã upload PowerPoint, triển khai bằng state machine trong `components/tour/presentation-tour.tsx`. **Từng hint xuất hiện theo hành động thật** của giáo viên, không chạy liên tục một mạch:
+
+- `idle → edge → drawer → all-sessions → create-session → done`.
+
+Điều kiện bật (`enabled`): onboarding chưa xong (`teacher_tour_seen_v1` chưa set) **và** chưa xem tour màn chiếu (`teacher_tour_presentation_seen_v1` chưa set).
+
+| Giai đoạn | Target (data-tour) | Nội dung | Kích hoạt |
+|-----------|--------------------|----------|-----------|
+| Hint board (ngoài màn chiếu) | `presentation-start` (nút "Chế độ chiếu lớp", `group-board.tsx`, chỉ `isTeacher`) | "Bấm để mở PowerPoint ra toàn màn hình" | Tự hiện khi có PowerPoint + chưa xem onboarding; set `teacher_tour_presentation_start_seen_v1` khi bấm bắt đầu chiếu |
+| 1. Mép trái | `presentation-edge` (vùng hover `w-10` mép trái, `presentation-viewer.tsx`) | "Di chuột mép trái để mở bảng điều khiển" | Vào màn chiếu (fullscreen active) |
+| 2. Drawer | `presentation-timer` (chỉnh thời gian) → `presentation-qr` (nút "QR code" trong drawer) | Hướng dẫn bảng điều khiển ẩn | Giáo viên mở drawer; stage này `continuous` 2 bước |
+| 3. Tất cả phiên | `presentation-all-sessions` (nút "Tất cả phiên" trong `renderBoard` embedded) | "Xem/chọn phiên khác" | Giáo viên bấm "Tất cả phiên" |
+| 4. Tạo phiên mới | `presentation-create-session` (nút trong picker, chỉ tồn tại khi `sessionPickerOpen`) | "Tạo phiên mới ngay trong lúc chiếu" | Giáo viên bấm "Tạo phiên mới" trong picker |
+| 5. Xong | — | Kết thúc | Bấm "Tạo phiên mới" → set `teacher_tour_presentation_seen_v1` |
+
+Ghi chú kỹ thuật:
+
+- `PresentationTour` dùng `key={`presentation-${stage}`}` để remount Joyride theo stage; chỉ stage "drawer" là multi-step (`continuous`), các stage khác là hint đơn.
+- Drawer fullscreen render nội dung bằng `board(openGroup)` = `renderBoard(true, …)` → các target `presentation-timer/all-sessions/create-session` nằm trong `renderBoard` (nhánh embedded). Nút QR nằm riêng ở header drawer của `presentation-viewer.tsx`.
+- `startPresentation()` set `teacher_tour_presentation_start_seen_v1` để hint board không hiện lại.
+- Toàn bộ hint màn chiếu nằm trong block `isTeacher` nên học sinh không thấy.
+
 ## 6. Trạng thái hoàn thành & replay
 
 - **Lần đầu**: tour onboarding tự động hiện ở Dashboard khi `teacher_tour_seen_v1` chưa tồn tại.
 - **Tour cục bộ** (Roster): tự hiện **lần đầu tiên duy nhất** (cờ toàn cục `teacher_tour_roster_seen_v1`) khi lớp đã có nhóm và chưa xem cờ; không hiện lại khi tạo lớp mới (vẫn quét cờ cũ `roster_intro_seen_*` để tương thích người đã xem modal cũ).
-- **Replay**: nút "Hướng dẫn" trên header (mở lại tour từ đầu, không ghi đè cờ đã xem).
+- **Tour màn chiếu PowerPoint**: tự hiện khi onboarding chưa xong + chưa xem cờ `teacher_tour_presentation_seen_v1`; tiến theo hành động thật (xem 5.6), set cờ khi bấm "Tạo phiên mới".
+- **Tour Bảng điểm**: chỉ tự chạy khi giáo viên bấm tab "Bảng điểm" (marker sessionStorage), không tự hiện khi mở trang trực tiếp.
+- **Replay**: nút "Hướng dẫn" trên header (dispatch `RESTART_EVENT`) mở lại tour TeacherTour của trang hiện tại từ đầu, không ghi đè cờ đã xem. **Lưu ý**: `PresentationTour` hiện chưa lắng nghe `RESTART_EVENT` (xem tồn đọng).
 - **Bỏ qua**: nút "Bỏ qua" cho phép kết thúc sớm; lần sau vẫn hiện lại (trừ khi đã hoàn thành).
 
 ## 7. Rủi ro & lưu ý kỹ thuật
@@ -198,27 +230,29 @@ Sau bước cuối: lưu cờ `teacher_tour_seen_v1 = 1`.
 
 ## 8. Checklist triển khai
 
-**Giai đoạn 1 — Hạ tầng**
-- [ ] Cài `react-joyride` (npm).
-- [ ] Tạo `components/tour/tour-config.ts`: định nghĩa 5 tour, mỗi tour là mảng step.
-- [ ] Tạo `components/tour/tour-store.ts`: tiện ích localStorage + `use-teacher-tour.ts`.
-- [ ] Tạo `components/tour/teacher-tour.tsx`: `<Joyride>` + logic điều hướng theo pathname.
+**Giai đoạn 1 — Hạ tầng** (đã xong)
+- [x] Cài `react-joyride` (npm, v3.2.0 — dùng `import { Joyride }` named export).
+- [x] Tạo `components/tour/tour-config.ts`: định nghĩa tour cho Dashboard, Roster, Sessions, Gradebook, Share + step hint màn chiếu.
+- [x] Tạo `components/tour/tour-store.ts`: tiện ích localStorage/sessionStorage + keys.
+- [x] Tạo `components/tour/teacher-tour.tsx`: `<Joyride>` + logic điều hướng theo pathname.
+- [x] Tạo `components/tour/presentation-tour.tsx`: tour màn chiếu PowerPoint (state machine).
 
-**Giai đoạn 2 — Gắn vào UI hiện có**
-- [ ] `components/teacher-shell.tsx`: thêm nút "Hướng dẫn" (replay).
-- [ ] `app/dashboard/page.tsx` + `create-class-card.tsx`: gắn `data-tour` cho nút tạo lớp & form; kích hoạt tour onboarding.
-- [ ] `app/classes/[id]/layout.tsx` + `class-tabs.tsx`: gắn `data-tour="class-tabs"`.
-- [ ] `app/classes/[id]/roster/roster-view.tsx`: thêm `data-tour` cho list HS, cột nhóm, nút vương miện, bulk select; **thay modal hướng dẫn bằng tour spotlight**.
-- [ ] `app/classes/[id]/session-list-view.tsx`: `data-tour` cho nút tạo phiên, preset, danh sách.
-- [ ] `app/classes/[id]/gradebook/gradebook-view.tsx`: `data-tour` cho bảng điểm, nút xuất file.
-- [ ] `app/classes/[id]/share/share-view.tsx`: `data-tour` cho link chia sẻ, toggle điểm, bước hoàn tất.
+**Giai đoạn 2 — Gắn vào UI hiện có** (đã xong)
+- [x] `components/teacher-shell.tsx`: thêm nút "Hướng dẫn" (replay, dispatch `RESTART_EVENT`).
+- [x] `app/dashboard/page.tsx` + `create-class-card.tsx`: gắn `data-tour` + tour onboarding.
+- [x] `app/classes/[id]/class-tabs.tsx`: gắn `data-tour="class-tabs"` + marker khi bấm tab Bảng điểm.
+- [x] `app/classes/[id]/roster/roster-view.tsx`: gắn `data-tour` cho list HS, cột nhóm, vương miện, bulk select.
+- [x] `app/classes/[id]/session-list-view.tsx`: gắn `data-tour` cho nút tạo phiên, danh sách.
+- [x] `app/classes/[id]/gradebook/gradebook-view.tsx`: gắn `data-tour` cho bảng điểm, nút xuất file; trigger qua marker tab.
+- [x] `app/classes/[id]/share/share-view.tsx`: gắn `data-tour` cho link chia sẻ, điểm, bước hoàn tất; set `teacher_tour_seen_v1` khi hoàn thành.
+- [x] `app/classes/[id]/sessions/[sid]/group-board.tsx` + `components/presentation-viewer.tsx`: gắn hint/tour màn chiếu PowerPoint.
 
-**Giai đoạn 3 — Kiểm thử**
+**Giai đoạn 3 — Kiểm thử** (còn tồn đọng, xem bangiao5)
 - [ ] Test luồng onboarding từ Dashboard → tạo lớp → roster → sessions → gradebook → share.
 - [ ] Test 2 lần chạy liên tiếp để xác nhận cờ localStorage (không hiện lại khi đã xem).
 - [ ] Test replay bằng nút "Hướng dẫn".
 - [ ] Test trên theme sáng/tối, màn hình nhỏ (mobile) — ẩn hoặc đơn giản hóa spotlight trên mobile nếu cần.
-- [ ] Chạy `npm run lint` và `npm run typecheck`.
+- [ ] Chạy `pnpm run lint` và `pnpm run typecheck` (hiện pass, chỉ warning `<img>` pre-existing).
 
 ## 9. Đánh giá thành công
 
