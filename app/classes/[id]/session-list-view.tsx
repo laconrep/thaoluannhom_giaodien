@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { createSessionAction, deleteSessionAction } from "@/app/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,11 +24,13 @@ import {
 } from "lucide-react"
 import { formatDate } from "@/lib/utils-format"
 import { TeacherTour } from "@/components/tour/teacher-tour"
-import { sessionsPresetsStep } from "@/components/tour/tour-config"
+import { sessionsNextStep, sessionsPresetsStep } from "@/components/tour/tour-config"
 import {
   classTourSeenKey,
+  consumeSessionsNextPending,
   getSeen,
   setSeen,
+  setSessionsNextPending,
   STOP_EVENT,
   TOUR_ONBOARDING_SEEN_KEY,
 } from "@/components/tour/tour-store"
@@ -74,6 +76,7 @@ export function SessionListView({
   const [numGroups, setNumGroups] = useState(6)
   const [useFixed, setUseFixed] = useState(fixedGroupsCount > 0)
   const [pending, startTransition] = useTransition()
+  const [showNextHint, setShowNextHint] = useState(false)
 
   const isGroup = kind === "group"
   const title1 = isGroup ? "Thảo luận nhóm" : "Giao việc cá nhân"
@@ -86,8 +89,27 @@ export function SessionListView({
   const hasFixed = fixedGroupsCount > 0
   const displayGroups = useFixed && hasFixed ? fixedGroupsCount : numGroups
 
+  const presetsSeenKey = classTourSeenKey("sessions-presets", classId)
+  const nextSeenKey = classTourSeenKey("sessions-next", classId)
+
+  useEffect(() => {
+    if (getSeen(TOUR_ONBOARDING_SEEN_KEY)) return
+    if (getSeen(nextSeenKey)) return
+    if (sessions.length === 0) return
+    if (!consumeSessionsNextPending(classId)) return
+    setShowNextHint(true)
+  }, [classId, sessions.length, nextSeenKey])
+
   function stopPresetsHint() {
-    setSeen(classTourSeenKey("sessions-presets", classId))
+    setSeen(presetsSeenKey)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(STOP_EVENT))
+    }
+  }
+
+  function stopNextHint() {
+    setSeen(nextSeenKey)
+    setShowNextHint(false)
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(STOP_EVENT))
     }
@@ -95,6 +117,7 @@ export function SessionListView({
 
   function onCreate() {
     stopPresetsHint()
+    setSessionsNextPending(classId)
     const finalTitle = title.trim() || (isGroup ? "Thảo luận mới" : "Giao việc cá nhân")
     startTransition(() => {
       createSessionAction(classId, {
@@ -117,7 +140,16 @@ export function SessionListView({
         <TeacherTour
           tourId="sessions-presets"
           steps={[sessionsPresetsStep()]}
-          seenKey={classTourSeenKey("sessions-presets", classId)}
+          seenKey={presetsSeenKey}
+          autoStart
+          autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+        />
+      )}
+      {!open && showNextHint && (
+        <TeacherTour
+          tourId="sessions-next"
+          steps={[sessionsNextStep()]}
+          seenKey={nextSeenKey}
           autoStart
           autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
         />
@@ -321,6 +353,7 @@ export function SessionListView({
                       ? `/classes/${classId}/sessions/${s.id}`
                       : `/classes/${classId}/individual/${s.id}`
                   }
+                  onClick={stopNextHint}
                   className="flex-1 p-4 flex flex-col gap-2"
                 >
                   <div className="flex items-start justify-between gap-2">

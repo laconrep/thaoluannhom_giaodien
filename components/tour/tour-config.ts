@@ -77,30 +77,18 @@ export function sessionsPresetsStep(): Step {
   }
 }
 
+export function sessionsNextStep(): Step {
+  return {
+    target: "[data-tour='session-list']",
+    placement: "top",
+    title: "Mở phiên",
+    content:
+      "Phiên vừa tạo hiện ở đây. Bấm vào phiên để mở màn chiếu cho học sinh nộp bài.",
+  }
+}
+
 export function sessionsTourSteps(_classId: string): Step[] {
-  return [
-    {
-      target: "[data-tour='session-create']",
-      placement: "bottom",
-      title: "Tạo phiên thảo luận",
-      content:
-        "Bấm \"Tạo phiên mới\" để mở biểu mẫu. Chọn cách chia nhóm, dùng preset 15/30/45 phút cho thời lượng, rồi bấm tạo.",
-    },
-    {
-      target: "[data-tour='session-list']",
-      placement: "top",
-      title: "Danh sách phiên",
-      content:
-        "Phiên sau khi tạo hiện ở đây. Bấm vào phiên để mở màn chiếu cho học sinh nộp bài.",
-    },
-    {
-      target: "[data-tour='class-tabs']",
-      placement: "bottom",
-      title: "Bước tiếp theo",
-      content:
-        "Khi phiên có bài nộp, bấm tab \"Bảng điểm\" để chấm và theo dõi điểm — tour sẽ tự hướng dẫn bạn.",
-    },
-  ]
+  return [sessionsPresetsStep(), sessionsNextStep()]
 }
 
 export function gradebookTourSteps(classId: string): Step[] {
