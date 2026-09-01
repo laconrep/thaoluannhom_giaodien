@@ -67,30 +67,28 @@ export function rosterNextStep(): Step {
   }
 }
 
+export function sessionsPresetsStep(): Step {
+  return {
+    target: "[data-tour='session-presets']",
+    placement: "bottom",
+    title: "Chọn thời lượng",
+    content:
+      "Chọn nhanh preset 15/30/45 phút (và số nhóm nếu có). Xong rồi bấm \"Tạo và vào ngay\".",
+  }
+}
+
+export function sessionsNextStep(): Step {
+  return {
+    target: "[data-tour='session-list']",
+    placement: "top",
+    title: "Mở phiên",
+    content:
+      "Phiên vừa tạo hiện ở đây. Bấm vào phiên để mở màn chiếu cho học sinh nộp bài.",
+  }
+}
+
 export function sessionsTourSteps(_classId: string): Step[] {
-  return [
-    {
-      target: "[data-tour='session-create']",
-      placement: "bottom",
-      title: "Tạo phiên thảo luận",
-      content:
-        "Bấm \"Tạo phiên mới\" để mở biểu mẫu. Chọn cách chia nhóm, dùng preset 15/30/45 phút cho thời lượng, rồi bấm tạo.",
-    },
-    {
-      target: "[data-tour='session-list']",
-      placement: "top",
-      title: "Danh sách phiên",
-      content:
-        "Phiên sau khi tạo hiện ở đây. Bấm vào phiên để mở màn chiếu cho học sinh nộp bài.",
-    },
-    {
-      target: "[data-tour='class-tabs']",
-      placement: "bottom",
-      title: "Bước tiếp theo",
-      content:
-        "Khi phiên có bài nộp, bấm tab \"Bảng điểm\" để chấm và theo dõi điểm — tour sẽ tự hướng dẫn bạn.",
-    },
-  ]
+  return [sessionsPresetsStep(), sessionsNextStep()]
 }
 
 export function gradebookTourSteps(classId: string): Step[] {
@@ -119,30 +117,28 @@ export function gradebookTourSteps(classId: string): Step[] {
   ]
 }
 
-export function shareTourSteps(classId: string): Step[] {
-  return [
-    {
-      target: "[data-tour='share-link']",
-      placement: "right",
-      title: "Link vào lớp",
-      content:
-        "Copy link này gửi cho học sinh. Các em dùng link để vào lớp, điền tên và tham gia phiên thảo luận.",
-    },
-    {
-      target: "[data-tour='share-grades']",
-      placement: "left",
-      title: "Link xem điểm",
-      content:
-        "Học sinh dùng link này để xem điểm của cả lớp (chỉ xem, không sửa được).",
-    },
-    {
-      target: "[data-tour='share-done']",
-      placement: "top",
-      title: "Hoàn tất",
-      content:
-        "Bạn đã sẵn sàng sử dụng Lớp học thảo luận. Bấm \"Hoàn tất\" để kết thúc tour hướng dẫn.",
-    },
-  ]
+export function shareLinkStep(): Step {
+  return {
+    target: "[data-tour='share-link']",
+    placement: "right",
+    title: "Link vào lớp",
+    content:
+      "Copy link này gửi cho học sinh. Các em dùng link để vào lớp, điền tên và tham gia phiên thảo luận.",
+  }
+}
+
+export function shareGradesStep(): Step {
+  return {
+    target: "[data-tour='share-grades']",
+    placement: "left",
+    title: "Link xem điểm",
+    content:
+      "Học sinh dùng link này để xem điểm của cả lớp (chỉ xem, không sửa được).",
+  }
+}
+
+export function shareTourSteps(_classId: string): Step[] {
+  return [shareLinkStep(), shareGradesStep()]
 }
 
 export function presentationStartStep(): Step {

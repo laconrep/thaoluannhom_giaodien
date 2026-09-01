@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import { createSessionAction, deleteSessionAction } from "@/app/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,8 +24,17 @@ import {
 } from "lucide-react"
 import { formatDate } from "@/lib/utils-format"
 import { TeacherTour } from "@/components/tour/teacher-tour"
-import { sessionsTourSteps } from "@/components/tour/tour-config"
-import { classTourSeenKey, getSeen, TOUR_ONBOARDING_SEEN_KEY } from "@/components/tour/tour-store"
+import { sessionsNextStep, sessionsPresetsStep } from "@/components/tour/tour-config"
+import {
+  classTourSeenKey,
+  consumeSessionsNextPending,
+  getSeen,
+  RESTART_EVENT,
+  setSeen,
+  setSessionsNextPending,
+  STOP_EVENT,
+  TOUR_ONBOARDING_SEEN_KEY,
+} from "@/components/tour/tour-store"
 
 type Kind = "group" | "individual"
 type Session = {
@@ -68,6 +77,12 @@ export function SessionListView({
   const [numGroups, setNumGroups] = useState(6)
   const [useFixed, setUseFixed] = useState(fixedGroupsCount > 0)
   const [pending, startTransition] = useTransition()
+  const [showNextHint, setShowNextHint] = useState(false)
+  const [presetsDismissed, setPresetsDismissed] = useState(false)
+  const [presetsReplayTick, setPresetsReplayTick] = useState(0)
+  const [nextReplayTick, setNextReplayTick] = useState(0)
+  const pendingPresetsReplay = useRef(false)
+  const pendingNextReplay = useRef(false)
 
   const isGroup = kind === "group"
   const title1 = isGroup ? "Thảo luận nhóm" : "Giao việc cá nhân"
@@ -80,7 +95,71 @@ export function SessionListView({
   const hasFixed = fixedGroupsCount > 0
   const displayGroups = useFixed && hasFixed ? fixedGroupsCount : numGroups
 
+  const presetsSeenKey = classTourSeenKey("sessions-presets", classId)
+  const nextSeenKey = classTourSeenKey("sessions-next", classId)
+
+  useEffect(() => {
+    if (getSeen(TOUR_ONBOARDING_SEEN_KEY)) return
+    if (getSeen(nextSeenKey)) return
+    if (sessions.length === 0) return
+    if (!consumeSessionsNextPending(classId)) return
+    setShowNextHint(true)
+  }, [classId, sessions.length, nextSeenKey])
+
+  useEffect(() => {
+    if (!open || !pendingPresetsReplay.current) return
+    pendingPresetsReplay.current = false
+    setPresetsReplayTick((n) => n + 1)
+  }, [open])
+
+  useEffect(() => {
+    if (!showNextHint || !pendingNextReplay.current) return
+    pendingNextReplay.current = false
+    setNextReplayTick((n) => n + 1)
+  }, [showNextHint])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const onRestart = () => {
+      if (open) {
+        setPresetsReplayTick((n) => n + 1)
+        return
+      }
+      if (sessions.length === 0) {
+        pendingPresetsReplay.current = true
+        setPresetsDismissed(false)
+        setOpen(true)
+        return
+      }
+      if (showNextHint) {
+        setNextReplayTick((n) => n + 1)
+        return
+      }
+      pendingNextReplay.current = true
+      setShowNextHint(true)
+    }
+    window.addEventListener(RESTART_EVENT, onRestart)
+    return () => window.removeEventListener(RESTART_EVENT, onRestart)
+  }, [open, sessions.length, showNextHint])
+
+  function stopPresetsHint() {
+    setSeen(presetsSeenKey)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(STOP_EVENT))
+    }
+  }
+
+  function stopNextHint() {
+    setSeen(nextSeenKey)
+    setShowNextHint(false)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(STOP_EVENT))
+    }
+  }
+
   function onCreate() {
+    stopPresetsHint()
+    setSessionsNextPending(classId)
     const finalTitle = title.trim() || (isGroup ? "Thảo luận mới" : "Giao việc cá nhân")
     startTransition(() => {
       createSessionAction(classId, {
@@ -99,13 +178,34 @@ export function SessionListView({
 
   return (
     <div className="flex flex-col gap-6">
-      <TeacherTour
-        tourId="sessions"
-        steps={sessionsTourSteps(classId)}
-        seenKey={classTourSeenKey("sessions", classId)}
-        autoStart
-        autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
-      />
+      {open && (
+        <TeacherTour
+          tourId="sessions-presets"
+          steps={[sessionsPresetsStep()]}
+          seenKey={presetsSeenKey}
+          autoStart
+          autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY) && !presetsDismissed}
+          restartToken={presetsReplayTick}
+          onEnd={() => {
+            setPresetsDismissed(true)
+            setSeen(presetsSeenKey)
+          }}
+        />
+      )}
+      {!open && showNextHint && (
+        <TeacherTour
+          tourId="sessions-next"
+          steps={[sessionsNextStep()]}
+          seenKey={nextSeenKey}
+          autoStart
+          autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+          restartToken={nextReplayTick}
+          onEnd={() => {
+            setShowNextHint(false)
+            setSeen(nextSeenKey)
+          }}
+        />
+      )}
       <Card className="overflow-hidden border-0 shadow-sm ring-1 ring-border">
         <CardHeader className="flex-row items-start justify-between bg-gradient-to-br from-primary/5 to-accent/5">
           <div>
@@ -187,7 +287,7 @@ export function SessionListView({
                   <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
                   Chọn nhanh
                 </FieldLabel>
-                <div className="flex flex-wrap gap-2">
+                <div data-tour="session-presets" className="flex flex-wrap gap-2">
                   {presets.map((p) => (
                     <Button
                       key={p.label}
@@ -201,6 +301,7 @@ export function SessionListView({
                       onClick={() => {
                         setDuration(p.seconds)
                         if (p.groups && !(useFixed && hasFixed)) setNumGroups(p.groups)
+                        stopPresetsHint()
                       }}
                     >
                       {p.label}
@@ -265,7 +366,14 @@ export function SessionListView({
                   {pending && <Spinner className="mr-2" />}
                   Tạo và vào ngay
                 </Button>
-                <Button variant="ghost" onClick={() => setOpen(false)}>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setPresetsDismissed(true)
+                    setSeen(presetsSeenKey)
+                    setOpen(false)
+                  }}
+                >
                   Hủy
                 </Button>
               </div>
@@ -304,6 +412,7 @@ export function SessionListView({
                       ? `/classes/${classId}/sessions/${s.id}`
                       : `/classes/${classId}/individual/${s.id}`
                   }
+                  onClick={stopNextHint}
                   className="flex-1 p-4 flex flex-col gap-2"
                 >
                   <div className="flex items-start justify-between gap-2">

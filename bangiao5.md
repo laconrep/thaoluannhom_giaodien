@@ -26,9 +26,9 @@
 
 | File | Vai trò | API quan trọng |
 |------|---------|----------------|
-| `teacher-tour.tsx` | Component `<Joyride>` dùng lại cho mọi tour theo trang | Props: `tourId`, `steps`, `seenKey`, `autoStart?`, `autoStartWhen?`, `onComplete?`, `isSeen?`, `markSeen?`. Xử lý `EVENTS.STEP_AFTER` + `step.data.navigateTo` → `router.push`; `EVENTS.TOUR_END` + `STATUS.FINISHED` → `markSeen()`. Lắng nghe `RESTART_EVENT` để replay. |
+| `teacher-tour.tsx` | Component `<Joyride>` dùng lại cho mọi tour theo trang | Props: `tourId`, `steps`, `seenKey`, `autoStart?`, `autoStartWhen?`, `onComplete?`, `isSeen?`, `markSeen?`, `restartToken?`, `onEnd?`. Xử lý `EVENTS.STEP_AFTER` + `step.data.navigateTo` → `router.push`; `EVENTS.TOUR_END` + `STATUS.FINISHED` → `markSeen()`; mọi `TOUR_END` → `onEnd()`. Lắng nghe `RESTART_EVENT`. `restartToken` đổi → `setRun(true)` (không tự chạy lúc mount). |
 | `roster-tour.tsx` | Tour phân nhóm **progressive** (state machine, không dùng TeacherTour) | Props: `ready`, `hasMembers`, `hasLeader`. Stage: `idle → list → leader → next → done`. Gate: `ready` (đã có nhóm) && `!rosterTourSeen()`. Chuyển stage theo hành động thật; bật hint khi stage đổi (remount `key={`roster-${stage}`}`, so sánh `prevStageRef` để không tự bật lại hint đã đóng); lắng nghe `RESTART_EVENT` replay. |
-| `tour-config.ts` | Định nghĩa steps + locale/options | `tourLocale` (VN), `tourOptions` (zIndex 200). Factories: `dashboardTourSteps`, `rosterListStep`, `rosterLeaderStep`, `rosterNextStep`, `sessionsTourSteps(_classId)`, `gradebookTourSteps(classId)`, `shareTourSteps(classId)`, `presentationStartStep`, `presentationEdgeStep`, `presentationTimerStep`, `presentationQrStep`, `presentationAllSessionsStep`, `presentationCreateSessionStep`. |
+| `tour-config.ts` | Định nghĩa steps + locale/options | `tourLocale` (VN), `tourOptions` (zIndex 200). Factories: `dashboardTourSteps`, `rosterListStep`, `rosterLeaderStep`, `rosterNextStep`, `sessionsPresetsStep`, `sessionsNextStep`, `sessionsTourSteps(_classId)`, `gradebookTourSteps(classId)`, `shareLinkStep`, `shareGradesStep`, `shareTourSteps(classId)`, `presentationStartStep`, `presentationEdgeStep`, `presentationTimerStep`, `presentationQrStep`, `presentationAllSessionsStep`, `presentationCreateSessionStep`. |
 | `tour-store.ts` | Keys + helper localStorage/sessionStorage | Xem 2.2. |
 | `tour-replay-button.tsx` | Nút "Hướng dẫn" trên header | Dispatch `window.dispatchEvent(new CustomEvent(RESTART_EVENT))`. |
 | `presentation-tour.tsx` | Tour màn chiếu PowerPoint (state machine) | Props: `active`, `drawerOpen`, `sessionPickerOpen`, `createSessionOpen`. Stage: `idle → edge → drawer → all-sessions → create-session → done`. Gate: onboarding chưa xong (`!getSeen(TOUR_ONBOARDING_SEEN_KEY)`) && chưa xem (`!getSeen(PRESENTATION_TOUR_SEEN_KEY)`). Joyride có `key={`presentation-${stage}`}` (remount theo stage); chỉ stage "drawer" là `continuous` (2 bước: timer + QR). |
@@ -44,9 +44,10 @@
 | `PRESENTATION_START_SEEN_KEY` = `"teacher_tour_presentation_start_seen_v1"` | Hint "Chế độ chiếu lớp" trên màn board. |
 | `PRESENTATION_TOUR_SEEN_KEY` = `"teacher_tour_presentation_seen_v1"` | Tour màn chiếu PowerPoint (set khi GV bấm "Tạo phiên mới" ở stage `create-session`). |
 | `GRADEBOOK_TOUR_PENDING_KEY` = `"teacher_tour_gradebook_pending_v1"` | Marker **sessionStorage** — set khi bấm tab "Bảng điểm"; gradebook-view đọc + xoá khi mount. |
+| `SESSIONS_NEXT_PENDING_PREFIX` = `"teacher_tour_sessions_next_pending_"` | Marker **sessionStorage** theo classId — set khi bấm "Tạo và vào ngay"; list đọc + xoá khi mount để hiện hint mở phiên. |
 | `RESTART_EVENT` = `"teacher-tour:restart"` | Event replay từ nút "Hướng dẫn". |
 
-Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `rosterTourSeen()`, `setRosterTourSeen()`, `setGradebookTourPending()`, `consumeGradebookTourPending()`.
+Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `rosterTourSeen()`, `setRosterTourSeen()`, `setGradebookTourPending()`, `consumeGradebookTourPending()`, `setSessionsNextPending(classId)`, `consumeSessionsNextPending(classId)`.
 
 ### 2.3 Bản đồ `data-tour` (target react-joyride)
 
@@ -55,9 +56,9 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 | `dashboard-header`, `create-class`, `class-list` | `app/dashboard/page.tsx`, `app/dashboard/create-class-card.tsx` | Tour Dashboard. |
 | `class-tabs` | `app/classes/[id]/class-tabs.tsx` | Thanh tab (roster/sessions/individual/gradebook/share). |
 | `roster-list`, `roster-groups`, `group-leader`, `bulk-select` | `app/classes/[id]/roster/roster-view.tsx` | Tour Roster. |
-| `session-create`, `session-list` | `app/classes/[id]/session-list-view.tsx` | Tour Sessions. |
+| `session-create`, `session-presets`, `session-list` | `app/classes/[id]/session-list-view.tsx` | Tour Sessions. `session-presets` = cụm nút 15/30/45 (chỉ render khi form mở). |
 | `gradebook-table`, `gradebook-export` | `app/classes/[id]/gradebook/gradebook-view.tsx` | Tour Bảng điểm. |
-| `share-link`, `share-grades`, `share-done` | `app/classes/[id]/share/share-view.tsx` | Tour Chia sẻ (bước cuối, set onboarding). |
+| `share-link`, `share-grades`, `share-done` | `app/classes/[id]/share/share-view.tsx` | Tour Chia sẻ. 5a: 2 hint progressive (`shareLinkStep` → copy link → `shareGradesStep`). `share-done` còn trên wrapper, chưa set onboarding (5c). |
 | `presentation-start` | `group-board.tsx` — nút "Chế độ chiếu lớp" (`renderBoard` non-embedded) | Hint mở PowerPoint. |
 | `presentation-edge` | `presentation-viewer.tsx` — vùng hover mép trái (`absolute left-0 top-0 bottom-0 w-10 z-10`) | Mở drawer. |
 | `presentation-timer` | `group-board.tsx` — `<div>` bọc `TimerPanel` trong `renderBoard` | Chỉnh thời gian. |
@@ -71,9 +72,13 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 
 - `app/dashboard/page.tsx`: `<TeacherTour tourId="dashboard" … seenKey={TOUR_DASHBOARD_SEEN_KEY} autoStart>`.
 - `app/classes/[id]/roster/roster-view.tsx`: `<RosterTour ready={groups.length>0} hasMembers hasLeader>` — `hasMembers = groups.some(g => (memberMap[g.id] ?? []).length>0)`, `hasLeader = groups.some(g => g.leader_student_id)`. Progressive theo hành động (list → leader → next), không còn `navigateTo`.
-- `app/classes/[id]/session-list-view.tsx`: `<TeacherTour tourId="sessions" … seenKey={classTourSeenKey("sessions", classId)} autoStart autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}>`.
+- `app/classes/[id]/session-list-view.tsx`: **không còn** auto-start multi-step.
+  - Form mở (`open`) → `<TeacherTour tourId="sessions-presets" steps={[sessionsPresetsStep()]} seenKey={classTourSeenKey("sessions-presets", classId)}>`.
+  - Bấm preset / "Tạo và vào ngay" → `setSeen(sessions-presets)` + `STOP_EVENT` + `setSessionsNextPending(classId)`. `createSessionAction` redirect sang trang phiên.
+  - Quay lại list: `consumeSessionsNextPending` + `sessions.length > 0` + chưa xem `sessions-next` → `<TeacherTour tourId="sessions-next" steps={[sessionsNextStep()]}>` trỏ `session-list`. Bấm mở phiên → `setSeen(sessions-next)` + `STOP_EVENT`. **Không** `navigateTo`.
+  - Replay `RESTART_EVENT`: form mở → presets; list trống → mở form + presets; đã có phiên → next. Đóng hint (`onEnd`/`presetsDismissed`) không tự hiện lại.
 - `app/classes/[id]/gradebook/gradebook-view.tsx`: `<TeacherTour tourId="gradebook" … seenKey={classTourSeenKey("gradebook", classId)} autoStart autoStartWhen={tabTriggered && !getSeen(TOUR_ONBOARDING_SEEN_KEY)}>` — `tabTriggered` từ marker sessionStorage (đọc trong `useEffect`, **không đọc trong useState initializer để tránh hydration mismatch**).
-- `app/classes/[id]/share/share-view.tsx`: `<TeacherTour tourId="share" … seenKey={TOUR_ONBOARDING_SEEN_KEY} autoStart autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}>`.
+- `app/classes/[id]/share/share-view.tsx`: **không còn** multi-step `shareTourSteps`. Vào trang → `<TeacherTour tourId="share-link" steps={[shareLinkStep()]} seenKey={classTourSeenKey("share-link", classId)}>` (gate onboarding chưa xong + `!linkDismissed`). Copy link lớp → `STOP_EVENT` + hiện `<TeacherTour tourId="share-grades" steps={[shareGradesStep()]}>`. Copy link điểm → tắt hint grades. **Chưa** set `TOUR_ONBOARDING_SEEN_KEY` (để phiên 5c).
 - `app/classes/[id]/sessions/[sid]/group-board.tsx`:
   - Hint board: `<TeacherTour tourId="presentation-start" steps={[presentationStartStep()]} seenKey={PRESENTATION_START_SEEN_KEY} autoStart autoStartWhen={!!presentation && !getSeen(TOUR_ONBOARDING_SEEN_KEY)} />` (nằm đầu `mainContent`, chỉ khi `isTeacher`).
   - Truyền `sessionPickerOpen` + `createSessionOpen` cho `PresentationViewer`.
@@ -98,6 +103,10 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 7. `pnpm run typecheck` + `pnpm run lint` (0 error, chỉ warning cũ) pass. `pnpm run build` đã pass trước thay đổi nhỏ gradebook-view (cần build lại xác minh ở Phiên 1).
 8. ✅ (Phiên 2) **Progressive Dashboard**: `dashboardTourSteps` thành hint 1 bước trỏ `create-class`; bấm nút "Tạo lớp mới" → `setSeen(TOUR_DASHBOARD_SEEN_KEY)` + dispatch `STOP_EVENT`. `TeacherTour` thêm listener `STOP_EVENT` (tái dùng cho tour progressive).
 9. ✅ (Phiên 3) **Progressive Roster**: tạo `components/tour/roster-tour.tsx` (state machine `idle → list → leader → next → done`). Tách `rosterTourSteps` thành 3 hint đơn: `rosterListStep` (vào trang), `rosterLeaderStep` (sau khi kéo ≥1 HS vào nhóm), `rosterNextStep` (sau khi gán leader). **Bỏ `navigateTo`** bước cuối — hint "chuyển tab" chỉ nhắc bấm tab Thảo luận nhóm. `roster-view.tsx` dùng `<RosterTour ready hasMembers hasLeader>` thay `TeacherTour`. Bật hint khi stage đổi qua `prevStageRef` (không tự hiện lại hint đã đóng); lắng nghe `RESTART_EVENT` (replay). Typecheck/lint/build pass.
+10. ✅ (Phiên 4a) **Sessions presets**: bỏ auto-start multi-step. Bấm "Tạo phiên mới" mở form → hint 1 bước `sessionsPresetsStep` trỏ `[data-tour='session-presets']`. Bấm preset / "Tạo và vào ngay" → `setSeen(classTourSeenKey("sessions-presets", classId))` + `STOP_EVENT`.
+11. ✅ (Phiên 4b) **Sessions next**: `sessionsNextStep` trỏ `session-list` (không `navigateTo`). `onCreate` set `setSessionsNextPending(classId)` trước redirect. Quay lại list: `consumeSessionsNextPending` + có phiên + chưa xem next → hint. Bấm mở phiên → `setSeen` + `STOP_EVENT`.
+12. ✅ (Phiên 4c) **Sessions verify**: không multi-step; đóng hint không tự hiện lại (`presetsDismissed`/`onEnd`); replay `RESTART_EVENT` (form mở → presets, list trống → mở form, có phiên → next). `TeacherTour` thêm `restartToken`/`onEnd`.
+13. ✅ (Phiên 5a) **Share progressive**: tách `shareTourSteps` thành `shareLinkStep` + `shareGradesStep` (bỏ bước `share-done`). Vào trang → hint link lớp; copy link lớp → hint xem điểm. **Chưa** set `TOUR_ONBOARDING_SEEN_KEY`.
 
 ## 4. Việc CHƯA LÀM / Tồn đọng
 
@@ -105,7 +114,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 2. ✅ (Đã xong) `docs/TOUR_HUONG_DAN_PLAN.md` **đã cập nhật**: thêm mục 5.6 (tour màn chiếu PowerPoint), sửa 4.1/4.3/5.4/6/8 cho khớp (roster global, gradebook tab-trigger, replay, checklist).
 3. ✅ (Đã xong) **Progressive Dashboard** — `dashboardTourSteps` đã thành hint 1 bước trỏ `create-class`; bấm nút "Tạo lớp mới" sẽ `setSeen(TOUR_DASHBOARD_SEEN_KEY)` + dispatch `STOP_EVENT` để tắt hint ngay. `TeacherTour` có thêm listener `STOP_EVENT` (dùng chung cho các tour progressive sau).
 4. Ảnh demo `docs/tour-screenshots/` **chưa có** cho tour màn chiếu PowerPoint + thay đổi bảng điểm.
-5. ✅ (Đã xong) **Progressive Roster** — đã tách `rosterTourSteps` thành state machine `roster-tour.tsx` (list → leader → next), bỏ `navigateTo` bước cuối. **Còn lại**: progressive refactor cho **Sessions** (hiện vẫn multi-step liên tục, bước cuối nhắc bấm tab) và **Share** (vẫn multi-step). Yêu cầu của user: "giáo viên thao tác xong bước n thì hint bước n+1 mới xuất hiện".
+5. ✅ **Progressive Roster** xong. **Sessions 4a+4b+4c xong**. **Share 5a xong** (2 hint: link → copy → grades). **Còn lại**: 5b Gradebook bỏ `navigateTo`; 5c set cờ onboarding khi hoàn tất Share.
 6. **Replay màn chiếu**: `PresentationTour` **không lắng nghe** `RESTART_EVENT` (nút "Hướng dẫn" header chỉ replay các tour TeacherTour).
 7. Chưa test thực tế trên trình duyệt có Supabase (phải có tài khoản).
 8. Chưa merge PR #4 vào `main`.
@@ -133,27 +142,27 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 
 ### Phiên 4 — Progressive Sessions tour (chia 3)
 
-- **Phiên 4a — Hook nút "Tạo phiên mới" + hint presets**
-  - File chính: `app/classes/[id]/session-list-view.tsx`, `components/tour/tour-config.ts`, `components/tour/teacher-tour.tsx` (nếu cần `STOP_EVENT`).
-  - Hook onClick nút "Tạo phiên mới" (`data-tour="session-create"`) → set flag / dispatch → hiện **hint 1 bước** trỏ presets 15/30/45.
-  - Tour Sessions hiện đang multi-step liên tục — **bỏ auto-start multi-step**; hint presets **chỉ hiện sau khi GV bấm nút**.
-  - Typecheck + lint. Commit + push + đánh dấu phần 7.
+- **Phiên 4a — Hook nút "Tạo phiên mới" + hint presets** ✅
+  - File chính: `app/classes/[id]/session-list-view.tsx`, `components/tour/tour-config.ts`.
+  - Bấm "Tạo phiên mới" (`setOpen(true)`) → mount TeacherTour hint 1 bước `sessionsPresetsStep` trỏ `[data-tour='session-presets']`.
+  - **Đã bỏ** auto-start multi-step (`sessionsTourSteps`). Bấm preset hoặc "Tạo và vào ngay" → `setSeen` + `STOP_EVENT`.
 
-- **Phiên 4b — Hint sau khi tạo phiên thành công**
-  - Sau **tạo phiên thành công** (có session mới trong list) → hint 1 bước nhắc **mở phiên** / bước tiếp (target `session-list`, **không** `navigateTo`).
-  - Progressive: thao tác xong 4a thì hint 4b mới hiện. Pattern giống Roster (`prevStageRef` / flag sessionStorage). Có thể tách `sessionsTourSteps` thành `sessionsPresetsStep` + `sessionsNextStep`.
-  - Typecheck + lint. Commit + push + đánh dấu phần 7.
+- **Phiên 4b — Hint sau khi tạo phiên thành công** ✅
+  - `sessionsNextStep` trỏ `[data-tour='session-list']`, **không** `navigateTo`.
+  - Gate: `consumeSessionsNextPending(classId)` + `sessions.length > 0` + chưa `getSeen(sessions-next)` + onboarding chưa xong. `createSessionAction` redirect nên hint hiện khi GV quay lại list.
+  - Bấm mở phiên → `setSeen(sessions-next)` + `STOP_EVENT`.
 
-- **Phiên 4c — Verify Sessions progressive**
-  - Rà: hint không tự chạy multi-step; đóng hint không tự hiện lại; replay `RESTART_EVENT` vẫn chạy được.
-  - `pnpm run typecheck` + `pnpm run lint` + `pnpm run build`. Commit + push + đánh dấu phần 7.
+- **Phiên 4c — Verify Sessions progressive** ✅
+  - Không auto-start multi-step: chỉ 1 hint presets (form mở) hoặc 1 hint next (sau tạo phiên).
+  - Đóng hint: `onEnd` + `presetsDismissed` / `showNextHint=false` + `setSeen` — không tự hiện lại. Hủy form cũng dismiss presets.
+  - Replay `RESTART_EVENT`: form đang mở → replay presets; list trống → mở form + replay presets; đã có phiên → replay next. `TeacherTour` thêm `restartToken`/`onEnd`.
 
 ### Phiên 5 — Progressive Share + Gradebook (chia 3)
 
-- **Phiên 5a — Progressive Share tour (1–2 hint)**
-  - File: `app/classes/[id]/share/share-view.tsx`, `components/tour/tour-config.ts` (`shareTourSteps`).
-  - Đổi Share từ multi-step liên tục thành **1–2 hint ngắn** (target `share-link` / `share-grades`). Hint bước n+1 chỉ hiện sau thao tác thật.
-  - **Chưa** đụng cờ onboarding ở phiên này. Typecheck + lint. Commit + push + đánh dấu phần 7.
+- **Phiên 5a — Progressive Share tour (1–2 hint)** ✅
+  - Tách `shareTourSteps` thành `shareLinkStep` + `shareGradesStep` (bỏ bước `share-done` khỏi tour).
+  - Vào trang → hint `share-link`. Copy link lớp → `STOP_EVENT` + hint `share-grades`. Copy link điểm → tắt hint grades.
+  - **Chưa** đụng `TOUR_ONBOARDING_SEEN_KEY`.
 
 - **Phiên 5b — Gradebook khớp tab-click, bỏ navigateTo**
   - File: `app/classes/[id]/gradebook/gradebook-view.tsx`, `gradebookTourSteps(classId)`.
@@ -228,10 +237,10 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 | 1 | Xác minh build + cập nhật docs/TOUR_HUONG_DAN_PLAN.md | ✅ Xong | Build pass (`pnpm run build`), typecheck pass, lint chỉ còn 9 warning `<img>` pre-existing. Đã thêm mục 5.6 (tour màn chiếu PowerPoint), sửa 4.1/4.3/5.4/6/8 cho khớp hiện trạng. |
 | 2 | Progressive Dashboard tour | ✅ Xong | `dashboardTourSteps` → 1 hint `create-class`. Bấm nút "Tạo lớp mới" → `setSeen(TOUR_DASHBOARD_SEEN_KEY)` + dispatch `STOP_EVENT` (tắt hint ngay, không chạy bước dư). Thêm `STOP_EVENT` vào `teacher-tour.tsx`/`tour-store.ts`. Build + typecheck + lint pass. |
 | 3 | Progressive Roster tour | ✅ Xong | Tạo `components/tour/roster-tour.tsx` (state machine `idle → list → leader → next → done`). `rosterTourSteps` tách thành `rosterListStep`/`rosterLeaderStep`/`rosterNextStep`; **bỏ `navigateTo`** bước cuối. `roster-view.tsx` dùng `<RosterTour ready hasMembers hasLeader>` thay `TeacherTour`. Hint bật khi stage đổi (`prevStageRef`), không tự hiện lại khi đã đóng; có replay `RESTART_EVENT`. Typecheck + lint (0 error, 9 warning cũ) + build pass. |
-| 4a | Sessions: hook "Tạo phiên mới" + hint presets 15/30/45 | ⏳ Chưa làm | Bỏ auto-start multi-step; hint chỉ hiện sau khi bấm nút |
-| 4b | Sessions: hint sau tạo phiên thành công (mở phiên / bước tiếp) | ⏳ Chưa làm | Không `navigateTo`; progressive theo hành động thật |
-| 4c | Sessions: verify + typecheck/lint/build | ⏳ Chưa làm | Replay `RESTART_EVENT`; hint đã đóng không tự hiện lại |
-| 5a | Share: đổi thành 1–2 hint ngắn progressive | ⏳ Chưa làm | Chưa đụng cờ onboarding |
+| 4a | Sessions: hook "Tạo phiên mới" + hint presets 15/30/45 | ✅ Xong | Bỏ auto-start multi-step. Form mở → `sessionsPresetsStep` trỏ `session-presets`. Bấm preset / tạo phiên → `setSeen` + `STOP_EVENT`. `sessionsTourSteps` giữ cho 4b. |
+| 4b | Sessions: hint sau tạo phiên thành công (mở phiên / bước tiếp) | ✅ Xong | `sessionsNextStep` trỏ `session-list`, không `navigateTo`. Marker `setSessionsNextPending` trước redirect; list `consume` rồi hiện hint. Bấm mở phiên → `setSeen` + `STOP_EVENT`. |
+| 4c | Sessions: verify + typecheck/lint/build | ✅ Xong | Không multi-step. Đóng hint (`onEnd`/`presetsDismissed`) không tự hiện lại. Replay `RESTART_EVENT`: form mở → presets; list trống → mở form; có phiên → next. `TeacherTour` thêm `restartToken`/`onEnd`. |
+| 5a | Share: đổi thành 1–2 hint ngắn progressive | ✅ Xong | `shareLinkStep` vào trang; copy link lớp → `shareGradesStep`. Bỏ bước `share-done` khỏi tour. **Chưa** set `TOUR_ONBOARDING_SEEN_KEY`. |
 | 5b | Gradebook: khớp tab-click, bỏ `navigateTo` sang Share | ⏳ Chưa làm | GV tự bấm tab Chia sẻ |
 | 5c | Share: set `TOUR_ONBOARDING_SEEN_KEY` khi hoàn tất | ⏳ Chưa làm | Mốc kết thúc onboarding; tour sau không auto-start |
 | 6a | PresentationTour lắng nghe `RESTART_EVENT` | ⏳ Chưa làm | Nút "Hướng dẫn" header replay được tour màn chiếu |
