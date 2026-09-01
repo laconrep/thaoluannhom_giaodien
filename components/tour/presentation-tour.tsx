@@ -39,13 +39,17 @@ export function PresentationTour({
   const [stage, setStage] = useState<Stage>("idle")
   const [run, setRun] = useState(false)
   const [replaying, setReplaying] = useState(false)
+  // Đọc localStorage trong effect (không đọc lúc render) để tránh hydration mismatch.
+  const [onboardingEnabled, setOnboardingEnabled] = useState(false)
+
+  useEffect(() => {
+    setOnboardingEnabled(
+      !getSeen(TOUR_ONBOARDING_SEEN_KEY) && !getSeen(PRESENTATION_TOUR_SEEN_KEY),
+    )
+  }, [])
 
   // Tự chạy khi onboarding chưa xong + chưa xem tour màn chiếu. Khi replay
   // (nút "Hướng dẫn") được kích hoạt, cho phép chạy kể cả sau khi đã xem.
-  const onboardingEnabled =
-    typeof window !== "undefined" &&
-    !getSeen(TOUR_ONBOARDING_SEEN_KEY) &&
-    !getSeen(PRESENTATION_TOUR_SEEN_KEY)
   const enabled = onboardingEnabled || replaying
 
   // Vào màn chiếu → bắt đầu từ hint mép trái.
@@ -74,6 +78,7 @@ export function PresentationTour({
     if (!enabled) return
     if (createSessionOpen && stage === "create-session") {
       setSeen(PRESENTATION_TOUR_SEEN_KEY)
+      setOnboardingEnabled(false)
       setReplaying(false)
       setRun(false)
       setStage("done")

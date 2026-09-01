@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { rotateShareTokenAction } from "@/app/actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,12 +29,17 @@ export function ShareView({
   const [, startTransition] = useTransition()
   const [linkDismissed, setLinkDismissed] = useState(false)
   const [showGradesHint, setShowGradesHint] = useState(false)
+  const [onboardingOpen, setOnboardingOpen] = useState(false)
+  const [origin, setOrigin] = useState("")
 
   const linkSeenKey = classTourSeenKey("share-link", classId)
   const gradesSeenKey = classTourSeenKey("share-grades", classId)
-  const onboardingOpen = !getSeen(TOUR_ONBOARDING_SEEN_KEY)
 
-  const origin = typeof window !== "undefined" ? window.location.origin : ""
+  useEffect(() => {
+    setOnboardingOpen(!getSeen(TOUR_ONBOARDING_SEEN_KEY))
+    setOrigin(window.location.origin)
+  }, [])
+
   const classUrl = `${origin}/c/${shareToken}`
   const gradesUrl = `${origin}/c/${shareToken}/grades`
 
@@ -50,20 +55,31 @@ export function ShareView({
     setSeen(gradesSeenKey)
     setShowGradesHint(false)
     setSeen(TOUR_ONBOARDING_SEEN_KEY)
+    setOnboardingOpen(false)
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(STOP_EVENT))
     }
   }
 
-  function copy(url: string, key: string) {
-    navigator.clipboard.writeText(url)
+  function afterCopy(key: string) {
     setCopied(key)
     setTimeout(() => setCopied(null), 2000)
     if (key === "class") {
       stopLinkHint()
-      if (onboardingOpen && !getSeen(gradesSeenKey)) setShowGradesHint(true)
+      if (!getSeen(TOUR_ONBOARDING_SEEN_KEY) && !getSeen(gradesSeenKey)) {
+        setShowGradesHint(true)
+      }
     }
     if (key === "grades") stopGradesHint()
+  }
+
+  function copy(url: string, key: string) {
+    const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined
+    if (clipboard?.writeText) {
+      clipboard.writeText(url).then(() => afterCopy(key)).catch(() => afterCopy(key))
+      return
+    }
+    afterCopy(key)
   }
 
   function rotate() {
@@ -84,6 +100,12 @@ export function ShareView({
         onEnd={() => {
           setLinkDismissed(true)
           setSeen(linkSeenKey)
+          if (getSeen(TOUR_ONBOARDING_SEEN_KEY)) return
+          if (getSeen(gradesSeenKey)) {
+            setSeen(TOUR_ONBOARDING_SEEN_KEY)
+            return
+          }
+          setShowGradesHint(true)
         }}
       />
       {showGradesHint && (
@@ -97,6 +119,7 @@ export function ShareView({
             setShowGradesHint(false)
             setSeen(gradesSeenKey)
             setSeen(TOUR_ONBOARDING_SEEN_KEY)
+            setOnboardingOpen(false)
           }}
         />
       )}

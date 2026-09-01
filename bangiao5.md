@@ -110,6 +110,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 14. ✅ (Phiên 5b) **Gradebook bỏ `navigateTo`**: xoá `data: { navigateTo: /classes/[id]/share }` khỏi bước cuối `gradebookTourSteps` (đổi tham số thành `_classId`). Hint trỏ `class-tabs` giờ chỉ nhắc "tự bấm tab Chia sẻ" — GV tự chuyển trang như roster/sessions. Xoá type `TourStepData` (không còn dùng). Trigger tab-click (`GRADEBOOK_TOUR_PENDING_KEY`/`consumeGradebookTourPending`) đã có sẵn từ trước, giữ nguyên. Cập nhật `docs/TOUR_HUONG_DAN_PLAN.md` 5.4. Typecheck + lint pass (9 warning cũ).
 15. ✅ (Phiên 5c) **Set cờ onboarding khi hoàn tất Share**: `share-view.tsx` giờ gọi `setSeen(TOUR_ONBOARDING_SEEN_KEY)` khi hint cuối (`share-grades`) kết thúc — cả khi GV copy link điểm (`stopGradesHint`) lẫn khi `onEnd` hint grades. Xác nhận các tour sau (màn chiếu `presentation-tour.tsx`, `presentation-start` hint board, `sessions` presets/next, `gradebook`) đều gate `!getSeen(TOUR_ONBOARDING_SEEN_KEY)` nên sẽ **không auto-start** sau khi cờ được set. Typecheck + lint + build pass.
 16. ✅ (Phiên 6a) **PresentationTour replay**: thêm listener `RESTART_EVENT` trong `components/tour/presentation-tour.tsx` (tham khảo `roster-tour.tsx`). Khi nhận event và `active` → `setReplaying(true)` + `setStage("edge")` + `setRun(true)` — nút "Hướng dẫn" header giờ replay được tour màn chiếu. Tách `enabled` thành `onboardingEnabled || replaying` để replay chạy kể cả khi tour đã xem (`setReplaying(false)` khi bấm "Tạo phiên mới" → `done`). Typecheck + lint pass.
+17. ✅ (Phiên 6b) **Test E2E luồng onboarding**: rà toàn bộ gate cờ. **Bug**: đóng hint Share-link (`onEnd`) không chuyển sang hint grades → `TOUR_ONBOARDING_SEEN_KEY` không set → lần 2 tour vẫn auto-start. **Fix**: `share-view.tsx` `onEnd` hint link → hiện hint grades (nếu chưa xong); copy clipboard có fallback; đọc `origin`/cờ onboarding trong `useEffect` (tránh hydration). `PresentationTour`/`RosterTour` đọc localStorage trong effect. Script `scripts/check-tour-onboarding.mjs` (`pnpm run check:tour`) mô phỏng lần 1 / lần 2 + assert 16 `data-tour`. Typecheck + lint pass (9 warning cũ).
 
 ## 4. Việc CHƯA LÀM / Tồn đọng
 
@@ -117,9 +118,9 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 2. ✅ (Đã xong) `docs/TOUR_HUONG_DAN_PLAN.md` **đã cập nhật**: thêm mục 5.6 (tour màn chiếu PowerPoint), sửa 4.1/4.3/5.4/6/8 cho khớp (roster global, gradebook tab-trigger, replay, checklist).
 3. ✅ (Đã xong) **Progressive Dashboard** — `dashboardTourSteps` đã thành hint 1 bước trỏ `create-class`; bấm nút "Tạo lớp mới" sẽ `setSeen(TOUR_DASHBOARD_SEEN_KEY)` + dispatch `STOP_EVENT` để tắt hint ngay. `TeacherTour` có thêm listener `STOP_EVENT` (dùng chung cho các tour progressive sau).
 4. Ảnh demo `docs/tour-screenshots/` **chưa có** cho tour màn chiếu PowerPoint + thay đổi bảng điểm.
-5. ✅ **Progressive Roster** xong. **Sessions 4a+4b+4c xong**. **Share 5a+5c xong** (2 hint: link → copy → grades, set `TOUR_ONBOARDING_SEEN_KEY` khi hint grades kết thúc). **Gradebook 5b xong** (bỏ `navigateTo`, giữ trigger tab-click). **Replay màn chiếu 6a xong**. **Còn lại**: 6b/6c test E2E, 7a–7c ảnh demo, 8 merge.
+5. ✅ **Progressive Roster** xong. **Sessions 4a+4b+4c xong**. **Share 5a+5c xong** (2 hint: link → copy → grades, set `TOUR_ONBOARDING_SEEN_KEY` khi hint grades kết thúc). **Gradebook 5b xong** (bỏ `navigateTo`, giữ trigger tab-click). **Replay màn chiếu 6a xong**. **E2E onboarding 6b xong** (script `pnpm run check:tour` PASS; fix đóng hint Share-link). **Còn lại**: 6c replay/mobile/theme, 7a–7c ảnh demo, 8 merge.
 6. ✅ **Replay màn chiếu** (đã xong ở 6a): `PresentationTour` **lắng nghe** `RESTART_EVENT` (nút "Hướng dẫn" header giờ replay được tour màn chiếu khi `active`).
-7. Chưa test thực tế trên trình duyệt có Supabase (phải có tài khoản).
+7. Chưa test thực tế trên trình duyệt có Supabase (phải có tài khoản). 6b đã chạy script cờ + rà `data-tour` (không cần login).
 8. Chưa merge PR #4 vào `main`.
 
 ## 5. Kế hoạch phiên code
@@ -185,10 +186,10 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
   - Bổ sung listener `RESTART_EVENT` để nút "Hướng dẫn" header replay được tour màn chiếu (reset stage về đầu khi `active`).
   - Typecheck + lint pass. Commit + push + đánh dấu phần 7.
 
-- **Phiên 6b — Test E2E luồng onboarding**
-  - Cần tài khoản Supabase. Luồng: Dashboard → tạo lớp → roster → phiên → màn chiếu PowerPoint → bảng điểm (bấm tab) → share.
-  - Test lần 2: cờ không hiện lại. Ghi bug vào phần 7 / commit fix nếu có.
-  - Commit (nếu có fix) + push + đánh dấu phần 7.
+- **Phiên 6b — Test E2E luồng onboarding** ✅
+  - Rà gate cờ: Dashboard → roster → phiên → chiếu → bảng điểm (tab) → share. **Lần 2** sau `TOUR_ONBOARDING_SEEN_KEY` không auto-start.
+  - **Bug đã fix**: đóng hint Share-link không mở hint grades → không set cờ tổng. `onEnd` share-link giờ chuyển sang grades.
+  - Script `scripts/check-tour-onboarding.mjs` (`pnpm run check:tour`) PASS. Typecheck + lint pass.
 
 - **Phiên 6c — Replay + mobile + theme**
   - Test replay nút "Hướng dẫn" trên từng trang (kể cả màn chiếu sau 6a).
@@ -247,7 +248,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 | 5b | Gradebook: khớp tab-click, bỏ `navigateTo` sang Share | ✅ Xong | Xoá `data.navigateTo` khỏi bước cuối `gradebookTourSteps` (đổi `_classId`), hint trỏ `class-tabs` chỉ nhắc tự bấm tab Chia sẻ. Xoá type `TourStepData`. Trigger tab-click giữ nguyên. Cập nhật plan 5.4. Typecheck + lint pass (9 warning cũ). |
 | 5c | Share: set `TOUR_ONBOARDING_SEEN_KEY` khi hoàn tất | ✅ Xong | `setSeen(TOUR_ONBOARDING_SEEN_KEY)` trong `stopGradesHint()` (copy link điểm) và `onEnd` hint `share-grades`. Xác nhận màn chiếu/phiên/bảng điểm đều gate `!getSeen(TOUR_ONBOARDING_SEEN_KEY)` → không auto-start sau khi cờ set. Typecheck + lint + build pass. |
 | 6a | PresentationTour lắng nghe `RESTART_EVENT` | ✅ Xong | Thêm listener `RESTART_EVENT`: khi `active` → `setReplaying(true)` + reset stage về `edge` + `setRun(true)`. Tách `enabled` = `onboardingEnabled || replaying` để replay chạy sau khi đã xem. `setReplaying(false)` khi bấm "Tạo phiên mới" (`done`). Typecheck + lint pass (9 warning cũ). |
-| 6b | Test E2E luồng onboarding (có Supabase) | ⏳ Chưa làm | Dashboard → roster → phiên → chiếu → bảng điểm → share; lần 2 cờ không hiện lại |
+| 6b | Test E2E luồng onboarding (có Supabase) | ✅ Xong | Rà gate cờ + 16 `data-tour`. **Fix**: đóng hint Share-link (`onEnd`) giờ mở hint grades rồi mới set `TOUR_ONBOARDING_SEEN_KEY`. Hydration: Share/Roster/PresentationTour đọc localStorage trong effect. Clipboard fallback. Script `pnpm run check:tour` PASS. Typecheck + lint (9 warning cũ). Chưa chạy trên trình duyệt có tài khoản Supabase (môi trường không có). |
 | 6c | Test replay + mobile + theme sáng/tối | ⏳ Chưa làm | Commit fix nếu có |
 | 7a | Dựng HTML giả lập màn chiếu | ⏳ Chưa làm | Pattern `/tmp/opencode/tour-demo/` |
 | 7b | Chụp PNG 4 cảnh tour màn chiếu | ⏳ Chưa làm | Vào `docs/tour-screenshots/` |

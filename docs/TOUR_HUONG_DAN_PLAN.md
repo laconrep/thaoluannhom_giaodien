@@ -191,7 +191,7 @@ Mục tiêu: tạo và chạy phiên đầu tiên.
 | Bước | Target | Nội dung | Kích hoạt |
 |------|--------|----------|-----------|
 | 1 | `data-tour="share-link"` | "Copy link này gửi cho học sinh. Học sinh dùng link để vào lớp và nộp bài." | Vào trang + onboarding chưa xong + chưa dismiss |
-| 2 | `data-tour="share-grades"` | "Copy link này để học sinh xem điểm (chỉ xem)." | Copy link lớp (`STOP_EVENT` link → hiện hint grades) |
+| 2 | `data-tour="share-grades"` | "Copy link này để học sinh xem điểm (chỉ xem)." | Copy link lớp **hoặc đóng hint link** (`onEnd` share-link → hiện hint grades) |
 | Xong | — | Kết thúc | Copy link điểm / `onEnd` hint grades → `setSeen(teacher_tour_seen_v1)` |
 
 Sau khi `teacher_tour_seen_v1` được set, các tour màn chiếu / phiên / bảng điểm **không còn auto-start** (đều gate `!getSeen(TOUR_ONBOARDING_SEEN_KEY)`).
@@ -259,11 +259,11 @@ Ghi chú kỹ thuật:
 - [x] `app/classes/[id]/sessions/[sid]/group-board.tsx` + `components/presentation-viewer.tsx`: gắn hint/tour màn chiếu PowerPoint.
 
 **Giai đoạn 3 — Kiểm thử** (còn tồn đọng, xem bangiao5)
-- [ ] Test luồng onboarding từ Dashboard → tạo lớp → roster → sessions → gradebook → share.
-- [ ] Test 2 lần chạy liên tiếp để xác nhận cờ localStorage (không hiện lại khi đã xem).
-- [ ] Test replay bằng nút "Hướng dẫn".
-- [ ] Test trên theme sáng/tối, màn hình nhỏ (mobile) — ẩn hoặc đơn giản hóa spotlight trên mobile nếu cần.
-- [ ] Chạy `pnpm run lint` và `pnpm run typecheck` (hiện pass, chỉ warning `<img>` pre-existing).
+- [x] Test luồng onboarding từ Dashboard → tạo lớp → roster → sessions → gradebook → share (6b: script `pnpm run check:tour` + rà gate/`data-tour`; đóng hint Share-link vẫn mở grades rồi set cờ tổng).
+- [x] Test 2 lần chạy liên tiếp để xác nhận cờ localStorage (không hiện lại khi đã xem) — 6b script PASS.
+- [ ] Test replay bằng nút "Hướng dẫn" (6c).
+- [ ] Test trên theme sáng/tối, màn hình nhỏ (mobile) — ẩn hoặc đơn giản hóa spotlight trên mobile nếu cần (6c).
+- [x] Chạy `pnpm run lint` và `pnpm run typecheck` (hiện pass, chỉ warning `<img>` pre-existing).
 
 ## 9. Đánh giá thành công
 

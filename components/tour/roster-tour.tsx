@@ -26,8 +26,11 @@ export function RosterTour({ ready, hasMembers, hasLeader }: RosterTourProps) {
   const [stage, setStage] = useState<Stage>("idle")
   const [run, setRun] = useState(false)
   const prevStageRef = useRef<Stage>("idle")
+  const [enabled, setEnabled] = useState(false)
 
-  const enabled = typeof window !== "undefined" && !rosterTourSeen()
+  useEffect(() => {
+    setEnabled(!rosterTourSeen())
+  }, [])
 
   // Vào trang (đã có nhóm, chưa xem tour) → hint danh sách học sinh.
   useEffect(() => {
@@ -90,6 +93,7 @@ export function RosterTour({ ready, hasMembers, hasLeader }: RosterTourProps) {
     if (data.status !== STATUS.FINISHED) return
     if (stage === "next") {
       setRosterTourSeen()
+      setEnabled(false)
       setStage("done")
     }
   }
