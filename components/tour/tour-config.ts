@@ -67,6 +67,16 @@ export function rosterNextStep(): Step {
   }
 }
 
+export function sessionsPresetsStep(): Step {
+  return {
+    target: "[data-tour='session-presets']",
+    placement: "bottom",
+    title: "Chọn thời lượng",
+    content:
+      "Chọn nhanh preset 15/30/45 phút (và số nhóm nếu có). Xong rồi bấm \"Tạo và vào ngay\".",
+  }
+}
+
 export function sessionsTourSteps(_classId: string): Step[] {
   return [
     {

@@ -24,8 +24,14 @@ import {
 } from "lucide-react"
 import { formatDate } from "@/lib/utils-format"
 import { TeacherTour } from "@/components/tour/teacher-tour"
-import { sessionsTourSteps } from "@/components/tour/tour-config"
-import { classTourSeenKey, getSeen, TOUR_ONBOARDING_SEEN_KEY } from "@/components/tour/tour-store"
+import { sessionsPresetsStep } from "@/components/tour/tour-config"
+import {
+  classTourSeenKey,
+  getSeen,
+  setSeen,
+  STOP_EVENT,
+  TOUR_ONBOARDING_SEEN_KEY,
+} from "@/components/tour/tour-store"
 
 type Kind = "group" | "individual"
 type Session = {
@@ -80,7 +86,15 @@ export function SessionListView({
   const hasFixed = fixedGroupsCount > 0
   const displayGroups = useFixed && hasFixed ? fixedGroupsCount : numGroups
 
+  function stopPresetsHint() {
+    setSeen(classTourSeenKey("sessions-presets", classId))
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(STOP_EVENT))
+    }
+  }
+
   function onCreate() {
+    stopPresetsHint()
     const finalTitle = title.trim() || (isGroup ? "Thảo luận mới" : "Giao việc cá nhân")
     startTransition(() => {
       createSessionAction(classId, {
@@ -99,13 +113,15 @@ export function SessionListView({
 
   return (
     <div className="flex flex-col gap-6">
-      <TeacherTour
-        tourId="sessions"
-        steps={sessionsTourSteps(classId)}
-        seenKey={classTourSeenKey("sessions", classId)}
-        autoStart
-        autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
-      />
+      {open && (
+        <TeacherTour
+          tourId="sessions-presets"
+          steps={[sessionsPresetsStep()]}
+          seenKey={classTourSeenKey("sessions-presets", classId)}
+          autoStart
+          autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+        />
+      )}
       <Card className="overflow-hidden border-0 shadow-sm ring-1 ring-border">
         <CardHeader className="flex-row items-start justify-between bg-gradient-to-br from-primary/5 to-accent/5">
           <div>
@@ -187,7 +203,7 @@ export function SessionListView({
                   <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
                   Chọn nhanh
                 </FieldLabel>
-                <div className="flex flex-wrap gap-2">
+                <div data-tour="session-presets" className="flex flex-wrap gap-2">
                   {presets.map((p) => (
                     <Button
                       key={p.label}
@@ -201,6 +217,7 @@ export function SessionListView({
                       onClick={() => {
                         setDuration(p.seconds)
                         if (p.groups && !(useFixed && hasFixed)) setNumGroups(p.groups)
+                        stopPresetsHint()
                       }}
                     >
                       {p.label}
