@@ -28,6 +28,13 @@ import { Switch } from "@/components/ui/switch"
 import { sounds, isSoundEnabled, setSoundEnabled } from "@/lib/sounds"
 import { PresentationUpload } from "@/components/presentation-upload"
 import { PresentationViewer, startPresentationMode } from "@/components/presentation-viewer"
+import { TeacherTour } from "@/components/tour/teacher-tour"
+import { presentationStartStep } from "@/components/tour/tour-config"
+import {
+  getSeen,
+  PRESENTATION_START_SEEN_KEY,
+  TOUR_ONBOARDING_SEEN_KEY,
+} from "@/components/tour/tour-store"
 import { QRCodeSVG } from "qrcode.react"
 import {
   ArrowLeft,
@@ -506,6 +513,7 @@ export function GroupSessionBoard({
                 size="sm"
                 className="gap-1 mr-auto text-xs"
                 onClick={openSessionPicker}
+                data-tour="presentation-all-sessions"
               >
                 <ArrowLeft className="size-3" aria-hidden="true" />
                 Tất cả phiên
@@ -534,7 +542,7 @@ export function GroupSessionBoard({
                 <Button variant="outline" size="sm" className="gap-1 text-xs px-2 h-7" onClick={() => {
                   setCreateTitleError(null)
                   setCreateSessionOpen(true)
-                }}>
+                }} data-tour="presentation-create-session">
                   <Plus className="size-3" aria-hidden="true" />
                   Tạo phiên mới
                 </Button>
@@ -623,13 +631,15 @@ export function GroupSessionBoard({
               </h3>
               <p className="text-xs text-muted-foreground">{className}</p>
 
-              <TimerPanel
-                sessionId={displaySession.id}
-                status={displaySession.status}
-                endsAt={displaySession.ends_at}
-                durationSeconds={displaySession.duration_seconds}
-                onChanged={handleSessionChanged}
-              />
+              <div data-tour="presentation-timer">
+                <TimerPanel
+                  sessionId={displaySession.id}
+                  status={displaySession.status}
+                  endsAt={displaySession.ends_at}
+                  durationSeconds={displaySession.duration_seconds}
+                  onChanged={handleSessionChanged}
+                />
+              </div>
 
               <div className="grid grid-cols-2 gap-1.5 mt-1">
                 <div className="rounded-md bg-muted/40 px-2 py-1.5 text-center">
@@ -684,6 +694,7 @@ export function GroupSessionBoard({
                   onClick={() => presentation ? startPresentationMode() : setSlideshowIdx(0)}
                   className="gap-1"
                   disabled={displayGroups.length === 0}
+                  data-tour="presentation-start"
                 >
                   <Presentation className="size-3" aria-hidden="true" />
                   Chế độ chiếu lớp
@@ -863,6 +874,15 @@ export function GroupSessionBoard({
 
   const mainContent = (
     <>
+      {isTeacher && (
+        <TeacherTour
+          tourId="presentation-start"
+          steps={[presentationStartStep()]}
+          seenKey={PRESENTATION_START_SEEN_KEY}
+          autoStart
+          autoStartWhen={!!presentation && !getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+        />
+      )}
       {renderBoard(false)}
       {openGroup && (
         <AnnotationEditor
@@ -960,6 +980,8 @@ export function GroupSessionBoard({
           durationSeconds={displaySession.duration_seconds}
           barsOnCollapse={displaySession.status === "running" || previewData !== null}
           onSessionChanged={handleSessionChanged}
+          sessionPickerOpen={sessionPickerOpen}
+          createSessionOpen={createSessionOpen}
           board={(openGroup) =>
             renderBoard(true, (id) => {
               const g = displayGroups.find((x) => x.id === id)
