@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import { createSessionAction, deleteSessionAction } from "@/app/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,6 +29,7 @@ import {
   classTourSeenKey,
   consumeSessionsNextPending,
   getSeen,
+  RESTART_EVENT,
   setSeen,
   setSessionsNextPending,
   STOP_EVENT,
@@ -77,6 +78,11 @@ export function SessionListView({
   const [useFixed, setUseFixed] = useState(fixedGroupsCount > 0)
   const [pending, startTransition] = useTransition()
   const [showNextHint, setShowNextHint] = useState(false)
+  const [presetsDismissed, setPresetsDismissed] = useState(false)
+  const [presetsReplayTick, setPresetsReplayTick] = useState(0)
+  const [nextReplayTick, setNextReplayTick] = useState(0)
+  const pendingPresetsReplay = useRef(false)
+  const pendingNextReplay = useRef(false)
 
   const isGroup = kind === "group"
   const title1 = isGroup ? "Thảo luận nhóm" : "Giao việc cá nhân"
@@ -99,6 +105,42 @@ export function SessionListView({
     if (!consumeSessionsNextPending(classId)) return
     setShowNextHint(true)
   }, [classId, sessions.length, nextSeenKey])
+
+  useEffect(() => {
+    if (!open || !pendingPresetsReplay.current) return
+    pendingPresetsReplay.current = false
+    setPresetsReplayTick((n) => n + 1)
+  }, [open])
+
+  useEffect(() => {
+    if (!showNextHint || !pendingNextReplay.current) return
+    pendingNextReplay.current = false
+    setNextReplayTick((n) => n + 1)
+  }, [showNextHint])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const onRestart = () => {
+      if (open) {
+        setPresetsReplayTick((n) => n + 1)
+        return
+      }
+      if (sessions.length === 0) {
+        pendingPresetsReplay.current = true
+        setPresetsDismissed(false)
+        setOpen(true)
+        return
+      }
+      if (showNextHint) {
+        setNextReplayTick((n) => n + 1)
+        return
+      }
+      pendingNextReplay.current = true
+      setShowNextHint(true)
+    }
+    window.addEventListener(RESTART_EVENT, onRestart)
+    return () => window.removeEventListener(RESTART_EVENT, onRestart)
+  }, [open, sessions.length, showNextHint])
 
   function stopPresetsHint() {
     setSeen(presetsSeenKey)
@@ -142,7 +184,12 @@ export function SessionListView({
           steps={[sessionsPresetsStep()]}
           seenKey={presetsSeenKey}
           autoStart
-          autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+          autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY) && !presetsDismissed}
+          restartToken={presetsReplayTick}
+          onEnd={() => {
+            setPresetsDismissed(true)
+            setSeen(presetsSeenKey)
+          }}
         />
       )}
       {!open && showNextHint && (
@@ -152,6 +199,11 @@ export function SessionListView({
           seenKey={nextSeenKey}
           autoStart
           autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+          restartToken={nextReplayTick}
+          onEnd={() => {
+            setShowNextHint(false)
+            setSeen(nextSeenKey)
+          }}
         />
       )}
       <Card className="overflow-hidden border-0 shadow-sm ring-1 ring-border">
@@ -314,7 +366,14 @@ export function SessionListView({
                   {pending && <Spinner className="mr-2" />}
                   Tạo và vào ngay
                 </Button>
-                <Button variant="ghost" onClick={() => setOpen(false)}>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setPresetsDismissed(true)
+                    setSeen(presetsSeenKey)
+                    setOpen(false)
+                  }}
+                >
                   Hủy
                 </Button>
               </div>

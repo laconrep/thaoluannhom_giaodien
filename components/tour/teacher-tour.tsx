@@ -15,6 +15,8 @@ type TeacherTourProps = {
   onComplete?: () => void
   isSeen?: () => boolean
   markSeen?: () => void
+  restartToken?: number
+  onEnd?: () => void
 }
 
 export function TeacherTour({
@@ -26,10 +28,13 @@ export function TeacherTour({
   onComplete,
   isSeen,
   markSeen,
+  restartToken = 0,
+  onEnd,
 }: TeacherTourProps) {
   const router = useRouter()
   const [run, setRun] = useState(false)
   const firstStepRef = useRef(false)
+  const prevRestartRef = useRef(restartToken)
   const seen = useMemo(() => isSeen ?? (() => getSeen(seenKey)), [isSeen, seenKey])
   const markAsSeen = useMemo(() => markSeen ?? (() => setSeen(seenKey)), [markSeen, seenKey])
 
@@ -64,6 +69,14 @@ export function TeacherTour({
     return () => window.removeEventListener(STOP_EVENT, onStop)
   }, [])
 
+  // Replay: chỉ chạy khi token đổi lúc tour đã mount, không tự chạy lúc mount.
+  useEffect(() => {
+    if (restartToken === prevRestartRef.current) return
+    prevRestartRef.current = restartToken
+    if (!restartToken) return
+    setRun(true)
+  }, [restartToken])
+
   function handleEvent(data: EventData) {
     if (data.type === EVENTS.STEP_AFTER) {
       const navigateTo = (data.step.data as { navigateTo?: string } | undefined)?.navigateTo
@@ -79,6 +92,7 @@ export function TeacherTour({
         markAsSeen()
         onComplete?.()
       }
+      onEnd?.()
     }
   }
 
