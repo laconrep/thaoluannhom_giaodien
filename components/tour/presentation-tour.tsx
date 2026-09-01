@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Joyride, EVENTS, STATUS, type EventData, type Step } from "react-joyride"
-import { getSeen, setSeen, PRESENTATION_TOUR_SEEN_KEY, TOUR_ONBOARDING_SEEN_KEY } from "./tour-store"
+import {
+  getSeen,
+  setSeen,
+  PRESENTATION_TOUR_SEEN_KEY,
+  RESTART_EVENT,
+  TOUR_ONBOARDING_SEEN_KEY,
+} from "./tour-store"
 import {
   tourLocale,
   tourOptions,
@@ -32,11 +38,15 @@ export function PresentationTour({
 }: PresentationTourProps) {
   const [stage, setStage] = useState<Stage>("idle")
   const [run, setRun] = useState(false)
+  const [replaying, setReplaying] = useState(false)
 
-  const enabled =
+  // Tự chạy khi onboarding chưa xong + chưa xem tour màn chiếu. Khi replay
+  // (nút "Hướng dẫn") được kích hoạt, cho phép chạy kể cả sau khi đã xem.
+  const onboardingEnabled =
     typeof window !== "undefined" &&
     !getSeen(TOUR_ONBOARDING_SEEN_KEY) &&
     !getSeen(PRESENTATION_TOUR_SEEN_KEY)
+  const enabled = onboardingEnabled || replaying
 
   // Vào màn chiếu → bắt đầu từ hint mép trái.
   useEffect(() => {
@@ -64,10 +74,24 @@ export function PresentationTour({
     if (!enabled) return
     if (createSessionOpen && stage === "create-session") {
       setSeen(PRESENTATION_TOUR_SEEN_KEY)
+      setReplaying(false)
       setRun(false)
       setStage("done")
     }
   }, [createSessionOpen, stage, enabled])
+
+  // Replay từ nút "Hướng dẫn" trên header: reset về hint mép trái khi đang chiếu.
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const onRestart = () => {
+      if (!active) return
+      setReplaying(true)
+      setStage("edge")
+      setRun(true)
+    }
+    window.addEventListener(RESTART_EVENT, onRestart)
+    return () => window.removeEventListener(RESTART_EVENT, onRestart)
+  }, [active])
 
   const steps = useMemo<Step[]>(() => {
     switch (stage) {

@@ -215,7 +215,7 @@ Tour màn hình chiếu lớp khi giáo viên đã upload PowerPoint, triển kh
 
 Ghi chú kỹ thuật:
 
-- `PresentationTour` dùng `key={`presentation-${stage}`}` để remount Joyride theo stage; chỉ stage "drawer" là multi-step (`continuous`), các stage khác là hint đơn.
+- `PresentationTour` dùng `key={`presentation-${stage}`}` để remount Joyride theo stage; chỉ stage "drawer" là multi-step (`continuous`), các stage khác là hint đơn. Lắng nghe `RESTART_EVENT`: khi đang chiếu (`active`) → replay từ hint mép trái (reset `stage` về `edge`), chạy được kể cả sau khi đã xem tour.
 - Drawer fullscreen render nội dung bằng `board(openGroup)` = `renderBoard(true, …)` → các target `presentation-timer/all-sessions/create-session` nằm trong `renderBoard` (nhánh embedded). Nút QR nằm riêng ở header drawer của `presentation-viewer.tsx`.
 - `startPresentation()` set `teacher_tour_presentation_start_seen_v1` để hint board không hiện lại.
 - Toàn bộ hint màn chiếu nằm trong block `isTeacher` nên học sinh không thấy.
@@ -226,7 +226,7 @@ Ghi chú kỹ thuật:
 - **Tour cục bộ** (Roster): tự hiện **lần đầu tiên duy nhất** (cờ toàn cục `teacher_tour_roster_seen_v1`) khi lớp đã có nhóm và chưa xem cờ; không hiện lại khi tạo lớp mới (vẫn quét cờ cũ `roster_intro_seen_*` để tương thích người đã xem modal cũ). **Progressive theo hành động**: hint danh sách HS → (kéo ≥1 HS vào nhóm) → hint nhóm trưởng → (gán leader) → hint chuyển tab.
 - **Tour màn chiếu PowerPoint**: tự hiện khi onboarding chưa xong + chưa xem cờ `teacher_tour_presentation_seen_v1`; tiến theo hành động thật (xem 5.6), set cờ khi bấm "Tạo phiên mới".
 - **Tour Bảng điểm**: chỉ tự chạy khi giáo viên bấm tab "Bảng điểm" (marker sessionStorage), không tự hiện khi mở trang trực tiếp.
-- **Replay**: nút "Hướng dẫn" trên header (dispatch `RESTART_EVENT`) mở lại tour của trang hiện tại từ đầu, không ghi đè cờ đã xem. TeacherTour và **RosterTour** đều lắng nghe `RESTART_EVENT`. **Lưu ý**: `PresentationTour` hiện chưa lắng nghe `RESTART_EVENT` (xem tồn đọng).
+- **Replay**: nút "Hướng dẫn" trên header (dispatch `RESTART_EVENT`) mở lại tour của trang hiện tại từ đầu, không ghi đè cờ đã xem. TeacherTour, RosterTour và **PresentationTour** (6a) đều lắng nghe `RESTART_EVENT`.
 - **Bỏ qua**: nút "Bỏ qua" cho phép kết thúc sớm; lần sau vẫn hiện lại (trừ khi đã hoàn thành).
 
 ## 7. Rủi ro & lưu ý kỹ thuật
