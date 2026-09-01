@@ -110,50 +110,105 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 7. Chưa test thực tế trên trình duyệt có Supabase (phải có tài khoản).
 8. Chưa merge PR #4 vào `main`.
 
-## 5. Kế hoạch 8 PHIÊN CODE
+## 5. Kế hoạch phiên code
 
-> Quy ước: mỗi phiên xong → chạy `pnpm run typecheck` + `pnpm run lint` (bắt buộc), build nếu sửa logic lớn → commit → push → cập nhật phần 7 file này → commit file → push.
+> Phiên 1–3 **đã xong, không đụng lại**. Phiên 4–8 được **chia mỗi cái thành 3 phiên nhỏ** (4a–8c) để phiên sau đọc là code tiếp được ngay.
+>
+> Quy ước: mỗi phiên nhỏ xong → chạy `pnpm run typecheck` + `pnpm run lint` (bắt buộc), build nếu sửa logic lớn → commit → push → cập nhật phần 7 file này → commit file → push.
 
-- **Phiên 1 — Xác minh & cập nhật tài liệu hiện tại**
+- **Phiên 1 — Xác minh & cập nhật tài liệu hiện tại** ✅
   - Chạy `pnpm run build` xác minh sau fix gradebook.
   - Cập nhật `docs/TOUR_HUONG_DAN_PLAN.md`: thêm tour màn chiếu PowerPoint (5.6), sửa 4.3/5.4/6 cho khớp (roster global, gradebook tab-trigger).
   - Commit + push. Đánh dấu xong ở phần 7.
 
-- **Phiên 2 — Progressive Dashboard tour**
+- **Phiên 2 — Progressive Dashboard tour** ✅
   - Đổi `dashboardTourSteps` thành hint 1 bước trỏ nút "Tạo lớp mới" (`create-class`); loại bỏ các bước dư nếu gây rối.
   - Đảm bảo hint tắt sau khi bấm nút (không chạy tiếp). Dùng `isSeen/markSeen` hoặc trigger theo onClick nếu cần.
   - Commit + push + cập nhật phần 7.
 
-- **Phiên 3 — Progressive Roster tour**
+- **Phiên 3 — Progressive Roster tour** ✅
   - Tách `rosterTourSteps` theo hành động: vào trang (list HS) → sau khi **kéo ≥1 HS vào nhóm** (`groups.some(g => g.members.length>0)`) hiện hint nhóm trưởng → sau khi **gán leader** (`groups.some(g => g.leaderId)`) hiện hint chuyển tab.
   - Bỏ `navigateTo` bước cuối (thay bằng "bấm tab Thảo luận nhóm").
   - Commit + push + cập nhật phần 7.
 
-- **Phiên 4 — Progressive Sessions tour**
-  - Hint chỉ hiện khi GV **bấm nút "Tạo phiên mới"** (hook onClick hiện có → set flag/dispatch) → hint presets 15/30/45.
-  - Sau khi **tạo phiên thành công** → hint nhắc mở phiên / bước tiếp.
-  - Commit + push + cập nhật phần 7.
+### Phiên 4 — Progressive Sessions tour (chia 3)
 
-- **Phiên 5 — Progressive Share tour & hoàn thiện Gradebook**
-  - Share tour: rà soát/đổi thành 1–2 hint ngắn; **bắt buộc set `TOUR_ONBOARDING_SEEN_KEY` khi hoàn thành** (mốc kết thúc onboarding).
-  - Gradebook: kiểm nội dung hint khớp trigger tab-click; bỏ `navigateTo` sang share nếu cần (để GV tự bấm tab).
-  - Commit + push + cập nhật phần 7.
+- **Phiên 4a — Hook nút "Tạo phiên mới" + hint presets**
+  - File chính: `app/classes/[id]/session-list-view.tsx`, `components/tour/tour-config.ts`, `components/tour/teacher-tour.tsx` (nếu cần `STOP_EVENT`).
+  - Hook onClick nút "Tạo phiên mới" (`data-tour="session-create"`) → set flag / dispatch → hiện **hint 1 bước** trỏ presets 15/30/45.
+  - Tour Sessions hiện đang multi-step liên tục — **bỏ auto-start multi-step**; hint presets **chỉ hiện sau khi GV bấm nút**.
+  - Typecheck + lint. Commit + push + đánh dấu phần 7.
 
-- **Phiên 6 — Kiểm thử end-to-end + replay màn chiếu**
-  - Test luồng thực tế có Supabase: Dashboard → tạo lớp → roster → phiên → màn chiếu PowerPoint → bảng điểm (bấm tab) → share.
-  - Test lại lần 2 để xác nhận cờ không hiện lại; test replay nút "Hướng dẫn".
-  - **Bổ sung** cho `PresentationTour` lắng nghe `RESTART_EVENT` (replay tour màn chiếu).
-  - Test mobile + theme sáng/tối. Commit fix (nếu có) + push + cập nhật phần 7.
+- **Phiên 4b — Hint sau khi tạo phiên thành công**
+  - Sau **tạo phiên thành công** (có session mới trong list) → hint 1 bước nhắc **mở phiên** / bước tiếp (target `session-list`, **không** `navigateTo`).
+  - Progressive: thao tác xong 4a thì hint 4b mới hiện. Pattern giống Roster (`prevStageRef` / flag sessionStorage). Có thể tách `sessionsTourSteps` thành `sessionsPresetsStep` + `sessionsNextStep`.
+  - Typecheck + lint. Commit + push + đánh dấu phần 7.
 
-- **Phiên 7 — Ảnh demo tour màn chiếu**
-  - Dựng file HTML giả lập màn chiếu (theo `/tmp/opencode/tour-demo/` pattern) và chụp: edge hint, drawer (timer+QR), "Tất cả phiên", "Tạo phiên mới".
-  - Thêm PNG vào `docs/tour-screenshots/` + cập nhật `index.html`.
-  - Commit + push + cập nhật phần 7.
+- **Phiên 4c — Verify Sessions progressive**
+  - Rà: hint không tự chạy multi-step; đóng hint không tự hiện lại; replay `RESTART_EVENT` vẫn chạy được.
+  - `pnpm run typecheck` + `pnpm run lint` + `pnpm run build`. Commit + push + đánh dấu phần 7.
 
-- **Phiên 8 — Merge & QA cuối**
-  - Rà toàn bộ diff PR #4; chạy đủ typecheck/lint/build.
-  - `gh pr merge` vào `main` (token: lấy từ `git credential fill` cho `github.com`, không in ra).
-  - Dọn dẹp, đánh dấu toàn bộ phần 7 hoàn thành, commit + push.
+### Phiên 5 — Progressive Share + Gradebook (chia 3)
+
+- **Phiên 5a — Progressive Share tour (1–2 hint)**
+  - File: `app/classes/[id]/share/share-view.tsx`, `components/tour/tour-config.ts` (`shareTourSteps`).
+  - Đổi Share từ multi-step liên tục thành **1–2 hint ngắn** (target `share-link` / `share-grades`). Hint bước n+1 chỉ hiện sau thao tác thật.
+  - **Chưa** đụng cờ onboarding ở phiên này. Typecheck + lint. Commit + push + đánh dấu phần 7.
+
+- **Phiên 5b — Gradebook khớp tab-click, bỏ navigateTo**
+  - File: `app/classes/[id]/gradebook/gradebook-view.tsx`, `gradebookTourSteps(classId)`.
+  - Kiểm hint khớp trigger tab "Bảng điểm" (`GRADEBOOK_TOUR_PENDING_KEY` / `consumeGradebookTourPending`).
+  - **Bỏ `navigateTo` sang Share** (nếu còn) — nhắc GV tự bấm tab Chia sẻ.
+  - Typecheck + lint. Commit + push + đánh dấu phần 7.
+
+- **Phiên 5c — Set cờ onboarding khi hoàn tất Share**
+  - **Bắt buộc** `setSeen(TOUR_ONBOARDING_SEEN_KEY)` khi hoàn thành Share (mốc kết thúc onboarding). `share-view.tsx` đang dùng `seenKey={TOUR_ONBOARDING_SEEN_KEY}` — xác nhận vẫn set khi FINISHED / thao tác xong hint cuối (`share-done`).
+  - Xác nhận các tour sau (màn chiếu / phiên / bảng điểm) **không auto-start** khi cờ này đã set.
+  - Typecheck + lint + build. Commit + push + đánh dấu phần 7.
+
+### Phiên 6 — Kiểm thử E2E + replay màn chiếu (chia 3)
+
+- **Phiên 6a — PresentationTour lắng nghe RESTART_EVENT**
+  - File: `components/tour/presentation-tour.tsx` (tham khảo `roster-tour.tsx`).
+  - Bổ sung listener `RESTART_EVENT` để nút "Hướng dẫn" header replay được tour màn chiếu (reset stage về đầu khi `active`).
+  - Typecheck + lint. Commit + push + đánh dấu phần 7.
+
+- **Phiên 6b — Test E2E luồng onboarding**
+  - Cần tài khoản Supabase. Luồng: Dashboard → tạo lớp → roster → phiên → màn chiếu PowerPoint → bảng điểm (bấm tab) → share.
+  - Test lần 2: cờ không hiện lại. Ghi bug vào phần 7 / commit fix nếu có.
+  - Commit (nếu có fix) + push + đánh dấu phần 7.
+
+- **Phiên 6c — Replay + mobile + theme**
+  - Test replay nút "Hướng dẫn" trên từng trang (kể cả màn chiếu sau 6a).
+  - Test mobile + theme sáng/tối. Commit fix (nếu có) + typecheck/lint + push + đánh dấu phần 7.
+
+### Phiên 7 — Ảnh demo tour màn chiếu (chia 3)
+
+- **Phiên 7a — Dựng HTML giả lập màn chiếu**
+  - Pattern `/tmp/opencode/tour-demo/`. Fake UI: edge mép trái, drawer (timer + QR), nút "Tất cả phiên", "Tạo phiên mới". Không cần Supabase.
+  - Commit mock (nếu đưa vào repo) hoặc ghi đường dẫn vào phần 7. Push + đánh dấu phần 7.
+
+- **Phiên 7b — Chụp PNG**
+  - Playwright chromium. Ảnh: edge hint, drawer (timer+QR), "Tất cả phiên", "Tạo phiên mới".
+  - Copy PNG vào `docs/tour-screenshots/`. Commit + push + đánh dấu phần 7.
+
+- **Phiên 7c — Cập nhật index demo**
+  - Cập nhật `docs/tour-screenshots/index.html` (hoặc file index tương ứng) gắn 4 ảnh mới.
+  - Commit + push + đánh dấu phần 7.
+
+### Phiên 8 — Merge & QA cuối (chia 3)
+
+- **Phiên 8a — Rà PR + typecheck/lint/build**
+  - Rà toàn bộ diff PR #4 so với `main`. Chạy đủ `pnpm run typecheck` + `pnpm run lint` + `pnpm run build`.
+  - Ghi checklist vào phần 7. **Chưa merge.** Commit (nếu có fix) + push + đánh dấu phần 7.
+
+- **Phiên 8b — Merge PR #4 vào main**
+  - `gh pr merge` PR #4 vào `main` (token: `git credential fill` cho `github.com`, **không in ra**).
+  - Xác nhận merge thành công trên GitHub. Đánh dấu phần 7.
+
+- **Phiên 8c — Dọn dẹp + đóng bàn giao**
+  - Dọn dẹp (nhánh local, ghi chú tồn đọng nếu còn). Đánh dấu **toàn bộ** phần 7 hoàn thành.
+  - Commit file bàn giao + push.
 
 ## 6. Lưu ý kỹ thuật quan trọng
 
@@ -173,8 +228,18 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 | 1 | Xác minh build + cập nhật docs/TOUR_HUONG_DAN_PLAN.md | ✅ Xong | Build pass (`pnpm run build`), typecheck pass, lint chỉ còn 9 warning `<img>` pre-existing. Đã thêm mục 5.6 (tour màn chiếu PowerPoint), sửa 4.1/4.3/5.4/6/8 cho khớp hiện trạng. |
 | 2 | Progressive Dashboard tour | ✅ Xong | `dashboardTourSteps` → 1 hint `create-class`. Bấm nút "Tạo lớp mới" → `setSeen(TOUR_DASHBOARD_SEEN_KEY)` + dispatch `STOP_EVENT` (tắt hint ngay, không chạy bước dư). Thêm `STOP_EVENT` vào `teacher-tour.tsx`/`tour-store.ts`. Build + typecheck + lint pass. |
 | 3 | Progressive Roster tour | ✅ Xong | Tạo `components/tour/roster-tour.tsx` (state machine `idle → list → leader → next → done`). `rosterTourSteps` tách thành `rosterListStep`/`rosterLeaderStep`/`rosterNextStep`; **bỏ `navigateTo`** bước cuối. `roster-view.tsx` dùng `<RosterTour ready hasMembers hasLeader>` thay `TeacherTour`. Hint bật khi stage đổi (`prevStageRef`), không tự hiện lại khi đã đóng; có replay `RESTART_EVENT`. Typecheck + lint (0 error, 9 warning cũ) + build pass. |
-| 4 | Progressive Sessions tour | ⏳ Chưa làm | |
-| 5 | Progressive Share + hoàn thiện Gradebook | ⏳ Chưa làm | |
-| 6 | Kiểm thử E2E + replay màn chiếu | ⏳ Chưa làm | |
-| 7 | Ảnh demo tour màn chiếu | ⏳ Chưa làm | |
-| 8 | Merge PR #4 + QA cuối | ⏳ Chưa làm | |
+| 4a | Sessions: hook "Tạo phiên mới" + hint presets 15/30/45 | ⏳ Chưa làm | Bỏ auto-start multi-step; hint chỉ hiện sau khi bấm nút |
+| 4b | Sessions: hint sau tạo phiên thành công (mở phiên / bước tiếp) | ⏳ Chưa làm | Không `navigateTo`; progressive theo hành động thật |
+| 4c | Sessions: verify + typecheck/lint/build | ⏳ Chưa làm | Replay `RESTART_EVENT`; hint đã đóng không tự hiện lại |
+| 5a | Share: đổi thành 1–2 hint ngắn progressive | ⏳ Chưa làm | Chưa đụng cờ onboarding |
+| 5b | Gradebook: khớp tab-click, bỏ `navigateTo` sang Share | ⏳ Chưa làm | GV tự bấm tab Chia sẻ |
+| 5c | Share: set `TOUR_ONBOARDING_SEEN_KEY` khi hoàn tất | ⏳ Chưa làm | Mốc kết thúc onboarding; tour sau không auto-start |
+| 6a | PresentationTour lắng nghe `RESTART_EVENT` | ⏳ Chưa làm | Nút "Hướng dẫn" header replay được tour màn chiếu |
+| 6b | Test E2E luồng onboarding (có Supabase) | ⏳ Chưa làm | Dashboard → roster → phiên → chiếu → bảng điểm → share; lần 2 cờ không hiện lại |
+| 6c | Test replay + mobile + theme sáng/tối | ⏳ Chưa làm | Commit fix nếu có |
+| 7a | Dựng HTML giả lập màn chiếu | ⏳ Chưa làm | Pattern `/tmp/opencode/tour-demo/` |
+| 7b | Chụp PNG 4 cảnh tour màn chiếu | ⏳ Chưa làm | Vào `docs/tour-screenshots/` |
+| 7c | Cập nhật `index.html` gắn ảnh mới | ⏳ Chưa làm | |
+| 8a | Rà PR #4 + typecheck/lint/build | ⏳ Chưa làm | Chưa merge |
+| 8b | Merge PR #4 vào `main` | ⏳ Chưa làm | Token `git credential fill`, không in ra |
+| 8c | Dọn dẹp + đánh dấu toàn bộ phần 7 xong | ⏳ Chưa làm | Commit file bàn giao + push |
