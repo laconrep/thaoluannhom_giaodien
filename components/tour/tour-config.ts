@@ -22,27 +22,15 @@ export const tourOptions: Partial<Options> = {
 
 type TourStepData = { navigateTo?: string }
 
+// Progressive: chỉ 1 hint trỏ nút "Tạo lớp mới". Hint tắt khi bấm nút (xem
+// CreateClassCard: onClick set cờ + dispatch STOP_EVENT), không chạy các bước dư.
 export const dashboardTourSteps: Step[] = [
-  {
-    target: "[data-tour='dashboard-header']",
-    placement: "bottom",
-    title: "Chào mừng đến Lớp học thảo luận",
-    content:
-      "Đây là nơi bạn quản lý tất cả lớp học, danh sách học sinh, phiên thảo luận và bảng điểm của mình.",
-  },
   {
     target: "[data-tour='create-class']",
     placement: "bottom",
     title: "Tạo lớp",
     content:
       "Nhấn \"Tạo lớp mới\", điền tên lớp, sĩ số và số nhóm cố định. Mỗi lớp dùng được cả năm học.",
-  },
-  {
-    target: "[data-tour='class-list']",
-    placement: "top",
-    title: "Lớp của bạn",
-    content:
-      "Sau khi tạo, lớp sẽ hiện ở đây. Bấm vào lớp để bắt đầu nhập tên học sinh và phân nhóm.",
   },
 ]
 

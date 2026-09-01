@@ -3,7 +3,7 @@
 import { Joyride, EVENTS, STATUS, type EventData, type Step } from "react-joyride"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { getSeen, setSeen, RESTART_EVENT } from "./tour-store"
+import { getSeen, setSeen, RESTART_EVENT, STOP_EVENT } from "./tour-store"
 import { tourLocale, tourOptions } from "./tour-config"
 
 type TeacherTourProps = {
@@ -53,6 +53,15 @@ export function TeacherTour({
     const onRestart = () => setRun(true)
     window.addEventListener(RESTART_EVENT, onRestart)
     return () => window.removeEventListener(RESTART_EVENT, onRestart)
+  }, [])
+
+  // Progressive: một hành động UI (ví dụ bấm nút được tour trỏ tới) có thể
+  // chủ động tắt hint đang hiện thay vì để Joyride chạy hết bước.
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const onStop = () => setRun(false)
+    window.addEventListener(STOP_EVENT, onStop)
+    return () => window.removeEventListener(STOP_EVENT, onStop)
   }, [])
 
   function handleEvent(data: EventData) {

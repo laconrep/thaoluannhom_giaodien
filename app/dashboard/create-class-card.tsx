@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
 import { Plus } from "lucide-react"
+import { setSeen, TOUR_DASHBOARD_SEEN_KEY, STOP_EVENT } from "@/components/tour/tour-store"
 
 export function CreateClassCard() {
   const [open, setOpen] = useState(false)
@@ -17,7 +18,20 @@ export function CreateClassCard() {
   if (!open) {
     return (
       <div>
-        <Button size="lg" onClick={() => setOpen(true)} className="gap-2" data-tour="create-class">
+        <Button
+          size="lg"
+          onClick={() => {
+            // Progressive dashboard: hint trỏ nút này — bấm là tắt hint, đánh
+            // dấu đã xem để lần sau không tự hiện lại (replay vẫn dùng được).
+            setSeen(TOUR_DASHBOARD_SEEN_KEY)
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent(STOP_EVENT))
+            }
+            setOpen(true)
+          }}
+          className="gap-2"
+          data-tour="create-class"
+        >
           <Plus className="size-4" aria-hidden="true" />
           Tạo lớp mới
         </Button>

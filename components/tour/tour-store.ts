@@ -6,6 +6,7 @@ export const PRESENTATION_START_SEEN_KEY = "teacher_tour_presentation_start_seen
 export const PRESENTATION_TOUR_SEEN_KEY = "teacher_tour_presentation_seen_v1"
 export const GRADEBOOK_TOUR_PENDING_KEY = "teacher_tour_gradebook_pending_v1"
 export const RESTART_EVENT = "teacher-tour:restart"
+export const STOP_EVENT = "teacher-tour:stop"
 
 export function classTourSeenKey(tourName: string, classId: string) {
   return `teacher_tour_${tourName}_${classId}`

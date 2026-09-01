@@ -95,16 +95,18 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 5. **Tour Bảng điểm chỉ hiện khi GV chủ động bấm tab "Bảng điểm"** (marker sessionStorage).
 6. Tour Sessions: bước cuối **không còn auto-navigate** sang gradebook (thay bằng hướng dẫn bấm tab).
 7. `pnpm run typecheck` + `pnpm run lint` (0 error, chỉ warning cũ) pass. `pnpm run build` đã pass trước thay đổi nhỏ gradebook-view (cần build lại xác minh ở Phiên 1).
+8. ✅ (Phiên 2) **Progressive Dashboard**: `dashboardTourSteps` thành hint 1 bước trỏ `create-class`; bấm nút "Tạo lớp mới" → `setSeen(TOUR_DASHBOARD_SEEN_KEY)` + dispatch `STOP_EVENT`. `TeacherTour` thêm listener `STOP_EVENT` (tái dùng cho tour progressive).
 
 ## 4. Việc CHƯA LÀM / Tồn đọng
 
 1. ✅ (Đã xong) Build đã chạy lại sau thay đổi gradebook-view — **pass** (`pnpm run build`). Typecheck pass, lint chỉ còn 9 warning pre-existing.
 2. ✅ (Đã xong) `docs/TOUR_HUONG_DAN_PLAN.md` **đã cập nhật**: thêm mục 5.6 (tour màn chiếu PowerPoint), sửa 4.1/4.3/5.4/6/8 cho khớp (roster global, gradebook tab-trigger, replay, checklist).
-3. Ảnh demo `docs/tour-screenshots/` **chưa có** cho tour màn chiếu PowerPoint + thay đổi bảng điểm.
-4. **Progressive refactor chưa làm cho Dashboard/Roster/Sessions/Share** — hiện các tour này vẫn là multi-step liên tục (chạy hết một lượt, có `navigateTo` xuyên trang ở Roster → sessions, Gradebook → share). Yêu cầu của user: "giáo viên thao tác xong bước n thì hint bước n+1 mới xuất hiện".
-5. **Replay màn chiếu**: `PresentationTour` **không lắng nghe** `RESTART_EVENT` (nút "Hướng dẫn" header chỉ replay các tour TeacherTour).
-6. Chưa test thực tế trên trình duyệt có Supabase (phải có tài khoản).
-7. Chưa merge PR #4 vào `main`.
+3. ✅ (Đã xong) **Progressive Dashboard** — `dashboardTourSteps` đã thành hint 1 bước trỏ `create-class`; bấm nút "Tạo lớp mới" sẽ `setSeen(TOUR_DASHBOARD_SEEN_KEY)` + dispatch `STOP_EVENT` để tắt hint ngay. `TeacherTour` có thêm listener `STOP_EVENT` (dùng chung cho các tour progressive sau).
+4. Ảnh demo `docs/tour-screenshots/` **chưa có** cho tour màn chiếu PowerPoint + thay đổi bảng điểm.
+5. **Progressive refactor chưa làm cho Roster/Sessions/Share** — hiện các tour này vẫn là multi-step liên tục (chạy hết một lượt, có `navigateTo` xuyên trang ở Roster → sessions, Gradebook → share). Yêu cầu của user: "giáo viên thao tác xong bước n thì hint bước n+1 mới xuất hiện".
+6. **Replay màn chiếu**: `PresentationTour` **không lắng nghe** `RESTART_EVENT` (nút "Hướng dẫn" header chỉ replay các tour TeacherTour).
+7. Chưa test thực tế trên trình duyệt có Supabase (phải có tài khoản).
+8. Chưa merge PR #4 vào `main`.
 
 ## 5. Kế hoạch 8 PHIÊN CODE
 
@@ -167,7 +169,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 | Phiên | Nội dung | Trạng thái | Ghi chú |
 |-------|----------|-----------|---------|
 | 1 | Xác minh build + cập nhật docs/TOUR_HUONG_DAN_PLAN.md | ✅ Xong | Build pass (`pnpm run build`), typecheck pass, lint chỉ còn 9 warning `<img>` pre-existing. Đã thêm mục 5.6 (tour màn chiếu PowerPoint), sửa 4.1/4.3/5.4/6/8 cho khớp hiện trạng. |
-| 2 | Progressive Dashboard tour | ⏳ Chưa làm | |
+| 2 | Progressive Dashboard tour | ✅ Xong | `dashboardTourSteps` → 1 hint `create-class`. Bấm nút "Tạo lớp mới" → `setSeen(TOUR_DASHBOARD_SEEN_KEY)` + dispatch `STOP_EVENT` (tắt hint ngay, không chạy bước dư). Thêm `STOP_EVENT` vào `teacher-tour.tsx`/`tour-store.ts`. Build + typecheck + lint pass. |
 | 3 | Progressive Roster tour | ⏳ Chưa làm | |
 | 4 | Progressive Sessions tour | ⏳ Chưa làm | |
 | 5 | Progressive Share + hoàn thiện Gradebook | ⏳ Chưa làm | |
