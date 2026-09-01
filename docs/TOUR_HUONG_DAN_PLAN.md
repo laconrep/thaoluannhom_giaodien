@@ -182,7 +182,7 @@ Mục tiêu: tạo và chạy phiên đầu tiên.
 |------|--------|----------|
 | 1 | `data-tour="gradebook-table"` | "Mỗi cột là một phiên, mỗi hàng là một học sinh. Điểm tự động tổng hợp." |
 | 2 | `data-tour="gradebook-export"` | "Xuất bảng điểm cuối kỳ ra file." |
-| 3 | `data-tour="class-tabs"` | "Cuối cùng, chia sẻ link cho học sinh xem điểm." → `navigateTo: /classes/[id]/share` |
+| 3 | `data-tour="class-tabs"` | "Cuối cùng, tự bấm tab \"Chia sẻ\" để gửi link cho học sinh xem điểm." (không `navigateTo` — nhắc GV tự bấm tab) |
 
 ### 5.5 Tour "Chia sẻ" — Share (bước kết thúc)
 

@@ -20,8 +20,6 @@ export const tourOptions: Partial<Options> = {
   buttons: ["back", "skip", "close", "primary"],
 }
 
-type TourStepData = { navigateTo?: string }
-
 // Progressive: chỉ 1 hint trỏ nút "Tạo lớp mới". Hint tắt khi bấm nút (xem
 // CreateClassCard: onClick set cờ + dispatch STOP_EVENT), không chạy các bước dư.
 export const dashboardTourSteps: Step[] = [
@@ -91,7 +89,7 @@ export function sessionsTourSteps(_classId: string): Step[] {
   return [sessionsPresetsStep(), sessionsNextStep()]
 }
 
-export function gradebookTourSteps(classId: string): Step[] {
+export function gradebookTourSteps(_classId: string): Step[] {
   return [
     {
       target: "[data-tour='gradebook-table']",
@@ -111,8 +109,8 @@ export function gradebookTourSteps(classId: string): Step[] {
       target: "[data-tour='class-tabs']",
       placement: "bottom",
       title: "Bước tiếp theo",
-      content: "Cuối cùng, mở tab \"Chia sẻ\" để gửi link cho học sinh xem điểm.",
-      data: { navigateTo: `/classes/${classId}/share` } satisfies TourStepData,
+      content:
+        "Cuối cùng, tự bấm tab \"Chia sẻ\" để gửi link cho học sinh xem điểm — tour sẽ hướng dẫn bạn tiếp theo.",
     },
   ]
 }
