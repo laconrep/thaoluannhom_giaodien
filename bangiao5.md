@@ -115,14 +115,16 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 17. ✅ (Phiên 6b) **Test E2E luồng onboarding**: rà toàn bộ gate cờ. **Bug**: đóng hint Share-link (`onEnd`) không chuyển sang hint grades → `TOUR_ONBOARDING_SEEN_KEY` không set → lần 2 tour vẫn auto-start. **Fix**: `share-view.tsx` `onEnd` hint link → hiện hint grades (nếu chưa xong); copy clipboard có fallback; đọc `origin`/cờ onboarding trong `useEffect` (tránh hydration). `PresentationTour`/`RosterTour` đọc localStorage trong effect. Script `scripts/check-tour-onboarding.mjs` (`pnpm run check:tour`) mô phỏng lần 1 / lần 2 + assert 16 `data-tour`. Typecheck + lint pass (9 warning cũ).
 18. ✅ (Phiên 6c) **Replay + mobile + theme**: `useTourOptions` (dark/light + width theo viewport). Tooltip CSS `max-width: min(380px, 100vw-24px)`. Nút Hướng dẫn compact trên mobile (chỉ icon). Overlay chiếu: nút HelpCircle cạnh X (`z-30`) vì header `z-30` bị đè `z-[70]`. Share replay chạy cả 2 hint (`shareReplay` + `isSeen={() => false}`). Dashboard: đóng form khi replay, `data-tour='create-class'` trên wrapper nút (không unmount). Presentation replay theo UI đang mở, không ghi đè stage. Edge: `onTouchStart` mở drawer. Remount replay 120ms. Typecheck + lint pass.
 19. ✅ (Phiên 7a) **HTML giả lập màn chiếu**: `docs/tour-demo/presentation.html` (copy `/tmp/opencode/tour-demo/`). 4 cảnh `?scene=edge|drawer|all-sessions|create-session` (+ `&shot=1` ẩn nav). Fake UI: mép trái, drawer (timer + QR), "Tất cả phiên", "Tạo phiên mới". Copy đúng `tour-config.ts`. Không cần Supabase.
+20. ✅ (Phiên 7b) **Chụp PNG 4 cảnh**: Playwright chromium 1280x720, `?scene=…&shot=1`. File: `docs/tour-screenshots/tour-3-presentation-{edge,drawer,all-sessions,create-session}.png`.
+21. ✅ (Phiên 7c) **Index demo**: `docs/tour-screenshots/index.html` thêm card "Tour màn chiếu PowerPoint (4 cảnh)".
 
 ## 4. Việc CHƯA LÀM / Tồn đọng
 
 1. ✅ (Đã xong) Build đã chạy lại sau thay đổi gradebook-view — **pass** (`pnpm run build`). Typecheck pass, lint chỉ còn 9 warning pre-existing.
 2. ✅ (Đã xong) `docs/TOUR_HUONG_DAN_PLAN.md` **đã cập nhật**: thêm mục 5.6 (tour màn chiếu PowerPoint), sửa 4.1/4.3/5.4/6/8 cho khớp (roster global, gradebook tab-trigger, replay, checklist).
 3. ✅ (Đã xong) **Progressive Dashboard** — `dashboardTourSteps` đã thành hint 1 bước trỏ `create-class`; bấm nút "Tạo lớp mới" sẽ `setSeen(TOUR_DASHBOARD_SEEN_KEY)` + dispatch `STOP_EVENT` để tắt hint ngay. `TeacherTour` có thêm listener `STOP_EVENT` (dùng chung cho các tour progressive sau).
-4. Ảnh demo `docs/tour-screenshots/` **chưa có** cho tour màn chiếu PowerPoint + thay đổi bảng điểm.
-5. ✅ **Progressive Roster** xong. **Sessions 4a+4b+4c xong**. **Share 5a+5c xong**. **Gradebook 5b xong**. **Replay màn chiếu 6a xong**. **E2E onboarding 6b xong**. **Replay/mobile/theme 6c xong**. **HTML giả lập chiếu 7a xong** (`docs/tour-demo/`). **Còn lại**: 7b–7c ảnh demo, 8 merge.
+4. ✅ Ảnh demo màn chiếu PowerPoint: 4 PNG trong `docs/tour-screenshots/` + index (7b+7c). Ảnh gradebook/share vẫn dùng HTML giả lập nếu cần.
+5. ✅ **Progressive Roster** xong. **Sessions 4a+4b+4c xong**. **Share 5a+5c xong**. **Gradebook 5b xong**. **Replay màn chiếu 6a xong**. **E2E onboarding 6b xong**. **Replay/mobile/theme 6c xong**. **HTML giả lập chiếu 7a xong**. **Ảnh demo 7b+7c xong**. **Còn lại**: 8 merge.
 6. ✅ **Replay màn chiếu** (đã xong ở 6a): `PresentationTour` **lắng nghe** `RESTART_EVENT` (nút "Hướng dẫn" header giờ replay được tour màn chiếu khi `active`).
 7. Chưa test thực tế trên trình duyệt có Supabase (phải có tài khoản). 6b đã chạy script cờ + rà `data-tour` (không cần login).
 8. Chưa merge PR #4 vào `main`.
@@ -205,13 +207,11 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
   - `docs/tour-demo/presentation.html` + `index.html` (copy `/tmp/opencode/tour-demo/`). Query `?scene=edge|drawer|all-sessions|create-session`, `&shot=1` ẩn nav khi 7b chụp.
   - Fake UI: edge, drawer timer+QR, "Tất cả phiên", "Tạo phiên mới". Copy hint từ `tour-config.ts`.
 
-- **Phiên 7b — Chụp PNG**
-  - Playwright chromium. Ảnh: edge hint, drawer (timer+QR), "Tất cả phiên", "Tạo phiên mới".
-  - Copy PNG vào `docs/tour-screenshots/`. Commit + push + đánh dấu phần 7.
+- **Phiên 7b — Chụp PNG** ✅
+  - Playwright chromium 1280x720. 4 PNG: `tour-3-presentation-{edge,drawer,all-sessions,create-session}.png` trong `docs/tour-screenshots/`.
 
-- **Phiên 7c — Cập nhật index demo**
-  - Cập nhật `docs/tour-screenshots/index.html` (hoặc file index tương ứng) gắn 4 ảnh mới.
-  - Commit + push + đánh dấu phần 7.
+- **Phiên 7c — Cập nhật index demo** ✅
+  - `docs/tour-screenshots/index.html` thêm card 4 ảnh màn chiếu.
 
 ### Phiên 8 — Merge & QA cuối (chia 3)
 
@@ -256,8 +256,8 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 | 6b | Test E2E luồng onboarding (có Supabase) | ✅ Xong | Rà gate cờ + 16 `data-tour`. **Fix**: đóng hint Share-link (`onEnd`) giờ mở hint grades rồi mới set `TOUR_ONBOARDING_SEEN_KEY`. Hydration: Share/Roster/PresentationTour đọc localStorage trong effect. Clipboard fallback. Script `pnpm run check:tour` PASS. Typecheck + lint (9 warning cũ). Chưa chạy trên trình duyệt có tài khoản Supabase (môi trường không có). |
 | 6c | Test replay + mobile + theme sáng/tối | ✅ Xong | `useTourOptions` theme/width. Overlay chiếu: nút HelpCircle cạnh X. Share replay 2 hint. Dashboard đóng form + `data-tour` trên wrapper. Presentation không ghi đè stage; replay theo UI đang mở. Mobile: nút compact, `onTouchStart` mép trái, CSS tooltip. Typecheck + lint pass (9 warning cũ). |
 | 7a | Dựng HTML giả lập màn chiếu | ✅ Xong | `docs/tour-demo/presentation.html` + copy `/tmp/opencode/tour-demo/`. 4 cảnh `?scene=edge\|drawer\|all-sessions\|create-session` (`&shot=1` ẩn nav). |
-| 7b | Chụp PNG 4 cảnh tour màn chiếu | ⏳ Chưa làm | Vào `docs/tour-screenshots/` |
-| 7c | Cập nhật `index.html` gắn ảnh mới | ⏳ Chưa làm | |
+| 7b | Chụp PNG 4 cảnh tour màn chiếu | ✅ Xong | Playwright chromium 1280x720. `tour-3-presentation-{edge,drawer,all-sessions,create-session}.png` trong `docs/tour-screenshots/`. |
+| 7c | Cập nhật `index.html` gắn ảnh mới | ✅ Xong | Card "Tour màn chiếu PowerPoint (4 cảnh)" trong `docs/tour-screenshots/index.html`. |
 | 8a | Rà PR #4 + typecheck/lint/build | ⏳ Chưa làm | Chưa merge |
 | 8b | Merge PR #4 vào `main` | ⏳ Chưa làm | Token `git credential fill`, không in ra |
 | 8c | Dọn dẹp + đánh dấu toàn bộ phần 7 xong | ⏳ Chưa làm | Commit file bàn giao + push |
