@@ -694,7 +694,6 @@ export function GroupSessionBoard({
                   onClick={() => presentation ? startPresentationMode() : setSlideshowIdx(0)}
                   className="gap-1"
                   disabled={displayGroups.length === 0}
-                  data-tour="presentation-start"
                 >
                   <Presentation className="size-3" aria-hidden="true" />
                   Chế độ chiếu lớp

@@ -121,7 +121,7 @@ Mỗi màn hình sẽ được gắn thuộc tính `data-tour="..."` vào các e
 - Tour Phân nhóm: `teacher_tour_roster_seen_v1` (**toàn cục, chỉ hiện lần đầu** — không theo lớp). Vẫn quét cờ cũ `roster_intro_seen_<classId>` để tương thích người đã xem modal cũ.
 - Tour Phiên thảo luận / Bảng điểm: `teacher_tour_<tour>_<classId>` (theo lớp) nhưng chỉ tự hiện khi `teacher_tour_seen_v1` chưa set.
 - Tour Bảng điểm: chỉ tự chạy khi giáo viên **chủ động bấm tab "Bảng điểm"** — tab click đặt marker `teacher_tour_gradebook_pending_v1` (sessionStorage) trước khi navigate; `gradebook-view` đọc + xoá marker khi mount rồi mới bật tour.
-- Hint màn chiếu: `teacher_tour_presentation_start_seen_v1` (hint "Chế độ chiếu lớp" trên board) và `teacher_tour_presentation_seen_v1` (tour màn chiếu PowerPoint, set khi bấm "Tạo phiên mới").
+- Hint màn chiếu: `teacher_tour_presentation_start_seen_v1` (hint nút FAB "Trình chiếu PowerPoint" góc phải dưới) và `teacher_tour_presentation_seen_v1` (tour màn chiếu PowerPoint, set khi bấm "Tạo phiên mới").
 - `RESTART_EVENT = "teacher-tour:restart"` — event replay từ nút "Hướng dẫn" trên header.
 - Giá trị cờ: `"1"` khi đã xem/hoàn thành.
 
@@ -206,7 +206,7 @@ Tour màn hình chiếu lớp khi giáo viên đã upload PowerPoint, triển kh
 
 | Giai đoạn | Target (data-tour) | Nội dung | Kích hoạt |
 |-----------|--------------------|----------|-----------|
-| Hint board (ngoài màn chiếu) | `presentation-start` (nút "Chế độ chiếu lớp", `group-board.tsx`, chỉ `isTeacher`) | "Bấm để mở PowerPoint ra toàn màn hình" | Tự hiện khi có PowerPoint + chưa xem onboarding; set `teacher_tour_presentation_start_seen_v1` khi bấm bắt đầu chiếu |
+| Hint board (ngoài màn chiếu) | `presentation-start` (nút FAB "Trình chiếu PowerPoint" góc phải dưới, `presentation-viewer.tsx`, chỉ `isTeacher`) | "Bấm nút góc phải dưới để mở PowerPoint ra toàn màn hình" | Tự hiện khi có PowerPoint + chưa xem onboarding; set `teacher_tour_presentation_start_seen_v1` + `STOP_EVENT` khi bấm FAB |
 | 1. Mép trái | `presentation-edge` (vùng hover `w-10` mép trái, `presentation-viewer.tsx`) | "Di chuột mép trái để mở bảng điều khiển" | Vào màn chiếu (fullscreen active) |
 | 2. Drawer | `presentation-timer` (chỉnh thời gian) → `presentation-qr` (nút "QR code" trong drawer) | Hướng dẫn bảng điều khiển ẩn | Giáo viên mở drawer; stage này `continuous` 2 bước |
 | 3. Tất cả phiên | `presentation-all-sessions` (nút "Tất cả phiên" trong `renderBoard` embedded) | "Xem/chọn phiên khác" | Giáo viên bấm "Tất cả phiên" |

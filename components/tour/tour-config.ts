@@ -146,7 +146,7 @@ export function presentationStartStep(): Step {
     placement: "top",
     title: "Trình chiếu PowerPoint",
     content:
-      "Bấm \"Chế độ chiếu lớp\" để mở PowerPoint ra toàn màn hình. Học sinh chỉ thấy màn chiếu, các nút điều khiển của bạn nằm gọn trong bảng điều khiển ẩn bên trái.",
+      "Bấm nút \"Trình chiếu PowerPoint\" góc phải dưới để mở PowerPoint ra toàn màn hình. Học sinh chỉ thấy màn chiếu, các nút điều khiển của bạn nằm gọn trong bảng điều khiển ẩn bên trái.",
   }
 }
 

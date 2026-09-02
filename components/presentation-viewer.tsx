@@ -23,7 +23,7 @@ import { useCountdown, formatClock } from "@/lib/use-countdown"
 import { endSessionAction, saveAnnotationAction } from "@/app/actions"
 import type { AnnotationItem, AnnotationRow, SubmissionRow } from "@/lib/types"
 import { PresentationTour } from "@/components/tour/presentation-tour"
-import { setSeen, PRESENTATION_START_SEEN_KEY, RESTART_EVENT } from "@/components/tour/tour-store"
+import { setSeen, PRESENTATION_START_SEEN_KEY, RESTART_EVENT, STOP_EVENT } from "@/components/tour/tour-store"
 
 export interface PresentationViewerProps {
   presentationId: string
@@ -267,8 +267,11 @@ export function PresentationViewer({
   }
 
   function startPresentation() {
-    setActive(true)
     setSeen(PRESENTATION_START_SEEN_KEY)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(STOP_EVENT))
+    }
+    setActive(true)
     const p = document.documentElement.requestFullscreen?.()
     if (p) p.catch(() => undefined)
     supabase
@@ -371,6 +374,7 @@ export function PresentationViewer({
           <Button
             onClick={startPresentation}
             className="fixed bottom-5 right-5 z-40 gap-2"
+            data-tour="presentation-start"
           >
             <Presentation className="size-4" />
             Trình chiếu PowerPoint

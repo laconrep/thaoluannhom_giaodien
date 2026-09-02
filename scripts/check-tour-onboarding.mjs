@@ -100,7 +100,7 @@ mark(local, classKey("sessions-next", CLASS_ID))
 
 assert(
   autoStartPresentationStart(local, true),
-  "Màn board: có PPT + onboarding chưa xong → hint Chế độ chiếu lớp",
+  "Màn board: có PPT + onboarding chưa xong → hint Trình chiếu PowerPoint",
 )
 assert(!autoStartPresentationStart(local, false), "Màn board: chưa upload PPT → không hiện hint chiếu")
 mark(local, KEYS.presentationStart)
@@ -156,7 +156,7 @@ const required = [
   ["app/classes/[id]/gradebook/gradebook-view.tsx", "gradebook-export"],
   ["app/classes/[id]/share/share-view.tsx", "share-link"],
   ["app/classes/[id]/share/share-view.tsx", "share-grades"],
-  ["app/classes/[id]/sessions/[sid]/group-board.tsx", "presentation-start"],
+  ["components/presentation-viewer.tsx", "presentation-start"],
   ["app/classes/[id]/sessions/[sid]/group-board.tsx", "presentation-timer"],
   ["app/classes/[id]/sessions/[sid]/group-board.tsx", "presentation-all-sessions"],
   ["app/classes/[id]/sessions/[sid]/group-board.tsx", "presentation-create-session"],

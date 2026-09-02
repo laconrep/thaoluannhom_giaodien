@@ -42,7 +42,7 @@
 | `TOUR_DASHBOARD_SEEN_KEY` = `"teacher_tour_dashboard_seen_v1"` | Tour Dashboard (toàn cục). |
 | `TOUR_ROSTER_SEEN_KEY` = `"teacher_tour_roster_seen_v1"` | Tour Phân nhóm — **toàn cục, chỉ hiện lần đầu**. |
 | `TOUR_ROSTER_SEEN_PREFIX` = `"roster_intro_seen_"` | Cờ cũ theo lớp (backward-compat, `rosterTourSeen()` quét prefix này). |
-| `PRESENTATION_START_SEEN_KEY` = `"teacher_tour_presentation_start_seen_v1"` | Hint "Chế độ chiếu lớp" trên màn board. |
+| `PRESENTATION_START_SEEN_KEY` = `"teacher_tour_presentation_start_seen_v1"` | Hint nút FAB "Trình chiếu PowerPoint" góc phải dưới. |
 | `PRESENTATION_TOUR_SEEN_KEY` = `"teacher_tour_presentation_seen_v1"` | Tour màn chiếu PowerPoint (set khi GV bấm "Tạo phiên mới" ở stage `create-session`). |
 | `GRADEBOOK_TOUR_PENDING_KEY` = `"teacher_tour_gradebook_pending_v1"` | Marker **sessionStorage** — set khi bấm tab "Bảng điểm"; gradebook-view đọc + xoá khi mount. |
 | `SESSIONS_NEXT_PENDING_PREFIX` = `"teacher_tour_sessions_next_pending_"` | Marker **sessionStorage** theo classId — set khi bấm "Tạo và vào ngay"; list đọc + xoá khi mount để hiện hint mở phiên. |
@@ -60,7 +60,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 | `session-create`, `session-presets`, `session-list` | `app/classes/[id]/session-list-view.tsx` | Tour Sessions. `session-presets` = cụm nút 15/30/45 (chỉ render khi form mở). |
 | `gradebook-table`, `gradebook-export` | `app/classes/[id]/gradebook/gradebook-view.tsx` | Tour Bảng điểm. |
 | `share-link`, `share-grades`, `share-done` | `app/classes/[id]/share/share-view.tsx` | Tour Chia sẻ. 5a: 2 hint progressive (`shareLinkStep` → copy link → `shareGradesStep`). `share-done` còn trên wrapper. 5c: **set `TOUR_ONBOARDING_SEEN_KEY` khi hint grades kết thúc** (copy link điểm hoặc `onEnd`). |
-| `presentation-start` | `group-board.tsx` — nút "Chế độ chiếu lớp" (`renderBoard` non-embedded) | Hint mở PowerPoint. |
+| `presentation-start` | `presentation-viewer.tsx` — nút FAB "Trình chiếu PowerPoint" (`fixed bottom-5 right-5`) | Hint mở PowerPoint. Không gắn trên nút sidebar "Chế độ chiếu lớp". |
 | `presentation-edge` | `presentation-viewer.tsx` — vùng hover mép trái (`absolute left-0 top-0 bottom-0 w-10 z-10`) | Mở drawer. |
 | `presentation-timer` | `group-board.tsx` — `<div>` bọc `TimerPanel` trong `renderBoard` | Chỉnh thời gian. |
 | `presentation-qr` | `presentation-viewer.tsx` — nút "QR code" trong header drawer | Tạo QR. |
@@ -97,7 +97,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 2. Hạ tầng tour (5 file components/tour/) + gắn vào Dashboard/Roster/Sessions/Gradebook/Share + nút replay header.
 3. Roster tour đổi sang **cờ toàn cục, chỉ hiện lần đầu** (`teacher_tour_roster_seen_v1`, có backward-compat `roster_intro_seen_*`).
 4. **Tour màn chiếu PowerPoint** (mới):
-   - Hint board trỏ nút "Chế độ chiếu lớp" (chỉ khi đã upload PowerPoint).
+    - Hint board trỏ nút FAB "Trình chiếu PowerPoint" góc phải dưới (chỉ khi đã upload PowerPoint).
    - Fullscreen: edge ("di chuột mép trái mở drawer") → drawer (timer + QR) → "Tất cả phiên" → "Tạo phiên mới" → xong.
    - Progressive theo hành động thật (mở drawer / bấm Tất cả phiên / bấm Tạo phiên mới).
 5. **Tour Bảng điểm chỉ hiện khi GV chủ động bấm tab "Bảng điểm"** (marker sessionStorage).
