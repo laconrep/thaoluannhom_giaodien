@@ -266,6 +266,7 @@ Ghi chú kỹ thuật:
 - [x] Chạy `pnpm run lint` và `pnpm run typecheck` (hiện pass, chỉ warning `<img>` pre-existing).
 - [x] HTML giả lập màn chiếu (7a): `docs/tour-demo/presentation.html` — 4 cảnh `?scene=edge|drawer|all-sessions|create-session`.
 - [x] Ảnh demo màn chiếu (7b+7c): 4 PNG + `docs/tour-screenshots/index.html`.
+- [x] 8a: typecheck + lint + build + `check:tour` trên `main` (PR #4 đã merge).
 
 ## 9. Đánh giá thành công
 

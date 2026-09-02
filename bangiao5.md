@@ -13,9 +13,9 @@
 ## 1. Tổng quan dự án & git
 
 - **App**: "Lớp học thảo luận" — Next.js (App Router), TypeScript, Tailwind, Supabase. Tài khoản giáo viên quản lý lớp, phân nhóm, phiên thảo luận nhóm, bảng điểm, chia sẻ.
-- **Branch đang làm**: `260829-feat-teacher-tour-guide` (base `main`).
+- **Branch đang làm**: `main` (HEAD `daa5d2b`). Nhánh `260829-feat-teacher-tour-guide` đã merge qua PR #4.
 - **Remote**: `https://github.com/laconrep/thaoluannhom_giaodien`
-- **PR #4** (chưa merge): `https://github.com/laconrep/thaoluannhom_giaodien/pull/4`
+- **PR #4**: đã merge vào `main` (closed + merged). PR #5 cùng head cũng merged. PR #3 `Update project files` vẫn **open** (không thuộc tour).
 - **Lệnh verify**: `pnpm run typecheck` (tsc --noEmit), `pnpm run lint` (eslint — đang có 9 warning `<img>`/eslint-disable **pre-existing, không phải lỗi mới**), `pnpm run build`.
 - **Cài thư viện**: `react-joyride@3.2.0` (đã cài). **Lưu ý v3 không có default export — phải `import { Joyride } from "react-joyride"`**; không có option `showSkipButton` (dùng `options.buttons: ["back","skip","close","primary"]`).
 - **Xác thực**: app yêu cầu đăng nhập Supabase nên chụp ảnh demo tour phải dùng file HTML tĩnh giả lập UI tại `docs/tour-demo/` (copy `/tmp/opencode/tour-demo/` — xem Phiên 7).
@@ -117,6 +117,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 19. ✅ (Phiên 7a) **HTML giả lập màn chiếu**: `docs/tour-demo/presentation.html` (copy `/tmp/opencode/tour-demo/`). 4 cảnh `?scene=edge|drawer|all-sessions|create-session` (+ `&shot=1` ẩn nav). Fake UI: mép trái, drawer (timer + QR), "Tất cả phiên", "Tạo phiên mới". Copy đúng `tour-config.ts`. Không cần Supabase.
 20. ✅ (Phiên 7b) **Chụp PNG 4 cảnh**: Playwright chromium 1280x720, `?scene=…&shot=1`. File: `docs/tour-screenshots/tour-3-presentation-{edge,drawer,all-sessions,create-session}.png`.
 21. ✅ (Phiên 7c) **Index demo**: `docs/tour-screenshots/index.html` thêm card "Tour màn chiếu PowerPoint (4 cảnh)".
+22. ✅ (Phiên 8a) **Rà PR + typecheck/lint/build**: PR #4/#5/#6/#7 **đã merge** vào `main` (tour nằm sẵn trên `main`, không còn nhánh feat). `pnpm run typecheck` pass, `pnpm run lint` 0 error / 9 warning `<img>` pre-existing, `pnpm run build` pass (Next.js 16.2.0), `pnpm run check:tour` PASS. **Chưa** merge thêm gì (8b).
 
 ## 4. Việc CHƯA LÀM / Tồn đọng
 
@@ -124,10 +125,10 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 2. ✅ (Đã xong) `docs/TOUR_HUONG_DAN_PLAN.md` **đã cập nhật**: thêm mục 5.6 (tour màn chiếu PowerPoint), sửa 4.1/4.3/5.4/6/8 cho khớp (roster global, gradebook tab-trigger, replay, checklist).
 3. ✅ (Đã xong) **Progressive Dashboard** — `dashboardTourSteps` đã thành hint 1 bước trỏ `create-class`; bấm nút "Tạo lớp mới" sẽ `setSeen(TOUR_DASHBOARD_SEEN_KEY)` + dispatch `STOP_EVENT` để tắt hint ngay. `TeacherTour` có thêm listener `STOP_EVENT` (dùng chung cho các tour progressive sau).
 4. ✅ Ảnh demo màn chiếu PowerPoint: 4 PNG trong `docs/tour-screenshots/` + index (7b+7c). Ảnh gradebook/share vẫn dùng HTML giả lập nếu cần.
-5. ✅ **Progressive Roster** xong. **Sessions 4a+4b+4c xong**. **Share 5a+5c xong**. **Gradebook 5b xong**. **Replay màn chiếu 6a xong**. **E2E onboarding 6b xong**. **Replay/mobile/theme 6c xong**. **HTML giả lập chiếu 7a xong**. **Ảnh demo 7b+7c xong**. **Còn lại**: 8 merge.
+5. ✅ **Progressive Roster** xong. **Sessions 4a+4b+4c xong**. **Share 5a+5c xong**. **Gradebook 5b xong**. **Replay màn chiếu 6a xong**. **E2E onboarding 6b xong**. **Replay/mobile/theme 6c xong**. **HTML giả lập chiếu 7a xong**. **Ảnh demo 7b+7c xong**. **8a QA xong**. **Còn lại**: 8b ghi nhận PR #4 đã merge, 8c dọn.
 6. ✅ **Replay màn chiếu** (đã xong ở 6a): `PresentationTour` **lắng nghe** `RESTART_EVENT` (nút "Hướng dẫn" header giờ replay được tour màn chiếu khi `active`).
 7. Chưa test thực tế trên trình duyệt có Supabase (phải có tài khoản). 6b đã chạy script cờ + rà `data-tour` (không cần login).
-8. Chưa merge PR #4 vào `main`.
+8. ✅ PR #4 đã merge vào `main` (8a xác nhận API: closed + merged). 8b không merge lại.
 
 ## 5. Kế hoạch phiên code
 
@@ -215,13 +216,12 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 
 ### Phiên 8 — Merge & QA cuối (chia 3)
 
-- **Phiên 8a — Rà PR + typecheck/lint/build**
-  - Rà toàn bộ diff PR #4 so với `main`. Chạy đủ `pnpm run typecheck` + `pnpm run lint` + `pnpm run build`.
-  - Ghi checklist vào phần 7. **Chưa merge.** Commit (nếu có fix) + push + đánh dấu phần 7.
+- **Phiên 8a — Rà PR + typecheck/lint/build** ✅
+  - PR #4/#5/#6/#7 đã merge; tour đang trên `main` (`daa5d2b`). Typecheck pass, lint 9 warning cũ, build pass, `check:tour` PASS.
+  - Checklist dưới. **Chưa merge thêm** (8b chỉ ghi nhận).
 
 - **Phiên 8b — Merge PR #4 vào main**
-  - `gh pr merge` PR #4 vào `main` (token: `git credential fill` cho `github.com`, **không in ra**).
-  - Xác nhận merge thành công trên GitHub. Đánh dấu phần 7.
+  - PR #4 **đã merge sẵn**. 8b: xác nhận trên GitHub, không gọi `gh pr merge` lại.
 
 - **Phiên 8c — Dọn dẹp + đóng bàn giao**
   - Dọn dẹp (nhánh local, ghi chú tồn đọng nếu còn). Đánh dấu **toàn bộ** phần 7 hoàn thành.
@@ -258,6 +258,6 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 | 7a | Dựng HTML giả lập màn chiếu | ✅ Xong | `docs/tour-demo/presentation.html` + copy `/tmp/opencode/tour-demo/`. 4 cảnh `?scene=edge\|drawer\|all-sessions\|create-session` (`&shot=1` ẩn nav). |
 | 7b | Chụp PNG 4 cảnh tour màn chiếu | ✅ Xong | Playwright chromium 1280x720. `tour-3-presentation-{edge,drawer,all-sessions,create-session}.png` trong `docs/tour-screenshots/`. |
 | 7c | Cập nhật `index.html` gắn ảnh mới | ✅ Xong | Card "Tour màn chiếu PowerPoint (4 cảnh)" trong `docs/tour-screenshots/index.html`. |
-| 8a | Rà PR #4 + typecheck/lint/build | ⏳ Chưa làm | Chưa merge |
+| 8a | Rà PR #4 + typecheck/lint/build | ✅ Xong | PR #4 đã merge. HEAD `main`=`daa5d2b`. typecheck pass; lint 0 error / 9 warning cũ; build pass; `check:tour` PASS. Chưa merge thêm. |
 | 8b | Merge PR #4 vào `main` | ⏳ Chưa làm | Token `git credential fill`, không in ra |
 | 8c | Dọn dẹp + đánh dấu toàn bộ phần 7 xong | ⏳ Chưa làm | Commit file bàn giao + push |
