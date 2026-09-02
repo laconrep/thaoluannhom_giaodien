@@ -11,13 +11,13 @@ import {
 } from "./tour-store"
 import {
   tourLocale,
-  tourOptions,
   presentationEdgeStep,
   presentationTimerStep,
   presentationQrStep,
   presentationAllSessionsStep,
   presentationCreateSessionStep,
 } from "./tour-config"
+import { useTourOptions } from "./use-tour-options"
 
 // Tour màn hình chiếu PowerPoint: từng hint xuất hiện theo hành động thật của
 // giáo viên — mở drawer → chỉnh thời gian/QR → "Tất cả phiên" → "Tạo phiên mới".
@@ -39,6 +39,7 @@ export function PresentationTour({
   const [stage, setStage] = useState<Stage>("idle")
   const [run, setRun] = useState(false)
   const [replaying, setReplaying] = useState(false)
+  const tourOptions = useTourOptions()
   // Đọc localStorage trong effect (không đọc lúc render) để tránh hydration mismatch.
   const [onboardingEnabled, setOnboardingEnabled] = useState(false)
 
@@ -52,10 +53,11 @@ export function PresentationTour({
   // (nút "Hướng dẫn") được kích hoạt, cho phép chạy kể cả sau khi đã xem.
   const enabled = onboardingEnabled || replaying
 
-  // Vào màn chiếu → bắt đầu từ hint mép trái.
+  // Vào màn chiếu → bắt đầu từ hint mép trái. Không ghi đè stage khi replay
+  // giữa chừng (drawer / picker đang mở).
   useEffect(() => {
     if (!enabled) return
-    if (active) setStage("edge")
+    if (active) setStage((s) => (s === "idle" || s === "done" ? "edge" : s))
     else setRun(false)
   }, [active, enabled])
 
@@ -91,12 +93,15 @@ export function PresentationTour({
     const onRestart = () => {
       if (!active) return
       setReplaying(true)
-      setStage("edge")
-      setRun(true)
+      if (sessionPickerOpen) setStage("create-session")
+      else if (drawerOpen) setStage("drawer")
+      else setStage("edge")
+      setRun(false)
+      window.setTimeout(() => setRun(true), 120)
     }
     window.addEventListener(RESTART_EVENT, onRestart)
     return () => window.removeEventListener(RESTART_EVENT, onRestart)
-  }, [active])
+  }, [active, drawerOpen, sessionPickerOpen])
 
   const steps = useMemo<Step[]>(() => {
     switch (stage) {

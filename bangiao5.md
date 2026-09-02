@@ -26,12 +26,13 @@
 
 | File | Vai trò | API quan trọng |
 |------|---------|----------------|
-| `teacher-tour.tsx` | Component `<Joyride>` dùng lại cho mọi tour theo trang | Props: `tourId`, `steps`, `seenKey`, `autoStart?`, `autoStartWhen?`, `onComplete?`, `isSeen?`, `markSeen?`, `restartToken?`, `onEnd?`. Xử lý `EVENTS.STEP_AFTER` + `step.data.navigateTo` → `router.push`; `EVENTS.TOUR_END` + `STATUS.FINISHED` → `markSeen()`; mọi `TOUR_END` → `onEnd()`. Lắng nghe `RESTART_EVENT`. `restartToken` đổi → `setRun(true)` (không tự chạy lúc mount). |
+| `teacher-tour.tsx` | Component `<Joyride>` dùng lại cho mọi tour theo trang | Props: `tourId`, `steps`, `seenKey`, `autoStart?`, `autoStartWhen?`, `onComplete?`, `isSeen?`, `markSeen?`, `restartToken?`, `onEnd?`, `listenRestart?` (mặc định true). Xử lý `EVENTS.STEP_AFTER` + `step.data.navigateTo` → `router.push`; `EVENTS.TOUR_END` + `STATUS.FINISHED` → `markSeen()`; mọi `TOUR_END` → `onEnd()`. Lắng nghe `RESTART_EVENT` (remount: `setRun(false)` → timeout 120ms `setRun(true)`). `restartToken` đổi → `setRun(true)` (không tự chạy lúc mount). Options từ `useTourOptions()` (theme/width). |
 | `roster-tour.tsx` | Tour phân nhóm **progressive** (state machine, không dùng TeacherTour) | Props: `ready`, `hasMembers`, `hasLeader`. Stage: `idle → list → leader → next → done`. Gate: `ready` (đã có nhóm) && `!rosterTourSeen()`. Chuyển stage theo hành động thật; bật hint khi stage đổi (remount `key={`roster-${stage}`}`, so sánh `prevStageRef` để không tự bật lại hint đã đóng); lắng nghe `RESTART_EVENT` replay. |
 | `tour-config.ts` | Định nghĩa steps + locale/options | `tourLocale` (VN), `tourOptions` (zIndex 200). Factories: `dashboardTourSteps`, `rosterListStep`, `rosterLeaderStep`, `rosterNextStep`, `sessionsPresetsStep`, `sessionsNextStep`, `sessionsTourSteps(_classId)`, `gradebookTourSteps(classId)`, `shareLinkStep`, `shareGradesStep`, `shareTourSteps(classId)`, `presentationStartStep`, `presentationEdgeStep`, `presentationTimerStep`, `presentationQrStep`, `presentationAllSessionsStep`, `presentationCreateSessionStep`. |
 | `tour-store.ts` | Keys + helper localStorage/sessionStorage | Xem 2.2. |
-| `tour-replay-button.tsx` | Nút "Hướng dẫn" trên header | Dispatch `window.dispatchEvent(new CustomEvent(RESTART_EVENT))`. |
-| `presentation-tour.tsx` | Tour màn chiếu PowerPoint (state machine) | Props: `active`, `drawerOpen`, `sessionPickerOpen`, `createSessionOpen`. Stage: `idle → edge → drawer → all-sessions → create-session → done`. Gate: onboarding chưa xong (`!getSeen(TOUR_ONBOARDING_SEEN_KEY)`) && chưa xem (`!getSeen(PRESENTATION_TOUR_SEEN_KEY)`), **hoặc** đang replay (nút "Hướng dẫn"). Joyride có `key={`presentation-${stage}`}` (remount theo stage); chỉ stage "drawer" là `continuous` (2 bước: timer + QR). 6a: lắng nghe `RESTART_EVENT` — khi `active` → `setReplaying(true)` + reset stage về `edge`. |
+| `tour-replay-button.tsx` | Nút "Hướng dẫn" trên header | Dispatch `RESTART_EVENT`. Mobile: chỉ icon (`sm:inline` chữ "Hướng dẫn"). |
+| `use-tour-options.ts` | Hook options Joyride theo theme + viewport | MutationObserver `html.dark`; `width = min(380, max(260, innerWidth-24))`; màu nền/chữ/overlay/primary theo dark/light. |
+| `presentation-tour.tsx` | Tour màn chiếu PowerPoint (state machine) | Props: `active`, `drawerOpen`, `sessionPickerOpen`, `createSessionOpen`. Stage: `idle → edge → drawer → all-sessions → create-session → done`. Gate: onboarding chưa xong && chưa xem, **hoặc** đang replay. Joyride `key={`presentation-${stage}`}`; stage "drawer" `continuous`. Replay `RESTART_EVENT` khi `active`: `setReplaying(true)` + stage theo UI đang mở (picker → `create-session`, drawer → `drawer`, không thì `edge`) + remount 120ms. Không ghi đè stage khi đã rời `idle`/`done`. |
 
 ### 2.2 Keys localStorage/sessionStorage (tour-store.ts)
 
@@ -78,7 +79,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
   - Quay lại list: `consumeSessionsNextPending` + `sessions.length > 0` + chưa xem `sessions-next` → `<TeacherTour tourId="sessions-next" steps={[sessionsNextStep()]}>` trỏ `session-list`. Bấm mở phiên → `setSeen(sessions-next)` + `STOP_EVENT`. **Không** `navigateTo`.
   - Replay `RESTART_EVENT`: form mở → presets; list trống → mở form + presets; đã có phiên → next. Đóng hint (`onEnd`/`presetsDismissed`) không tự hiện lại.
 - `app/classes/[id]/gradebook/gradebook-view.tsx`: `<TeacherTour tourId="gradebook" … seenKey={classTourSeenKey("gradebook", classId)} autoStart autoStartWhen={tabTriggered && !getSeen(TOUR_ONBOARDING_SEEN_KEY)}>` — `tabTriggered` từ marker sessionStorage (đọc trong `useEffect`, **không đọc trong useState initializer để tránh hydration mismatch**). Bước cuối **không** `navigateTo` — chỉ nhắc GV tự bấm tab Chia sẻ (5b).
-- `app/classes/[id]/share/share-view.tsx`: **không còn** multi-step `shareTourSteps`. Vào trang → `<TeacherTour tourId="share-link" steps={[shareLinkStep()]} seenKey={classTourSeenKey("share-link", classId)}>` (gate onboarding chưa xong + `!linkDismissed`). Copy link lớp → `STOP_EVENT` + hiện `<TeacherTour tourId="share-grades" steps={[shareGradesStep()]}>`. Copy link điểm → tắt hint grades + `setSeen(TOUR_ONBOARDING_SEEN_KEY)`; `onEnd` hint grades cũng set cờ (mốc kết thúc onboarding).
+- `app/classes/[id]/share/share-view.tsx`: **không còn** multi-step `shareTourSteps`. Vào trang → hint link (gate onboarding + `!linkDismissed`). Copy/đóng link → hint grades. Copy/`onEnd` grades → `setSeen(TOUR_ONBOARDING_SEEN_KEY)`. 6c: replay `RESTART_EVENT` set `shareReplay` (bỏ `seen()`), chạy lại 2 hint; grades `listenRestart={false}` để không đè hint link.
 - `app/classes/[id]/sessions/[sid]/group-board.tsx`:
   - Hint board: `<TeacherTour tourId="presentation-start" steps={[presentationStartStep()]} seenKey={PRESENTATION_START_SEEN_KEY} autoStart autoStartWhen={!!presentation && !getSeen(TOUR_ONBOARDING_SEEN_KEY)} />` (nằm đầu `mainContent`, chỉ khi `isTeacher`).
   - Truyền `sessionPickerOpen` + `createSessionOpen` cho `PresentationViewer`.
@@ -87,7 +88,8 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
   - Render `<PresentationTour active={active} drawerOpen={drawerOpen} sessionPickerOpen={sessionPickerOpen} createSessionOpen={createSessionOpen} />` trong block `{isTeacher && …}` của nhánh active.
   - `startPresentation()` gọi `setSeen(PRESENTATION_START_SEEN_KEY)` để hint board không hiện lại.
 - `app/classes/[id]/class-tabs.tsx`: tab "Bảng điểm" có `onClick={() => setGradebookTourPending()}` (chỉ tab href chứa `/gradebook`).
-- `components/teacher-shell.tsx`: nút "Hướng dẫn" (TourReplayButton).
+- `components/teacher-shell.tsx`: nút "Hướng dẫn" (TourReplayButton — mobile chỉ icon).
+- Overlay chiếu (`presentation-viewer.tsx`): nút HelpCircle cạnh X dispatch `RESTART_EVENT` (header bị overlay `z-[70]` đè).
 
 ## 3. Việc ĐÃ LÀM (tính đến commit `636ee69`)
 
@@ -111,6 +113,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 15. ✅ (Phiên 5c) **Set cờ onboarding khi hoàn tất Share**: `share-view.tsx` giờ gọi `setSeen(TOUR_ONBOARDING_SEEN_KEY)` khi hint cuối (`share-grades`) kết thúc — cả khi GV copy link điểm (`stopGradesHint`) lẫn khi `onEnd` hint grades. Xác nhận các tour sau (màn chiếu `presentation-tour.tsx`, `presentation-start` hint board, `sessions` presets/next, `gradebook`) đều gate `!getSeen(TOUR_ONBOARDING_SEEN_KEY)` nên sẽ **không auto-start** sau khi cờ được set. Typecheck + lint + build pass.
 16. ✅ (Phiên 6a) **PresentationTour replay**: thêm listener `RESTART_EVENT` trong `components/tour/presentation-tour.tsx` (tham khảo `roster-tour.tsx`). Khi nhận event và `active` → `setReplaying(true)` + `setStage("edge")` + `setRun(true)` — nút "Hướng dẫn" header giờ replay được tour màn chiếu. Tách `enabled` thành `onboardingEnabled || replaying` để replay chạy kể cả khi tour đã xem (`setReplaying(false)` khi bấm "Tạo phiên mới" → `done`). Typecheck + lint pass.
 17. ✅ (Phiên 6b) **Test E2E luồng onboarding**: rà toàn bộ gate cờ. **Bug**: đóng hint Share-link (`onEnd`) không chuyển sang hint grades → `TOUR_ONBOARDING_SEEN_KEY` không set → lần 2 tour vẫn auto-start. **Fix**: `share-view.tsx` `onEnd` hint link → hiện hint grades (nếu chưa xong); copy clipboard có fallback; đọc `origin`/cờ onboarding trong `useEffect` (tránh hydration). `PresentationTour`/`RosterTour` đọc localStorage trong effect. Script `scripts/check-tour-onboarding.mjs` (`pnpm run check:tour`) mô phỏng lần 1 / lần 2 + assert 16 `data-tour`. Typecheck + lint pass (9 warning cũ).
+18. ✅ (Phiên 6c) **Replay + mobile + theme**: `useTourOptions` (dark/light + width theo viewport). Tooltip CSS `max-width: min(380px, 100vw-24px)`. Nút Hướng dẫn compact trên mobile (chỉ icon). Overlay chiếu: nút HelpCircle cạnh X (`z-30`) vì header `z-30` bị đè `z-[70]`. Share replay chạy cả 2 hint (`shareReplay` + `isSeen={() => false}`). Dashboard: đóng form khi replay, `data-tour='create-class'` trên wrapper nút (không unmount). Presentation replay theo UI đang mở, không ghi đè stage. Edge: `onTouchStart` mở drawer. Remount replay 120ms. Typecheck + lint pass.
 
 ## 4. Việc CHƯA LÀM / Tồn đọng
 
@@ -118,7 +121,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 2. ✅ (Đã xong) `docs/TOUR_HUONG_DAN_PLAN.md` **đã cập nhật**: thêm mục 5.6 (tour màn chiếu PowerPoint), sửa 4.1/4.3/5.4/6/8 cho khớp (roster global, gradebook tab-trigger, replay, checklist).
 3. ✅ (Đã xong) **Progressive Dashboard** — `dashboardTourSteps` đã thành hint 1 bước trỏ `create-class`; bấm nút "Tạo lớp mới" sẽ `setSeen(TOUR_DASHBOARD_SEEN_KEY)` + dispatch `STOP_EVENT` để tắt hint ngay. `TeacherTour` có thêm listener `STOP_EVENT` (dùng chung cho các tour progressive sau).
 4. Ảnh demo `docs/tour-screenshots/` **chưa có** cho tour màn chiếu PowerPoint + thay đổi bảng điểm.
-5. ✅ **Progressive Roster** xong. **Sessions 4a+4b+4c xong**. **Share 5a+5c xong** (2 hint: link → copy → grades, set `TOUR_ONBOARDING_SEEN_KEY` khi hint grades kết thúc). **Gradebook 5b xong** (bỏ `navigateTo`, giữ trigger tab-click). **Replay màn chiếu 6a xong**. **E2E onboarding 6b xong** (script `pnpm run check:tour` PASS; fix đóng hint Share-link). **Còn lại**: 6c replay/mobile/theme, 7a–7c ảnh demo, 8 merge.
+5. ✅ **Progressive Roster** xong. **Sessions 4a+4b+4c xong**. **Share 5a+5c xong**. **Gradebook 5b xong**. **Replay màn chiếu 6a xong**. **E2E onboarding 6b xong**. **Replay/mobile/theme 6c xong**. **Còn lại**: 7a–7c ảnh demo, 8 merge.
 6. ✅ **Replay màn chiếu** (đã xong ở 6a): `PresentationTour` **lắng nghe** `RESTART_EVENT` (nút "Hướng dẫn" header giờ replay được tour màn chiếu khi `active`).
 7. Chưa test thực tế trên trình duyệt có Supabase (phải có tài khoản). 6b đã chạy script cờ + rà `data-tour` (không cần login).
 8. Chưa merge PR #4 vào `main`.
@@ -191,9 +194,9 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
   - **Bug đã fix**: đóng hint Share-link không mở hint grades → không set cờ tổng. `onEnd` share-link giờ chuyển sang grades.
   - Script `scripts/check-tour-onboarding.mjs` (`pnpm run check:tour`) PASS. Typecheck + lint pass.
 
-- **Phiên 6c — Replay + mobile + theme**
-  - Test replay nút "Hướng dẫn" trên từng trang (kể cả màn chiếu sau 6a).
-  - Test mobile + theme sáng/tối. Commit fix (nếu có) + typecheck/lint + push + đánh dấu phần 7.
+- **Phiên 6c — Replay + mobile + theme** ✅
+  - Replay từng trang: Share 2 hint (`shareReplay`); Dashboard đóng form khi replay; chiếu: nút HelpCircle trên overlay + stage theo UI đang mở.
+  - Theme: `useTourOptions` (MutationObserver `html.dark`); width `min(380, max(260, innerWidth-24))`; CSS tooltip; nút Hướng dẫn chỉ icon trên mobile; `onTouchStart` mép trái. Typecheck + lint pass.
 
 ### Phiên 7 — Ảnh demo tour màn chiếu (chia 3)
 
@@ -229,6 +232,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 - `TeacherTour`: `isSeen`/`markSeen` override cho phép logic cờ tùy biến (đã dùng cho roster global). `markSeen()` được gọi khi navigate (STEP_AFTER có `navigateTo`) và khi FINISHED.
 - `PresentationTour`: dùng `key={`presentation-${stage}`}` để remount Joyride mỗi stage; stage "drawer" mới `continuous`. Các stage khác là hint single-step, chỉ tiến khi có hành động thật (effect theo prop).
 - **Hydration**: không đọc `localStorage`/`sessionStorage` trong `useState` initializer — đọc trong `useEffect` (xem gradebook-view). `getSeen/setSeen` tự guard `typeof window === "undefined"`.
+- **Theme/mobile (6c)**: `useTourOptions` đọc `html.dark` + `innerWidth`; CSS `.react-joyride__tooltip { max-width: min(380px, calc(100vw - 24px)) }`. Overlay chiếu `z-[70]` đè header → nút replay trong overlay. `disableFocusTrap: true`.
 - Cờ tour **không gắn tài khoản**, chỉ theo trình duyệt.
 - Các hint dùng `target` = selector CSS (`[data-tour='…']`). Target chỉ tồn tại khi render mới hiện được hint (`targetWaitTimeout: 1500` đã set).
 - Màn chiếu fullscreen z-index: Joyride `zIndex 200` > overlay fullscreen `z-[70]` > drawer `z-20` → hint luôn nổi trên.
@@ -249,7 +253,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 | 5c | Share: set `TOUR_ONBOARDING_SEEN_KEY` khi hoàn tất | ✅ Xong | `setSeen(TOUR_ONBOARDING_SEEN_KEY)` trong `stopGradesHint()` (copy link điểm) và `onEnd` hint `share-grades`. Xác nhận màn chiếu/phiên/bảng điểm đều gate `!getSeen(TOUR_ONBOARDING_SEEN_KEY)` → không auto-start sau khi cờ set. Typecheck + lint + build pass. |
 | 6a | PresentationTour lắng nghe `RESTART_EVENT` | ✅ Xong | Thêm listener `RESTART_EVENT`: khi `active` → `setReplaying(true)` + reset stage về `edge` + `setRun(true)`. Tách `enabled` = `onboardingEnabled || replaying` để replay chạy sau khi đã xem. `setReplaying(false)` khi bấm "Tạo phiên mới" (`done`). Typecheck + lint pass (9 warning cũ). |
 | 6b | Test E2E luồng onboarding (có Supabase) | ✅ Xong | Rà gate cờ + 16 `data-tour`. **Fix**: đóng hint Share-link (`onEnd`) giờ mở hint grades rồi mới set `TOUR_ONBOARDING_SEEN_KEY`. Hydration: Share/Roster/PresentationTour đọc localStorage trong effect. Clipboard fallback. Script `pnpm run check:tour` PASS. Typecheck + lint (9 warning cũ). Chưa chạy trên trình duyệt có tài khoản Supabase (môi trường không có). |
-| 6c | Test replay + mobile + theme sáng/tối | ⏳ Chưa làm | Commit fix nếu có |
+| 6c | Test replay + mobile + theme sáng/tối | ✅ Xong | `useTourOptions` theme/width. Overlay chiếu: nút HelpCircle cạnh X. Share replay 2 hint. Dashboard đóng form + `data-tour` trên wrapper. Presentation không ghi đè stage; replay theo UI đang mở. Mobile: nút compact, `onTouchStart` mép trái, CSS tooltip. Typecheck + lint pass (9 warning cũ). |
 | 7a | Dựng HTML giả lập màn chiếu | ⏳ Chưa làm | Pattern `/tmp/opencode/tour-demo/` |
 | 7b | Chụp PNG 4 cảnh tour màn chiếu | ⏳ Chưa làm | Vào `docs/tour-screenshots/` |
 | 7c | Cập nhật `index.html` gắn ảnh mới | ⏳ Chưa làm | |

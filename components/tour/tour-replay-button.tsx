@@ -14,10 +14,12 @@ export function TourReplayButton() {
           window.dispatchEvent(new CustomEvent(RESTART_EVENT))
         }
       }}
-      className="gap-2"
+      className="gap-2 px-2 sm:px-3"
+      aria-label="Hướng dẫn"
+      title="Hướng dẫn"
     >
       <HelpCircle className="size-4" aria-hidden="true" />
-      Hướng dẫn
+      <span className="hidden sm:inline">Hướng dẫn</span>
     </Button>
   )
 }

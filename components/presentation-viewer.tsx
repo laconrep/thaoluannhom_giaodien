@@ -9,6 +9,7 @@ import {
   Link as LinkIcon,
   Presentation,
   QrCode,
+  HelpCircle,
   X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -22,7 +23,7 @@ import { useCountdown, formatClock } from "@/lib/use-countdown"
 import { endSessionAction, saveAnnotationAction } from "@/app/actions"
 import type { AnnotationItem, AnnotationRow, SubmissionRow } from "@/lib/types"
 import { PresentationTour } from "@/components/tour/presentation-tour"
-import { setSeen, PRESENTATION_START_SEEN_KEY } from "@/components/tour/tour-store"
+import { setSeen, PRESENTATION_START_SEEN_KEY, RESTART_EVENT } from "@/components/tour/tour-store"
 
 export interface PresentationViewerProps {
   presentationId: string
@@ -431,6 +432,7 @@ export function PresentationViewer({
               clearHoverTimer()
             }}
             onClick={openDrawer}
+            onTouchStart={openDrawer}
           />
 
           {/* Tay cầm mở lại drawer khi thu gọn (chỉ khi thanh nhóm không hiện) */}
@@ -624,7 +626,15 @@ export function PresentationViewer({
             </div>
           )}
 
-          {/* Nút đóng trình chiếu */}
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent(RESTART_EVENT))}
+            aria-label="Hướng dẫn"
+            title="Hướng dẫn"
+            className="absolute right-14 top-3 z-30 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
+          >
+            <HelpCircle className="size-4" />
+          </button>
           <button
             type="button"
             onClick={stopPresentation}

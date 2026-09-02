@@ -215,7 +215,7 @@ Tour màn hình chiếu lớp khi giáo viên đã upload PowerPoint, triển kh
 
 Ghi chú kỹ thuật:
 
-- `PresentationTour` dùng `key={`presentation-${stage}`}` để remount Joyride theo stage; chỉ stage "drawer" là multi-step (`continuous`), các stage khác là hint đơn. Lắng nghe `RESTART_EVENT`: khi đang chiếu (`active`) → replay từ hint mép trái (reset `stage` về `edge`), chạy được kể cả sau khi đã xem tour.
+- `PresentationTour` dùng `key={`presentation-${stage}`}` để remount Joyride theo stage; chỉ stage "drawer" là multi-step (`continuous`), các stage khác là hint đơn. Lắng nghe `RESTART_EVENT`: khi đang chiếu (`active`) → `setReplaying(true)` + stage theo UI (picker → `create-session`, drawer → `drawer`, không thì `edge`) + remount 120ms. Overlay fullscreen có nút HelpCircle cạnh X vì header bị đè.
 - Drawer fullscreen render nội dung bằng `board(openGroup)` = `renderBoard(true, …)` → các target `presentation-timer/all-sessions/create-session` nằm trong `renderBoard` (nhánh embedded). Nút QR nằm riêng ở header drawer của `presentation-viewer.tsx`.
 - `startPresentation()` set `teacher_tour_presentation_start_seen_v1` để hint board không hiện lại.
 - Toàn bộ hint màn chiếu nằm trong block `isTeacher` nên học sinh không thấy.
@@ -226,7 +226,7 @@ Ghi chú kỹ thuật:
 - **Tour cục bộ** (Roster): tự hiện **lần đầu tiên duy nhất** (cờ toàn cục `teacher_tour_roster_seen_v1`) khi lớp đã có nhóm và chưa xem cờ; không hiện lại khi tạo lớp mới (vẫn quét cờ cũ `roster_intro_seen_*` để tương thích người đã xem modal cũ). **Progressive theo hành động**: hint danh sách HS → (kéo ≥1 HS vào nhóm) → hint nhóm trưởng → (gán leader) → hint chuyển tab.
 - **Tour màn chiếu PowerPoint**: tự hiện khi onboarding chưa xong + chưa xem cờ `teacher_tour_presentation_seen_v1`; tiến theo hành động thật (xem 5.6), set cờ khi bấm "Tạo phiên mới".
 - **Tour Bảng điểm**: chỉ tự chạy khi giáo viên bấm tab "Bảng điểm" (marker sessionStorage), không tự hiện khi mở trang trực tiếp.
-- **Replay**: nút "Hướng dẫn" trên header (dispatch `RESTART_EVENT`) mở lại tour của trang hiện tại từ đầu, không ghi đè cờ đã xem. TeacherTour, RosterTour và **PresentationTour** (6a) đều lắng nghe `RESTART_EVENT`.
+- **Replay**: nút "Hướng dẫn" trên header (dispatch `RESTART_EVENT`) mở lại tour của trang hiện tại, không ghi đè cờ đã xem. TeacherTour, RosterTour, PresentationTour, Sessions, Share (`shareReplay` chạy 2 hint) đều lắng nghe. Overlay chiếu có nút riêng. Dashboard đóng form tạo lớp để hiện lại `data-tour='create-class'`.
 - **Bỏ qua**: nút "Bỏ qua" cho phép kết thúc sớm; lần sau vẫn hiện lại (trừ khi đã hoàn thành).
 
 ## 7. Rủi ro & lưu ý kỹ thuật
@@ -261,8 +261,8 @@ Ghi chú kỹ thuật:
 **Giai đoạn 3 — Kiểm thử** (còn tồn đọng, xem bangiao5)
 - [x] Test luồng onboarding từ Dashboard → tạo lớp → roster → sessions → gradebook → share (6b: script `pnpm run check:tour` + rà gate/`data-tour`; đóng hint Share-link vẫn mở grades rồi set cờ tổng).
 - [x] Test 2 lần chạy liên tiếp để xác nhận cờ localStorage (không hiện lại khi đã xem) — 6b script PASS.
-- [ ] Test replay bằng nút "Hướng dẫn" (6c).
-- [ ] Test trên theme sáng/tối, màn hình nhỏ (mobile) — ẩn hoặc đơn giản hóa spotlight trên mobile nếu cần (6c).
+- [x] Test replay bằng nút "Hướng dẫn" (6c: Share 2 hint, Dashboard đóng form, chiếu nút overlay + stage theo UI).
+- [x] Test trên theme sáng/tối, màn hình nhỏ (mobile) — `useTourOptions` + CSS tooltip + nút compact + `onTouchStart` mép trái (6c).
 - [x] Chạy `pnpm run lint` và `pnpm run typecheck` (hiện pass, chỉ warning `<img>` pre-existing).
 
 ## 9. Đánh giá thành công

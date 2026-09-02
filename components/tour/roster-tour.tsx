@@ -5,11 +5,11 @@ import { Joyride, EVENTS, STATUS, type EventData, type Step } from "react-joyrid
 import { RESTART_EVENT, rosterTourSeen, setRosterTourSeen } from "./tour-store"
 import {
   tourLocale,
-  tourOptions,
   rosterListStep,
   rosterLeaderStep,
   rosterNextStep,
 } from "./tour-config"
+import { useTourOptions } from "./use-tour-options"
 
 // Tour phân nhóm progressive: hint xuất hiện theo hành động thật của giáo viên —
 // vào trang (danh sách HS) → kéo ≥1 HS vào nhóm (hint nhóm trưởng) → gán leader
@@ -27,6 +27,7 @@ export function RosterTour({ ready, hasMembers, hasLeader }: RosterTourProps) {
   const [run, setRun] = useState(false)
   const prevStageRef = useRef<Stage>("idle")
   const [enabled, setEnabled] = useState(false)
+  const tourOptions = useTourOptions()
 
   useEffect(() => {
     setEnabled(!rosterTourSeen())
@@ -68,7 +69,8 @@ export function RosterTour({ ready, hasMembers, hasLeader }: RosterTourProps) {
     if (typeof window === "undefined") return
     const onRestart = () => {
       setStage(hasLeader ? "next" : hasMembers ? "leader" : "list")
-      setRun(true)
+      setRun(false)
+      window.setTimeout(() => setRun(true), 80)
     }
     window.addEventListener(RESTART_EVENT, onRestart)
     return () => window.removeEventListener(RESTART_EVENT, onRestart)

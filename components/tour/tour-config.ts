@@ -14,9 +14,10 @@ export const tourOptions: Partial<Options> = {
   skipBeacon: true,
   showProgress: true,
   zIndex: 200,
-  primaryColor: "#2563eb",
+  primaryColor: "#2a8f8a",
   scrollDuration: 400,
   targetWaitTimeout: 1500,
+  disableFocusTrap: true,
   buttons: ["back", "skip", "close", "primary"],
 }
 
@@ -155,7 +156,7 @@ export function presentationEdgeStep(): Step {
     placement: "right",
     title: "Bảng điều khiển ẩn",
     content:
-      "Di chuột sát mép trái màn hình (hoặc bấm vào mép trái) để mở bảng điều khiển. Không chiếu bảng này lên màn hình học sinh.",
+      "Di chuột sát mép trái (máy tính) hoặc chạm mép trái (điện thoại) để mở bảng điều khiển. Không chiếu bảng này lên màn hình học sinh.",
   }
 }
 

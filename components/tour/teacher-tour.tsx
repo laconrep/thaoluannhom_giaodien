@@ -4,7 +4,8 @@ import { Joyride, EVENTS, STATUS, type EventData, type Step } from "react-joyrid
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { getSeen, setSeen, RESTART_EVENT, STOP_EVENT } from "./tour-store"
-import { tourLocale, tourOptions } from "./tour-config"
+import { tourLocale } from "./tour-config"
+import { useTourOptions } from "./use-tour-options"
 
 type TeacherTourProps = {
   tourId: string
@@ -17,6 +18,7 @@ type TeacherTourProps = {
   markSeen?: () => void
   restartToken?: number
   onEnd?: () => void
+  listenRestart?: boolean
 }
 
 export function TeacherTour({
@@ -30,11 +32,13 @@ export function TeacherTour({
   markSeen,
   restartToken = 0,
   onEnd,
+  listenRestart = true,
 }: TeacherTourProps) {
   const router = useRouter()
   const [run, setRun] = useState(false)
   const firstStepRef = useRef(false)
   const prevRestartRef = useRef(restartToken)
+  const tourOptions = useTourOptions()
   const seen = useMemo(() => isSeen ?? (() => getSeen(seenKey)), [isSeen, seenKey])
   const markAsSeen = useMemo(() => markSeen ?? (() => setSeen(seenKey)), [markSeen, seenKey])
 
@@ -55,10 +59,14 @@ export function TeacherTour({
   // Nút "Hướng dẫn" ở header: mở lại tour của trang hiện tại.
   useEffect(() => {
     if (typeof window === "undefined") return
-    const onRestart = () => setRun(true)
+    if (!listenRestart) return
+    const onRestart = () => {
+      setRun(false)
+      window.setTimeout(() => setRun(true), 120)
+    }
     window.addEventListener(RESTART_EVENT, onRestart)
     return () => window.removeEventListener(RESTART_EVENT, onRestart)
-  }, [])
+  }, [listenRestart])
 
   // Progressive: một hành động UI (ví dụ bấm nút được tour trỏ tới) có thể
   // chủ động tắt hint đang hiện thay vì để Joyride chạy hết bước.

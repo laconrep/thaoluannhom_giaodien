@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { createClassAction } from "@/app/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,21 +8,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
 import { Plus } from "lucide-react"
-import { setSeen, TOUR_DASHBOARD_SEEN_KEY, STOP_EVENT } from "@/components/tour/tour-store"
+import { setSeen, TOUR_DASHBOARD_SEEN_KEY, STOP_EVENT, RESTART_EVENT } from "@/components/tour/tour-store"
 
 export function CreateClassCard() {
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const onRestart = () => setOpen(false)
+    window.addEventListener(RESTART_EVENT, onRestart)
+    return () => window.removeEventListener(RESTART_EVENT, onRestart)
+  }, [])
+
   if (!open) {
     return (
-      <div>
+      <div data-tour="create-class">
         <Button
           size="lg"
           onClick={() => {
-            // Progressive dashboard: hint trỏ nút này — bấm là tắt hint, đánh
-            // dấu đã xem để lần sau không tự hiện lại (replay vẫn dùng được).
             setSeen(TOUR_DASHBOARD_SEEN_KEY)
             if (typeof window !== "undefined") {
               window.dispatchEvent(new CustomEvent(STOP_EVENT))
@@ -30,7 +35,6 @@ export function CreateClassCard() {
             setOpen(true)
           }}
           className="gap-2"
-          data-tour="create-class"
         >
           <Plus className="size-4" aria-hidden="true" />
           Tạo lớp mới

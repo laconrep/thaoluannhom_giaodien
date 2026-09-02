@@ -12,6 +12,7 @@ import {
   classTourSeenKey,
   getSeen,
   setSeen,
+  RESTART_EVENT,
   STOP_EVENT,
   TOUR_ONBOARDING_SEEN_KEY,
 } from "@/components/tour/tour-store"
@@ -31,6 +32,7 @@ export function ShareView({
   const [showGradesHint, setShowGradesHint] = useState(false)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [origin, setOrigin] = useState("")
+  const [shareReplay, setShareReplay] = useState(false)
 
   const linkSeenKey = classTourSeenKey("share-link", classId)
   const gradesSeenKey = classTourSeenKey("share-grades", classId)
@@ -38,6 +40,17 @@ export function ShareView({
   useEffect(() => {
     setOnboardingOpen(!getSeen(TOUR_ONBOARDING_SEEN_KEY))
     setOrigin(window.location.origin)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const onRestart = () => {
+      setShareReplay(true)
+      setShowGradesHint(false)
+      setLinkDismissed(false)
+    }
+    window.addEventListener(RESTART_EVENT, onRestart)
+    return () => window.removeEventListener(RESTART_EVENT, onRestart)
   }, [])
 
   const classUrl = `${origin}/c/${shareToken}`
@@ -54,6 +67,7 @@ export function ShareView({
   function stopGradesHint() {
     setSeen(gradesSeenKey)
     setShowGradesHint(false)
+    setShareReplay(false)
     setSeen(TOUR_ONBOARDING_SEEN_KEY)
     setOnboardingOpen(false)
     if (typeof window !== "undefined") {
@@ -64,12 +78,12 @@ export function ShareView({
   function afterCopy(key: string) {
     setCopied(key)
     setTimeout(() => setCopied(null), 2000)
-    if (key === "class") {
-      stopLinkHint()
-      if (!getSeen(TOUR_ONBOARDING_SEEN_KEY) && !getSeen(gradesSeenKey)) {
-        setShowGradesHint(true)
+      if (key === "class") {
+        stopLinkHint()
+        if (shareReplay || (!getSeen(TOUR_ONBOARDING_SEEN_KEY) && !getSeen(gradesSeenKey))) {
+          setShowGradesHint(true)
+        }
       }
-    }
     if (key === "grades") stopGradesHint()
   }
 
@@ -96,10 +110,15 @@ export function ShareView({
         steps={[shareLinkStep()]}
         seenKey={linkSeenKey}
         autoStart
-        autoStartWhen={onboardingOpen && !linkDismissed}
+        autoStartWhen={(onboardingOpen || shareReplay) && !linkDismissed}
+        isSeen={shareReplay ? () => false : undefined}
         onEnd={() => {
           setLinkDismissed(true)
           setSeen(linkSeenKey)
+          if (shareReplay) {
+            setShowGradesHint(true)
+            return
+          }
           if (getSeen(TOUR_ONBOARDING_SEEN_KEY)) return
           if (getSeen(gradesSeenKey)) {
             setSeen(TOUR_ONBOARDING_SEEN_KEY)
@@ -114,9 +133,12 @@ export function ShareView({
           steps={[shareGradesStep()]}
           seenKey={gradesSeenKey}
           autoStart
-          autoStartWhen={onboardingOpen}
+          autoStartWhen={onboardingOpen || shareReplay}
+          listenRestart={false}
+          isSeen={shareReplay ? () => false : undefined}
           onEnd={() => {
             setShowGradesHint(false)
+            setShareReplay(false)
             setSeen(gradesSeenKey)
             setSeen(TOUR_ONBOARDING_SEEN_KEY)
             setOnboardingOpen(false)
