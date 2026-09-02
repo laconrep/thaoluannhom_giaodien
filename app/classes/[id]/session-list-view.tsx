@@ -24,7 +24,7 @@ import {
 } from "lucide-react"
 import { formatDate } from "@/lib/utils-format"
 import { TeacherTour } from "@/components/tour/teacher-tour"
-import { sessionsNextStep, sessionsPresetsStep } from "@/components/tour/tour-config"
+import { sessionsCreateStep, sessionsNextStep, sessionsPresetsStep } from "@/components/tour/tour-config"
 import {
   classTourSeenKey,
   consumeSessionsNextPending,
@@ -78,10 +78,11 @@ export function SessionListView({
   const [useFixed, setUseFixed] = useState(fixedGroupsCount > 0)
   const [pending, startTransition] = useTransition()
   const [showNextHint, setShowNextHint] = useState(false)
+  const [createDismissed, setCreateDismissed] = useState(false)
   const [presetsDismissed, setPresetsDismissed] = useState(false)
+  const [createReplayTick, setCreateReplayTick] = useState(0)
   const [presetsReplayTick, setPresetsReplayTick] = useState(0)
   const [nextReplayTick, setNextReplayTick] = useState(0)
-  const pendingPresetsReplay = useRef(false)
   const pendingNextReplay = useRef(false)
 
   const isGroup = kind === "group"
@@ -95,6 +96,7 @@ export function SessionListView({
   const hasFixed = fixedGroupsCount > 0
   const displayGroups = useFixed && hasFixed ? fixedGroupsCount : numGroups
 
+  const createSeenKey = classTourSeenKey("sessions-create", classId)
   const presetsSeenKey = classTourSeenKey("sessions-presets", classId)
   const nextSeenKey = classTourSeenKey("sessions-next", classId)
 
@@ -107,12 +109,6 @@ export function SessionListView({
   }, [classId, sessions.length, nextSeenKey])
 
   useEffect(() => {
-    if (!open || !pendingPresetsReplay.current) return
-    pendingPresetsReplay.current = false
-    setPresetsReplayTick((n) => n + 1)
-  }, [open])
-
-  useEffect(() => {
     if (!showNextHint || !pendingNextReplay.current) return
     pendingNextReplay.current = false
     setNextReplayTick((n) => n + 1)
@@ -122,13 +118,13 @@ export function SessionListView({
     if (typeof window === "undefined") return
     const onRestart = () => {
       if (open) {
+        setPresetsDismissed(false)
         setPresetsReplayTick((n) => n + 1)
         return
       }
       if (sessions.length === 0) {
-        pendingPresetsReplay.current = true
-        setPresetsDismissed(false)
-        setOpen(true)
+        setCreateDismissed(false)
+        setCreateReplayTick((n) => n + 1)
         return
       }
       if (showNextHint) {
@@ -141,6 +137,13 @@ export function SessionListView({
     window.addEventListener(RESTART_EVENT, onRestart)
     return () => window.removeEventListener(RESTART_EVENT, onRestart)
   }, [open, sessions.length, showNextHint])
+
+  function stopCreateHint() {
+    setSeen(createSeenKey)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(STOP_EVENT))
+    }
+  }
 
   function stopPresetsHint() {
     setSeen(presetsSeenKey)
@@ -158,6 +161,7 @@ export function SessionListView({
   }
 
   function onCreate() {
+    stopCreateHint()
     stopPresetsHint()
     setSessionsNextPending(classId)
     const finalTitle = title.trim() || (isGroup ? "Thảo luận mới" : "Giao việc cá nhân")
@@ -178,6 +182,20 @@ export function SessionListView({
 
   return (
     <div className="flex flex-col gap-6">
+      {!open && !showNextHint && (
+        <TeacherTour
+          tourId="sessions-create"
+          steps={[sessionsCreateStep()]}
+          seenKey={createSeenKey}
+          autoStart
+          autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY) && !createDismissed}
+          restartToken={createReplayTick}
+          onEnd={() => {
+            setCreateDismissed(true)
+            setSeen(createSeenKey)
+          }}
+        />
+      )}
       {open && (
         <TeacherTour
           tourId="sessions-presets"
@@ -218,7 +236,10 @@ export function SessionListView({
           {!open && (
             <Button
               data-tour="session-create"
-              onClick={() => setOpen(true)}
+              onClick={() => {
+                stopCreateHint()
+                setOpen(true)
+              }}
               className="gap-2 shadow-sm"
             >
               <Plus className="size-4" aria-hidden="true" />
@@ -414,6 +435,7 @@ export function SessionListView({
                   }
                   onClick={stopNextHint}
                   className="flex-1 p-4 flex flex-col gap-2"
+                  data-tour="session-open"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <h4 className="font-medium leading-snug text-pretty line-clamp-2">{s.title}</h4>

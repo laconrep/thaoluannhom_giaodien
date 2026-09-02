@@ -90,7 +90,8 @@ assert(seen(local, KEYS.dashboard), "Bấm Tạo lớp mới → set dashboard s
 mark(local, KEYS.roster)
 assert(seen(local, KEYS.roster), "Roster hoàn tất → set roster seen (toàn cục)")
 
-assert(autoStartSessions(local), "Sessions presets/next vẫn auto-start (onboarding chưa set)")
+assert(autoStartSessions(local), "Sessions create/presets/next vẫn auto-start (onboarding chưa set)")
+mark(local, classKey("sessions-create", CLASS_ID))
 mark(local, classKey("sessions-presets", CLASS_ID))
 session.setItem(`teacher_tour_sessions_next_pending_${CLASS_ID}`, "1")
 const pending = session.getItem(`teacher_tour_sessions_next_pending_${CLASS_ID}`) === "1"
@@ -150,8 +151,10 @@ const required = [
   ["app/classes/[id]/class-tabs.tsx", "class-tabs"],
   ["app/classes/[id]/roster/roster-view.tsx", "roster-list"],
   ["app/classes/[id]/roster/roster-view.tsx", "group-leader"],
+  ["app/classes/[id]/session-list-view.tsx", "session-create"],
   ["app/classes/[id]/session-list-view.tsx", "session-presets"],
   ["app/classes/[id]/session-list-view.tsx", "session-list"],
+  ["app/classes/[id]/session-list-view.tsx", "session-open"],
   ["app/classes/[id]/gradebook/gradebook-view.tsx", "gradebook-table"],
   ["app/classes/[id]/gradebook/gradebook-view.tsx", "gradebook-export"],
   ["app/classes/[id]/share/share-view.tsx", "share-link"],

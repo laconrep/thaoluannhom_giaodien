@@ -66,6 +66,16 @@ export function rosterNextStep(): Step {
   }
 }
 
+export function sessionsCreateStep(): Step {
+  return {
+    target: "[data-tour='session-create']",
+    placement: "bottom",
+    title: "Tạo phiên",
+    content:
+      "Nhấn \"Tạo phiên mới\" để tạo phiên thảo luận đầu tiên. Chọn thời lượng rồi bấm \"Tạo và vào ngay\".",
+  }
+}
+
 export function sessionsPresetsStep(): Step {
   return {
     target: "[data-tour='session-presets']",
@@ -78,16 +88,16 @@ export function sessionsPresetsStep(): Step {
 
 export function sessionsNextStep(): Step {
   return {
-    target: "[data-tour='session-list']",
+    target: "[data-tour='session-open']",
     placement: "top",
     title: "Mở phiên",
     content:
-      "Phiên vừa tạo hiện ở đây. Bấm vào phiên để mở màn chiếu cho học sinh nộp bài.",
+      "Phiên vừa tạo hiện ở đây. Bấm \"Mở phiên\" để vào màn chiếu cho học sinh nộp bài.",
   }
 }
 
 export function sessionsTourSteps(_classId: string): Step[] {
-  return [sessionsPresetsStep(), sessionsNextStep()]
+  return [sessionsCreateStep(), sessionsPresetsStep(), sessionsNextStep()]
 }
 
 export function gradebookTourSteps(_classId: string): Step[] {
