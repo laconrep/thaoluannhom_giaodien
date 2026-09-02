@@ -13,7 +13,7 @@
 ## 1. Tổng quan dự án & git
 
 - **App**: "Lớp học thảo luận" — Next.js (App Router), TypeScript, Tailwind, Supabase. Tài khoản giáo viên quản lý lớp, phân nhóm, phiên thảo luận nhóm, bảng điểm, chia sẻ.
-- **Branch đang làm**: `main` (HEAD `1786838`). Nhánh `260829-feat-teacher-tour-guide` đã merge qua PR #4 (8b xác nhận API).
+- **Branch đang làm**: `main` (sau 8c). Nhánh `260829-feat-teacher-tour-guide` đã merge qua PR #4. Tour **đóng bàn giao** — toàn bộ phiên 1–8c xong.
 - **Remote**: `https://github.com/laconrep/thaoluannhom_giaodien`
 - **PR #4**: đã merge vào `main` (closed + merged). PR #5 cùng head cũng merged. PR #3 `Update project files` vẫn **open** (không thuộc tour).
 - **Lệnh verify**: `pnpm run typecheck` (tsc --noEmit), `pnpm run lint` (eslint — đang có 9 warning `<img>`/eslint-disable **pre-existing, không phải lỗi mới**), `pnpm run build`.
@@ -118,7 +118,8 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 20. ✅ (Phiên 7b) **Chụp PNG 4 cảnh**: Playwright chromium 1280x720, `?scene=…&shot=1`. File: `docs/tour-screenshots/tour-3-presentation-{edge,drawer,all-sessions,create-session}.png`.
 21. ✅ (Phiên 7c) **Index demo**: `docs/tour-screenshots/index.html` thêm card "Tour màn chiếu PowerPoint (4 cảnh)".
 22. ✅ (Phiên 8a) **Rà PR + typecheck/lint/build**: PR #4/#5/#6/#7 **đã merge** vào `main` (tour nằm sẵn trên `main`). `pnpm run typecheck` pass, `pnpm run lint` 0 error / 9 warning `<img>` pre-existing, `pnpm run build` pass (Next.js 16.2.0), `pnpm run check:tour` PASS.
-23. ✅ (Phiên 8b) **Xác nhận PR #4 đã merge**: GitHub API `state=closed`, `merged=true`, `merged_at=2026-08-31T07:32:28Z`, `merge_commit_sha=6898bd40`, head `260829-feat-teacher-tour-guide` → `main`. **Không** gọi merge lại. PR #5/#6/#7 cũng closed+merged. PR #3 `Update project files` vẫn open (không thuộc tour). Remote vẫn còn refs/heads/260829-feat-teacher-tour-guide (8c dọn nếu cần). HEAD local `main`=`1786838` khớp `origin/main`.
+23. ✅ (Phiên 8b) **Xác nhận PR #4 đã merge**: GitHub API `state=closed`, `merged=true`, `merged_at=2026-08-31T07:32:28Z`, `merge_commit_sha=6898bd40`, head `260829-feat-teacher-tour-guide` → `main`. **Không** gọi merge lại. PR #5/#6/#7 cũng closed+merged. PR #3 `Update project files` vẫn open (không thuộc tour).
+24. ✅ (Phiên 8c) **Dọn + đóng bàn giao**: local chỉ còn `main` (không còn nhánh feat). Remote vẫn giữ `260829-feat-teacher-tour-guide` và `260901-chore-split-tour-sessions-4-8` (đã merge, không xóa). Tồn đọng ngoài tour: PR #3 open; chưa test trình duyệt có tài khoản Supabase. **Toàn bộ phần 7 hoàn thành.**
 
 ## 4. Việc CHƯA LÀM / Tồn đọng
 
@@ -126,7 +127,7 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 2. ✅ (Đã xong) `docs/TOUR_HUONG_DAN_PLAN.md` **đã cập nhật**: thêm mục 5.6 (tour màn chiếu PowerPoint), sửa 4.1/4.3/5.4/6/8 cho khớp (roster global, gradebook tab-trigger, replay, checklist).
 3. ✅ (Đã xong) **Progressive Dashboard** — `dashboardTourSteps` đã thành hint 1 bước trỏ `create-class`; bấm nút "Tạo lớp mới" sẽ `setSeen(TOUR_DASHBOARD_SEEN_KEY)` + dispatch `STOP_EVENT` để tắt hint ngay. `TeacherTour` có thêm listener `STOP_EVENT` (dùng chung cho các tour progressive sau).
 4. ✅ Ảnh demo màn chiếu PowerPoint: 4 PNG trong `docs/tour-screenshots/` + index (7b+7c). Ảnh gradebook/share vẫn dùng HTML giả lập nếu cần.
-5. ✅ **Progressive Roster** xong. **Sessions 4a+4b+4c xong**. **Share 5a+5c xong**. **Gradebook 5b xong**. **Replay màn chiếu 6a xong**. **E2E onboarding 6b xong**. **Replay/mobile/theme 6c xong**. **HTML giả lập chiếu 7a xong**. **Ảnh demo 7b+7c xong**. **8a QA xong**. **8b xác nhận PR #4 đã merge**. **Còn lại**: 8c dọn.
+5. ✅ **Toàn bộ phiên 1–8c xong.** Tồn đọng ngoài phạm vi tour: PR #3 vẫn open; chưa test trình duyệt có tài khoản Supabase. Remote còn 2 nhánh feat đã merge (`260829-feat-teacher-tour-guide`, `260901-chore-split-tour-sessions-4-8`) — không xóa.
 6. ✅ **Replay màn chiếu** (đã xong ở 6a): `PresentationTour` **lắng nghe** `RESTART_EVENT` (nút "Hướng dẫn" header giờ replay được tour màn chiếu khi `active`).
 7. Chưa test thực tế trên trình duyệt có Supabase (phải có tài khoản). 6b đã chạy script cờ + rà `data-tour` (không cần login).
 8. ✅ PR #4 đã merge vào `main` (8b xác nhận lại API 2026-09-02: `state=closed`, `merged=true`, `merged_at=2026-08-31T07:32:28Z`, `merge_commit_sha=6898bd40`). Không merge lại.
@@ -224,9 +225,9 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 - **Phiên 8b — Merge PR #4 vào main** ✅
   - PR #4 **đã merge sẵn** (GitHub API 2026-09-02): `state=closed`, `merged=true`, `merged_at=2026-08-31T07:32:28Z`, `merge_commit_sha=6898bd40`, head `260829-feat-teacher-tour-guide` → base `main`. Không gọi merge lại. PR #5/#6/#7 cũng merged. PR #3 vẫn open (ngoài phạm vi tour).
 
-- **Phiên 8c — Dọn dẹp + đóng bàn giao**
-  - Dọn dẹp (nhánh local, ghi chú tồn đọng nếu còn). Đánh dấu **toàn bộ** phần 7 hoàn thành.
-  - Commit file bàn giao + push.
+- **Phiên 8c — Dọn dẹp + đóng bàn giao** ✅
+  - Local: chỉ `main`, không còn nhánh feat. Remote: giữ 2 nhánh đã merge (`260829-feat-teacher-tour-guide`, `260901-chore-split-tour-sessions-4-8`). Tồn đọng ghi chú: PR #3 open; chưa test live Supabase.
+  - Đánh dấu **toàn bộ** phần 7 hoàn thành. Commit file bàn giao + push.
 
 ## 6. Lưu ý kỹ thuật quan trọng
 
@@ -261,4 +262,4 @@ Helper: `getSeen(key)`, `setSeen(key)`, `classTourSeenKey(tourName, classId)`, `
 | 7c | Cập nhật `index.html` gắn ảnh mới | ✅ Xong | Card "Tour màn chiếu PowerPoint (4 cảnh)" trong `docs/tour-screenshots/index.html`. |
 | 8a | Rà PR #4 + typecheck/lint/build | ✅ Xong | PR #4 đã merge. HEAD `main`=`daa5d2b`. typecheck pass; lint 0 error / 9 warning cũ; build pass; `check:tour` PASS. Chưa merge thêm. |
 | 8b | Merge PR #4 vào `main` | ✅ Xong | GitHub API: PR #4 `state=closed` `merged=true` `merged_at=2026-08-31T07:32:28Z` `merge_commit_sha=6898bd40`. Không merge lại. HEAD `main`=`1786838` = `origin/main`. PR #3 vẫn open (không thuộc tour). |
-| 8c | Dọn dẹp + đánh dấu toàn bộ phần 7 xong | ⏳ Chưa làm | Commit file bàn giao + push |
+| 8c | Dọn dẹp + đánh dấu toàn bộ phần 7 xong | ✅ Xong | Local chỉ `main`. Remote giữ 2 nhánh feat đã merge (không xóa). Tồn đọng ngoài tour: PR #3 open; chưa test live Supabase. **Bàn giao 5 đóng.** |
