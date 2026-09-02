@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Demo tour màn chiếu PowerPoint</title>
+<style>
+  :root {
+    --primary: #2a8f8a;
+    --primary-fg: #fff;
+    --bg: #f4f6f6;
+    --card: #ffffff;
+    --fg: #1a2b2e;
+    --muted: #5b6b6e;
+    --border: #d7e0e0;
+    --overlay: #00000080;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: ui-sans-serif, system-ui, sans-serif; color: var(--fg); }
+  body { background: #000; overflow: hidden; }
+
+  .stage { position: fixed; inset: 0; background: #111; }
+  .slide {
+    position: absolute; inset: 48px 56px 48px 56px;
+    background: linear-gradient(180deg, #1e3a5f 0%, #0f2744 100%);
+    border-radius: 4px; color: #fff; padding: 48px 56px;
+    box-shadow: 0 12px 40px #0008;
+  }
+  .slide h1 { font-size: 36px; margin: 0 0 12px; font-weight: 700; }
+  .slide p.kicker { color: #93c5fd; font-size: 14px; margin: 0 0 28px; letter-spacing: .04em; text-transform: uppercase; }
+  .slide ul { margin: 0; padding-left: 22px; font-size: 22px; line-height: 1.7; }
+  .clock {
+    position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
+    background: #000000bf; color: #fff; font-family: ui-monospace, monospace;
+    font-size: 20px; padding: 8px 16px; border-radius: 6px; z-index: 30;
+  }
+  .icon-btn {
+    position: absolute; top: 12px; z-index: 30;
+    width: 36px; height: 36px; border: 0; border-radius: 999px;
+    background: #00000099; color: #fff; cursor: pointer; display: grid; place-items: center;
+  }
+  .icon-btn.help { right: 56px; }
+  .icon-btn.close { right: 12px; }
+  .icon-btn:hover { background: #000000cc; }
+
+  .edge {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 40px; z-index: 10;
+  }
+  .handle {
+    position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    z-index: 10; background: #ffffffe6; border: 1px solid #ccc; border-left: 0;
+    border-radius: 0 6px 6px 0; padding: 6px 4px; color: #333;
+  }
+  .bars-l, .bars-r {
+    position: absolute; top: 0; bottom: 0; width: 3vw; min-width: 28px;
+    display: flex; flex-direction: column; justify-content: center; gap: 4px;
+    padding: 32px 0; z-index: 20;
+  }
+  .bars-l { left: 40px; }
+  .bars-r { right: 0; }
+  .bar {
+    height: 4vh; border-radius: 0 4px 4px 0; font-size: 9px; text-align: center;
+    background: #d4d4d4b3; color: #111; border: 1px solid #0001; padding: 2px;
+    display: grid; place-items: center; line-height: 1.1;
+  }
+  .bars-r .bar { border-radius: 4px 0 0 4px; }
+  .bar.on { background: var(--primary); color: #fff; font-weight: 700; }
+
+  .drawer {
+    position: absolute; left: 0; top: 0; bottom: 0; z-index: 25;
+    width: min(780px, 92vw); background: var(--bg); color: var(--fg);
+    box-shadow: 8px 0 32px #0006; display: none; flex-direction: column;
+  }
+  .drawer.open { display: flex; }
+  .d-head {
+    display: flex; align-items: center; gap: 8px; padding: 12px; border-bottom: 1px solid var(--border);
+    background: var(--card);
+  }
+  .d-head strong { font-size: 14px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    border: 1px solid var(--border); background: var(--card); color: var(--fg);
+    border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+  }
+  .btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .btn.ghost { background: transparent; border-color: transparent; }
+  .btn.sm { font-size: 11px; padding: 3px 8px; height: 28px; }
+  .d-body { flex: 1; display: grid; grid-template-columns: 260px 1fr; gap: 12px; padding: 12px; min-height: 0; }
+  .sidebar {
+    display: flex; flex-direction: column; gap: 8px;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 8px; overflow: auto;
+  }
+  .sidebar h3 { margin: 4px 0 0; font-size: 14px; }
+  .sidebar .muted { font-size: 12px; color: var(--muted); margin: 0; }
+  .timer {
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .timer .clock-row { display: flex; align-items: center; gap: 8px; }
+  .timer .clock-val { flex: 1; text-align: center; font-family: ui-monospace, monospace; font-size: 20px; font-weight: 600; }
+  .timer .bar-track { height: 6px; background: #e8eeee; border-radius: 99px; overflow: hidden; }
+  .timer .bar-fill { height: 100%; width: 72%; background: var(--primary); }
+  .presets { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: 10px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); background: #f0f4f4; }
+  .chip.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat { background: #f0f4f4; border-radius: 6px; padding: 6px; text-align: center; }
+  .stat b { display: block; font-size: 18px; }
+  .stat span { font-size: 10px; color: var(--muted); }
+  .groups { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: start; }
+  .gcard { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px; min-height: 140px; }
+  .gcard h4 { margin: 0 0 6px; font-size: 13px; }
+  .gcard .member { font-size: 12px; padding: 4px 6px; background: #f0f4f4; border-radius: 4px; margin-bottom: 4px; }
+  .picker {
+    display: none; flex-direction: column; gap: 6px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--bg); padding: 8px;
+  }
+  .picker.open { display: flex; }
+  .picker .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .picker .row p { margin: 0; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .sess {
+    text-align: left; border: 1px solid var(--border); background: var(--card);
+    border-radius: 6px; padding: 6px 8px; font-size: 12px; cursor: pointer;
+  }
+  .sess.cur { border-color: var(--primary); background: #e7f4f3; }
+
+  .mask { position: fixed; inset: 0; z-index: 80; pointer-events: none; }
+  .hole {
+    position: absolute; border-radius: 8px;
+    box-shadow: 0 0 0 9999px var(--overlay);
+    outline: 4px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  }
+  .tip {
+    position: absolute; z-index: 90; width: 340px; max-width: calc(100vw - 24px);
+    background: #fff; color: #1a2b2e; border-radius: 8px;
+    box-shadow: 0 8px 24px #0003; padding: 16px 16px 12px;
+  }
+  .tip h4 { margin: 0 30px 8px 0; font-size: 16px; }
+  .tip p { margin: 0 0 12px; font-size: 14px; line-height: 1.45; }
+  .tip .x { position: absolute; top: 10px; right: 10px; border: 0; background: none; font-size: 16px; cursor: pointer; color: #667; }
+  .tip .actions { display: flex; align-items: center; gap: 8px; }
+  .tip .skip { margin-right: auto; background: none; border: 0; color: #667; font-size: 13px; cursor: pointer; }
+  .tip .ghost { background: none; border: 0; color: var(--primary); font-size: 13px; cursor: pointer; }
+  .tip .next { background: var(--primary); color: #fff; border: 0; border-radius: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  .arrow {
+    position: absolute; width: 0; height: 0;
+  }
+  .arrow.right { left: -10px; top: 28px; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-right: 10px solid #fff; }
+  .arrow.bottom { top: -10px; left: 24px; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 10px solid #fff; }
+
+  .nav {
+    position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 100;
+    display: flex; gap: 6px; background: #000000cc; padding: 6px 8px; border-radius: 999px;
+  }
+  .nav a {
+    color: #fff; text-decoration: none; font-size: 12px; padding: 4px 10px; border-radius: 99px;
+  }
+  .nav a.on { background: var(--primary); }
+  body.shot .nav { display: none; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="clock">14:32</div>
+    <button class="icon-btn help" title="Hướng dẫn" aria-label="Hướng dẫn">?</button>
+    <button class="icon-btn close" title="Đóng trình chiếu" aria-label="Đóng">x</button>
+
+    <div class="slide">
+      <p class="kicker">12A1 — Văn nghị luận</p>
+      <h1>Phiên 3: Lập luận trong văn nghị luận</h1>
+      <ul>
+        <li>Nêu luận điểm rõ, đúng trọng tâm đề</li>
+        <li>Dẫn chứng cụ thể, gắn với tác phẩm</li>
+        <li>Bình luận ngắn, tránh kể lại cốt truyện</li>
+      </ul>
+    </div>
+
+    <div class="edge" data-tour="presentation-edge" id="edge"></div>
+    <div class="handle">&#8250;</div>
+    <div class="bars-l">
+      <div class="bar on">Nhóm 1</div>
+      <div class="bar">Nhóm 2</div>
+      <div class="bar">Nhóm 3</div>
+      <div class="bar">Nhóm 4</div>
+    </div>
+    <div class="bars-r">
+      <div class="bar">Nhóm 5</div>
+      <div class="bar">Nhóm 6</div>
+      <div class="bar">Nhóm 7</div>
+      <div class="bar">Nhóm 8</div>
+    </div>
+
+    <div class="drawer" id="drawer">
+      <div class="d-head">
+        <strong>Giao việc cho nhóm</strong>
+        <button class="btn sm">Link HS làm bài</button>
+        <button class="btn sm" data-tour="presentation-qr" id="qr">QR code</button>
+        <button class="btn ghost sm" style="margin-left:auto">Thu</button>
+      </div>
+      <div class="d-body">
+        <aside class="sidebar">
+          <div style="display:flex;align-items:center;gap:4px">
+            <button class="btn ghost sm" data-tour="presentation-all-sessions" id="all-sessions">&#8592; Tất cả phiên</button>
+          </div>
+          <div class="picker" id="picker">
+            <div class="row">
+              <p>Chọn phiên thảo luận</p>
+              <button class="btn sm" data-tour="presentation-create-session" id="create-session">+ Tạo phiên mới</button>
+            </div>
+            <div class="sess cur">Phiên 3: Lập luận — đang chạy</div>
+            <div class="sess">Phiên 2: Mở bài</div>
+            <div class="sess">Phiên 1: Đọc hiểu</div>
+          </div>
+          <h3>Phiên 3: Lập luận trong văn nghị luận</h3>
+          <p class="muted">12A1 - Văn</p>
+          <div data-tour="presentation-timer" id="timer">
+            <div class="timer">
+              <div class="clock-row">
+                <span style="color:var(--primary)">&#9719;</span>
+                <div class="clock-val">15:00</div>
+              </div>
+              <div class="bar-track"><div class="bar-fill"></div></div>
+              <div style="display:flex;gap:4px;align-items:center">
+                <input value="15" readonly style="width:48px;height:28px;text-align:center;border:1px solid var(--border);border-radius:6px;font-size:12px" />
+                <span class="muted" style="font-size:11px">phút</span>
+                <input value="0" readonly style="width:48px;height:28px;text-align:center;border:1px solid var(--border);border-radius:6px;font-size:12px" />
+                <span class="muted" style="font-size:11px">giây</span>
+              </div>
+              <div class="presets">
+                <span class="chip">1p</span><span class="chip">3p</span><span class="chip">5p</span>
+                <span class="chip">10p</span><span class="chip on">15p</span><span class="chip">20p</span>
+              </div>
+              <button class="btn primary sm">Bắt đầu</button>
+            </div>
+          </div>
+          <div class="stats">
+            <div class="stat"><b>6</b><span>đã chọn</span></div>
+            <div class="stat"><b>2</b><span>đã nộp</span></div>
+          </div>
+        </aside>
+        <div class="groups">
+          <div class="gcard"><h4>Nhóm 1</h4><div class="member">An (nhóm trưởng)</div><div class="member">Bình</div><div class="member">Chi</div></div>
+          <div class="gcard"><h4>Nhóm 2</h4><div class="member">Dũng</div><div class="member">Em</div></div>
+          <div class="gcard"><h4>Nhóm 3</h4><div class="member">Giang</div><div class="member">Hà</div></div>
+          <div class="gcard"><h4>Nhóm 4</h4><div class="member">Khang</div><div class="member">Lan</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mask" id="mask">
+    <div class="hole" id="hole"></div>
+  </div>
+  <div class="tip" id="tip">
+    <div class="arrow right" id="arrow"></div>
+    <button class="x" type="button">x</button>
+    <h4 id="tip-title"></h4>
+    <p id="tip-body"></p>
+    <div class="actions">
+      <button class="skip" type="button">Bỏ qua</button>
+      <button class="ghost" type="button">Trước</button>
+      <button class="next" type="button" id="tip-next">Tiếp</button>
+    </div>
+  </div>
+
+  <nav class="nav" id="nav">
+    <a href="?scene=edge">1. Mép trái</a>
+    <a href="?scene=drawer">2. Timer + QR</a>
+    <a href="?scene=all-sessions">3. Tất cả phiên</a>
+    <a href="?scene=create-session">4. Tạo phiên mới</a>
+  </nav>
+
+<script>
+  const SCENES = {
+    edge: {
+      title: "Bảng điều khiển ẩn",
+      body: "Di chuột sát mép trái (máy tính) hoặc chạm mép trái (điện thoại) để mở bảng điều khiển. Không chiếu bảng này lên màn hình học sinh.",
+      next: "Tiếp",
+      target: "edge",
+      drawer: false,
+      picker: false,
+      arrow: "right",
+      pad: 6,
+    },
+    drawer: {
+      title: "Chỉnh thời gian",
+      body: "Trong bảng điều khiển, bạn chỉnh thời gian phiên tại đây — bắt đầu, tạm dừng hay gia hạn.",
+      next: "Tiếp (1/2)",
+      target: "timer",
+      drawer: true,
+      picker: false,
+      arrow: "right",
+      pad: 8,
+    },
+    "all-sessions": {
+      title: "Chuyển phiên",
+      body: "Bấm \"Tất cả phiên\" để xem danh sách phiên thảo luận của lớp, chọn phiên khác hoặc tạo phiên mới ngay trong lúc chiếu.",
+      next: "Tiếp",
+      target: "all-sessions",
+      drawer: true,
+      picker: false,
+      arrow: "right",
+      pad: 6,
+    },
+    "create-session": {
+      title: "Tạo phiên mới",
+      body: "Bấm \"Tạo phiên mới\" để mở một phiên thảo luận mới ngay trên bảng điều khiển mà không cần thoát màn chiếu.",
+      next: "Hoàn tất",
+      target: "create-session",
+      drawer: true,
+      picker: true,
+      arrow: "bottom",
+      pad: 6,
+    },
+  };
+
+  const params = new URLSearchParams(location.search);
+  const scene = SCENES[params.get("scene")] ? params.get("scene") : "edge";
+  if (params.get("shot") === "1") document.body.classList.add("shot");
+
+  const cfg = SCENES[scene];
+  document.getElementById("drawer").classList.toggle("open", cfg.drawer);
+  document.getElementById("picker").classList.toggle("open", cfg.picker);
+  document.getElementById("tip-title").textContent = cfg.title;
+  document.getElementById("tip-body").textContent = cfg.body;
+  document.getElementById("tip-next").textContent = cfg.next;
+  document.getElementById("arrow").className = "arrow " + cfg.arrow;
+  document.querySelectorAll(".nav a").forEach((a) => {
+    if (a.getAttribute("href") === "?scene=" + scene) a.classList.add("on");
+  });
+
+  function place() {
+    const el = document.getElementById(cfg.target);
+    const r = el.getBoundingClientRect();
+    const pad = cfg.pad;
+    const hole = document.getElementById("hole");
+    hole.style.left = r.left - pad + "px";
+    hole.style.top = r.top - pad + "px";
+    hole.style.width = r.width + pad * 2 + "px";
+    hole.style.height = r.height + pad * 2 + "px";
+
+    const tip = document.getElementById("tip");
+    const tw = tip.offsetWidth;
+    const th = tip.offsetHeight;
+    if (cfg.arrow === "right") {
+      tip.style.left = r.right + pad + 16 + "px";
+      tip.style.top = Math.max(12, r.top + r.height / 2 - 40) + "px";
+    } else {
+      tip.style.left = Math.min(window.innerWidth - tw - 12, Math.max(12, r.left)) + "px";
+      tip.style.top = r.bottom + pad + 16 + "px";
+    }
+    void th;
+  }
+  requestAnimationFrame(place);
+  window.addEventListener("resize", place);
+</script>
+</body>
+</html>

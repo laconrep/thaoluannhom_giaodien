@@ -264,6 +264,7 @@ Ghi chú kỹ thuật:
 - [x] Test replay bằng nút "Hướng dẫn" (6c: Share 2 hint, Dashboard đóng form, chiếu nút overlay + stage theo UI).
 - [x] Test trên theme sáng/tối, màn hình nhỏ (mobile) — `useTourOptions` + CSS tooltip + nút compact + `onTouchStart` mép trái (6c).
 - [x] Chạy `pnpm run lint` và `pnpm run typecheck` (hiện pass, chỉ warning `<img>` pre-existing).
+- [x] HTML giả lập màn chiếu (7a): `docs/tour-demo/presentation.html` — 4 cảnh `?scene=edge|drawer|all-sessions|create-session`.
 
 ## 9. Đánh giá thành công
 
