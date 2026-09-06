@@ -150,10 +150,10 @@ export function AnnotationEditor({
   const isPdf = currentFile?.kind === "pdf"
   const isDocx = currentFile?.kind === "docx"
   const isPptx = currentFile?.kind === "pptx"
-  // PPT: khi đang dùng công cụ chấm (không phải bàn tay) thì khóa iframe để
+  // PPT/PDF: khi đang dùng công cụ chấm (không phải bàn tay) thì khóa iframe để
   // không tương tác được với file, chuột chỉ dùng để đặt dấu/vẽ.
-  const annotateLocked = isPptx && tool !== "pan"
-  const canAnnotate = isImage || currentIdx === -1 || isDocx || isPptx
+  const annotateLocked = (isPptx || isPdf) && tool !== "pan"
+  const canAnnotate = isImage || currentIdx === -1 || isDocx || isPptx || isPdf
   const annotationKey = currentIdx
 
   // Render tệp .docx bằng docx-preview thành DOM thuần (thay iframe Office):
@@ -948,9 +948,18 @@ export function AnnotationEditor({
                 <iframe
                   src={currentFile.url}
                   title={currentFile.name}
-                  className="w-full h-full rounded-md"
+                  className={cn(
+                    "w-full h-full rounded-md",
+                    annotateLocked && "pointer-events-none",
+                  )}
                 />
-                <div className="absolute top-2 right-2">
+                {annotateLocked && (
+                  <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-background/90 border shadow px-3 py-1 text-xs text-muted-foreground pointer-events-none">
+                    <Hand className="size-3.5" />
+                    Chọn bàn tay để xem file
+                  </div>
+                )}
+                <div className="absolute top-2 right-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
                   <Button asChild variant="outline" size="sm" className="gap-1">
                     <a href={currentFile.url} target="_blank" rel="noreferrer" download>
                       <Download className="size-3.5" />
