@@ -213,12 +213,7 @@ export function ResultsViewer({
 }
 
 function AnnotationOverlay({ items, fileIdx }: { items: AnnotationItem[]; fileIdx: number }) {
-  const relevant = items.filter((it) => {
-    if (it.kind === "text" || it.kind === "highlight" || it.kind === "underline" || it.kind === "stamp") {
-      return (it.fileIndex ?? 0) === fileIdx
-    }
-    return true
-  })
+  const relevant = items.filter((it) => (it.fileIndex ?? 0) === fileIdx)
   return (
     <div className="pointer-events-none absolute inset-0">
       {relevant.map((it, i) => {

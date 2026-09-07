@@ -155,6 +155,7 @@ export function AnnotationEditor({
   const annotateLocked = isPptx && tool !== "pan"
   const canAnnotate = isImage || currentIdx === -1 || isDocx || isPptx
   const annotationKey = currentIdx
+  const showAnnotations = canAnnotate && !presentationMode && !isPdf
 
   // Render tệp .docx bằng docx-preview thành DOM thuần (thay iframe Office):
   // scroll trang tự nhiên theo viewport, dấu bám nội dung, chấm chính xác như ảnh.
@@ -195,15 +196,17 @@ export function AnnotationEditor({
     })()
     return () => {
       cancelled = true
+      if (el) el.replaceChildren()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIdx])
 
   const filteredItems = useMemo(() => {
+    if (!canAnnotate) return []
     return items
       .map((it, origIdx) => ({ it, origIdx }))
       .filter(({ it }) => (it.fileIndex ?? -1) === annotationKey)
-  }, [items, annotationKey])
+  }, [items, annotationKey, canAnnotate])
 
   const drawingRef = useRef<{
     active: boolean
@@ -222,6 +225,15 @@ export function AnnotationEditor({
     startY: number
     original: TextItem | null
   }>({ mode: null, origIdx: -1, startX: 0, startY: 0, original: null })
+
+  useEffect(() => {
+    setPendingText(null)
+    setSelectedTextIdx(null)
+    drawingRef.current = { active: false, origIdx: -1, start: null }
+    panRef.current.active = false
+    if (!canAnnotate) setTool("pan")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIdx])
 
   function pushHistory() {
     setHistory((h) => [...h, items])
@@ -883,6 +895,7 @@ export function AnnotationEditor({
         >
           <div
             ref={surfaceRef}
+            key={`surface-${annotationKey}-${currentFile?.kind ?? "text"}`}
             className={cn(
               "relative bg-card rounded-md shadow-sm border",
               presentationMode && "bg-white shadow-none border-none",
@@ -911,8 +924,8 @@ export function AnnotationEditor({
             style={{
               cursor,
               minHeight: presentationMode ? undefined : "70vh",
-              width: docxWidth ?? undefined,
-              margin: docxWidth ? "0 auto" : undefined,
+              width: isDocx ? (docxWidth ?? undefined) : undefined,
+              margin: isDocx && docxWidth ? "0 auto" : undefined,
             }}
           >
             {currentIdx === -1 ? (
@@ -1035,9 +1048,10 @@ export function AnnotationEditor({
               </div>
             )}
 
-            {/* Annotations */}
-            {canAnnotate && !presentationMode && (
+            {/* Annotations — remount theo file để stamp Word không dính sang PDF/PPT */}
+            {showAnnotations && (
               <svg
+                key={`ann-svg-${annotationKey}`}
                 className="absolute inset-0 w-full h-full pointer-events-none"
                 preserveAspectRatio="none"
               >
@@ -1091,7 +1105,7 @@ export function AnnotationEditor({
             )}
 
             {/* Text items */}
-            {canAnnotate && !presentationMode &&
+            {showAnnotations &&
               filteredItems.map(({ it, origIdx }) => {
                 if (it.kind !== "text") return null
                 const selected = selectedTextIdx === origIdx
@@ -1133,7 +1147,7 @@ export function AnnotationEditor({
               })}
 
             {/* Stamps */}
-            {canAnnotate && !presentationMode &&
+            {showAnnotations &&
               filteredItems.map(({ it, origIdx }) => {
                 if (it.kind !== "stamp") return null
                 return (
