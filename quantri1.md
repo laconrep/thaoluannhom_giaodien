@@ -2,7 +2,7 @@
 
 Mục đích file này: phiên code sau đọc file này là đủ để code tiếp, không cần đọc lại toàn bộ repo.
 
-Cập nhật lần cuối: 2026-09-08 — CHƯA CODE. Chỉ có kế hoạch.
+Cập nhật lần cuối: 2026-09-08 — Phiên 1 đã xong. Chưa có UI.
 
 Admin duy nhất (allowlist cứng): `gagabux95@gmail.com`
 Các tài khoản khác không thấy link và không vào được `/admin`.
@@ -67,13 +67,15 @@ RLS profiles hiện `using (true)` (mở). Vẫn phải kiểm tra quyền ở s
 - [x] Khảo sát repo: plans, profiles, auth, middleware, teacher-shell, admin client.
 - [x] Thống nhất yêu cầu với user (trang admin, ẩn với user thường, activate/terminate, đổi gói).
 - [x] Viết kế hoạch 6 phiên trong file này.
-- [ ] Chưa viết bất kỳ code nào.
+- [x] Phiên 1: `scripts/080_admin.sql` + `lib/admin.ts`.
 
 ---
 
 ## 4. Việc CHƯA LÀM — chia 6 phiên
 
 Quy ước: mỗi phiên xong phải đánh dấu checkbox trong mục này và ghi "Phiên N đã xong" ở mục 6. Phiên sau chỉ làm phần còn ` [ ] `.
+
+BẮT BUỘC: sau mỗi phiên code xong phải `git add` đúng files vừa đụng, `git commit`, rồi `git push` lên GitHub (`origin`, nhánh hiện tại). Không để code nằm local. Không commit secret. Phiên 1 chưa push — phiên sau nếu thấy chưa push thì push trước khi làm tiếp.
 
 ### Phiên 1 — Schema + helper quyền admin
 
@@ -211,8 +213,9 @@ Không sửa trừ khi cần:
 ## 6. Nhật ký phiên (điền khi code)
 
 ### Phiên 1
-Status: CHƯA LÀM
-Ghi chú:
+Status: ĐÃ XONG
+Files: `scripts/080_admin.sql`, `lib/admin.ts`
+Ghi chú: SQL thêm `profiles.role` + `profiles.status`, trigger tạo profile khi user mới, gán admin cho gagabux95@gmail.com. Helper `isAdminEmail` / `requireAdmin` ưu tiên allowlist email. Chưa UI. User cần chạy SQL trên Supabase.
 
 ### Phiên 2
 Status: CHƯA LÀM
@@ -241,8 +244,9 @@ Ghi chú:
 1. Đọc file này, không đọc cả repo.
 2. Làm phiên nhỏ nhất còn `CHƯA LÀM`.
 3. Code xong: tick checkbox mục 4, đổi Status mục 6, ghi files đã đụng.
-4. Dừng. Không làm vượt phiên trừ khi user bảo làm tiếp.
-5. SQL `080_admin.sql` cần user chạy trên Supabase SQL Editor (hoặc one-click). Code phải chịu được DB chưa migrate: `requireAdmin` ưu tiên allowlist email; cột `role`/`status` thiếu thì coi `status=active`, `role=user` trừ admin email.
+4. Commit + push ngay lên GitHub (origin, nhánh hiện tại). Đây là bước bắt buộc của mỗi phiên, không chờ user nhắc.
+5. Dừng. Không làm vượt phiên trừ khi user bảo làm tiếp.
+6. SQL `080_admin.sql` cần user chạy trên Supabase SQL Editor (hoặc one-click). Code phải chịu được DB chưa migrate: `requireAdmin` ưu tiên allowlist email; cột `role`/`status` thiếu thì coi `status=active`, `role=user` trừ admin email.
 
 ---
 
