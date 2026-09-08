@@ -1,33 +1,12 @@
 import { requireAdmin } from "@/lib/admin"
 import { AdminShell } from "@/components/admin-shell"
-import { PLANS, PLAN_DEFAULT, type Plan } from "@/lib/plans"
-import { Badge } from "@/components/ui/badge"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { PLAN_DEFAULT, type Plan } from "@/lib/plans"
 import { EmptyState } from "@/components/empty-state"
-import { formatDateShort } from "@/lib/utils-format"
 import { Users } from "lucide-react"
-import { AccountStatusButtons } from "@/app/admin/account-status-buttons"
-import { AccountPlanSelect } from "@/app/admin/account-plan-select"
+import { AccountsTable, type AdminAccountRow } from "@/app/admin/accounts-table"
 
 type AccountStatus = "active" | "disabled"
 type AccountRole = "user" | "admin"
-
-type AccountRow = {
-  id: string
-  email: string
-  createdAt: string | null
-  lastSignInAt: string | null
-  plan: Plan
-  role: AccountRole
-  status: AccountStatus
-}
 
 function asPlan(value: unknown): Plan {
   if (value === "free" || value === "pro" || value === "school") return value
@@ -81,11 +60,9 @@ export default async function AdminPage() {
     )
   }
 
-  const profileById = new Map(
-    (profiles ?? []).map((p) => [p.id as string, p]),
-  )
+  const profileById = new Map((profiles ?? []).map((p) => [p.id as string, p]))
 
-  const accounts: AccountRow[] = (authData.users ?? []).map((u) => {
+  const accounts: AdminAccountRow[] = (authData.users ?? []).map((u) => {
     const profile = profileById.get(u.id)
     const email = u.email ?? "(không có email)"
     return {
@@ -99,11 +76,9 @@ export default async function AdminPage() {
     }
   })
 
-  const byPlan: Record<Plan, AccountRow[]> = {
-    free: accounts.filter((a) => a.plan === "free"),
-    pro: accounts.filter((a) => a.plan === "pro"),
-    school: accounts.filter((a) => a.plan === "school"),
-  }
+  const freeCount = accounts.filter((a) => a.plan === "free").length
+  const proCount = accounts.filter((a) => a.plan === "pro").length
+  const schoolCount = accounts.filter((a) => a.plan === "school").length
   const disabledCount = accounts.filter((a) => a.status === "disabled").length
 
   return (
@@ -123,15 +98,13 @@ export default async function AdminPage() {
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <StatCard label="Tổng" value={accounts.length} />
-          <StatCard label="Free" value={byPlan.free.length} />
-          <StatCard label="Pro" value={byPlan.pro.length} />
-          <StatCard label="School" value={byPlan.school.length} />
+          <StatCard label="Free" value={freeCount} />
+          <StatCard label="Pro" value={proCount} />
+          <StatCard label="School" value={schoolCount} />
           <StatCard label="Đã chấm dứt" value={disabledCount} />
         </div>
 
-        {PLANS.map((plan) => (
-          <PlanBlock key={plan.id} title={plan.name} planId={plan.id} rows={byPlan[plan.id]} />
-        ))}
+        <AccountsTable accounts={accounts} />
       </section>
     </AdminShell>
   )
@@ -142,85 +115,6 @@ function StatCard({ label, value }: { label: string; value: number }) {
     <div className="rounded-xl border bg-card px-4 py-3">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="font-heading text-2xl font-bold leading-tight mt-1">{value}</p>
-    </div>
-  )
-}
-
-function PlanBlock({
-  title,
-  planId,
-  rows,
-}: {
-  title: string
-  planId: Plan
-  rows: AccountRow[]
-}) {
-  return (
-    <div className="rounded-xl border bg-card overflow-hidden">
-      <div className="px-4 py-3 border-b flex items-baseline justify-between gap-3">
-        <h2 className="font-heading font-semibold">
-          Gói {title}
-        </h2>
-        <p className="text-xs text-muted-foreground">{rows.length} tài khoản</p>
-      </div>
-      {rows.length === 0 ? (
-        <div className="p-4">
-          <EmptyState
-            icon={Users}
-            title={`Chưa có tài khoản gói ${planId}`}
-            description="Khi có giáo viên đăng ký hoặc được đổi sang gói này, email sẽ hiện ở đây."
-            className="py-8 border-0 bg-transparent"
-          />
-        </div>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Email</TableHead>
-              <TableHead>Ngày tạo</TableHead>
-              <TableHead>Đăng nhập gần nhất</TableHead>
-              <TableHead>Gói</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead>Quyền</TableHead>
-              <TableHead className="text-right">Thao tác</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell className="font-medium">{row.email}</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {row.createdAt ? formatDateShort(row.createdAt) : "—"}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {row.lastSignInAt ? formatDateShort(row.lastSignInAt) : "—"}
-                </TableCell>
-                <TableCell>
-                  <AccountPlanSelect userId={row.id} email={row.email} currentPlan={row.plan} />
-                </TableCell>
-                <TableCell>
-                  <Badge variant={row.status === "disabled" ? "destructive" : "secondary"}>
-                    {row.status === "disabled" ? "Đã chấm dứt" : "Đang hoạt động"}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={row.role === "admin" ? "default" : "outline"}>
-                    {row.role === "admin" ? "Admin" : "User"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <AccountStatusButtons
-                    userId={row.id}
-                    email={row.email}
-                    status={row.status}
-                    locked={row.role === "admin"}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
     </div>
   )
 }

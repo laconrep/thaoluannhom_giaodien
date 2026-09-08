@@ -1,10 +1,11 @@
 import Link from "next/link"
-import { GraduationCap, LayoutDashboard, CreditCard } from "lucide-react"
+import { GraduationCap, LayoutDashboard, CreditCard, Shield } from "lucide-react"
 import { signOutAction } from "@/app/actions"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { AvatarInitials } from "@/components/avatar-initials"
 import { TourReplayButton } from "@/components/tour/tour-replay-button"
+import { isAdminEmail } from "@/lib/admin"
 
 export function TeacherShell({
   children,
@@ -13,6 +14,7 @@ export function TeacherShell({
   children: React.ReactNode
   email?: string | null
 }) {
+  const isAdmin = isAdminEmail(email)
   return (
     <div className="min-h-svh flex flex-col bg-background">
       <header className="border-b bg-card/95 backdrop-blur sticky top-0 z-30">
@@ -35,6 +37,14 @@ export function TeacherShell({
               Gói sử dụng
             </Link>
           </Button>
+          {isAdmin && (
+            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Link href="/admin" className="gap-2">
+                <Shield className="size-4" aria-hidden="true" />
+                Quản trị
+              </Link>
+            </Button>
+          )}
           <div className="ml-auto flex items-center gap-1.5">
             <TourReplayButton />
             <ThemeToggle compact />

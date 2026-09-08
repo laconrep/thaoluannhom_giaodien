@@ -2,7 +2,7 @@
 
 Mục đích file này: phiên code sau đọc file này là đủ để code tiếp, không cần đọc lại toàn bộ repo.
 
-Cập nhật lần cuối: 2026-09-08 — Phiên 5 đã xong. Phiên 6 chưa làm.
+Cập nhật lần cuối: 2026-09-08 — Phiên 1–6 đã xong.
 
 Admin duy nhất (allowlist cứng): `gagabux95@gmail.com`
 Các tài khoản khác không thấy link và không vào được `/admin`.
@@ -72,6 +72,7 @@ RLS profiles hiện `using (true)` (mở). Vẫn phải kiểm tra quyền ở s
 - [x] Phiên 3: trang `/admin` danh sách tài khoản theo gói.
 - [x] Phiên 4: kích hoạt / chấm dứt tài khoản.
 - [x] Phiên 5: admin đổi gói free/pro/school.
+- [x] Phiên 6: link ẩn/hiện, tìm email, typecheck/lint.
 
 ---
 
@@ -242,8 +243,9 @@ Files: `app/admin/actions.ts`, `app/admin/account-plan-select.tsx`, `app/admin/p
 Ghi chú: Select gói + confirm dialog. `setAccountPlanAction` upsert profiles.plan bằng admin client, không qua thanh toán. `upgradeToPlanAction` của user không đổi. Link ẩn/hiện còn phiên 6.
 
 ### Phiên 6
-Status: CHƯA LÀM
-Ghi chú:
+Status: ĐÃ XONG
+Files: `components/teacher-shell.tsx`, `app/admin/accounts-table.tsx`, `app/admin/page.tsx`
+Ghi chú: Link Quản trị chỉ hiện khi `isAdminEmail(email)`. Ô tìm email client-side. Empty state theo gói giữ nguyên. Typecheck + lint.
 
 ---
 
