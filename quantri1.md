@@ -2,7 +2,7 @@
 
 Mục đích file này: phiên code sau đọc file này là đủ để code tiếp, không cần đọc lại toàn bộ repo.
 
-Cập nhật lần cuối: 2026-09-08 — Phiên 2 đang làm / Phiên 1 đã xong.
+Cập nhật lần cuối: 2026-09-08 — Phiên 3 đã xong. Phiên 4–6 chưa làm.
 
 Admin duy nhất (allowlist cứng): `gagabux95@gmail.com`
 Các tài khoản khác không thấy link và không vào được `/admin`.
@@ -69,6 +69,7 @@ RLS profiles hiện `using (true)` (mở). Vẫn phải kiểm tra quyền ở s
 - [x] Viết kế hoạch 6 phiên trong file này.
 - [x] Phiên 1: `scripts/080_admin.sql` + `lib/admin.ts`.
 - [x] Phiên 2: chặn `/admin` + tài khoản disabled.
+- [x] Phiên 3: trang `/admin` danh sách tài khoản theo gói.
 
 ---
 
@@ -224,8 +225,9 @@ Files: `lib/account-status.ts`, `app/admin/layout.tsx`, `lib/supabase/proxy.ts`,
 Ghi chú: `/admin` cần login (middleware). Layout admin gọi `requireAdmin` — user thường bị đá dashboard. `ensureActiveUser` chặn status=disabled (thiếu cột thì bỏ qua). Login hiện message `reason=disabled`.
 
 ### Phiên 3
-Status: CHƯA LÀM
-Ghi chú:
+Status: ĐÃ XONG
+Files: `components/admin-shell.tsx`, `app/admin/page.tsx`
+Ghi chú: Trang `/admin` thống kê tổng/free/pro/school/disabled + 3 bảng email theo gói. Join auth.users + profiles. Thiếu service role thì hiện empty state, không crash. Chưa có nút hành động (phiên 4–5). TeacherShell chưa có link (phiên 6).
 
 ### Phiên 4
 Status: CHƯA LÀM
