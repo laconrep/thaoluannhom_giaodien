@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/empty-state"
 import { formatDateShort } from "@/lib/utils-format"
 import { Users } from "lucide-react"
 import { AccountStatusButtons } from "@/app/admin/account-status-buttons"
+import { AccountPlanSelect } from "@/app/admin/account-plan-select"
 
 type AccountStatus = "active" | "disabled"
 type AccountRole = "user" | "admin"
@@ -111,7 +112,7 @@ export default async function AdminPage() {
         <header className="flex flex-col gap-1">
           <h1 className="font-heading text-2xl md:text-3xl font-bold">Tài khoản</h1>
           <p className="text-sm text-muted-foreground text-pretty">
-            Email đăng ký theo gói. Có thể kích hoạt hoặc chấm dứt tài khoản. Đổi gói ở phiên sau.
+            Email đăng ký theo gói. Có thể kích hoạt, chấm dứt hoặc đổi gói tài khoản.
           </p>
           {profileError && (
             <p className="text-sm text-destructive">
@@ -178,6 +179,7 @@ function PlanBlock({
               <TableHead>Email</TableHead>
               <TableHead>Ngày tạo</TableHead>
               <TableHead>Đăng nhập gần nhất</TableHead>
+              <TableHead>Gói</TableHead>
               <TableHead>Trạng thái</TableHead>
               <TableHead>Quyền</TableHead>
               <TableHead className="text-right">Thao tác</TableHead>
@@ -192,6 +194,9 @@ function PlanBlock({
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {row.lastSignInAt ? formatDateShort(row.lastSignInAt) : "—"}
+                </TableCell>
+                <TableCell>
+                  <AccountPlanSelect userId={row.id} email={row.email} currentPlan={row.plan} />
                 </TableCell>
                 <TableCell>
                   <Badge variant={row.status === "disabled" ? "destructive" : "secondary"}>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { isAdminEmail } from "@/lib/admin"
+import type { Plan } from "@/lib/plans"
 
 async function assertAdminActor() {
   const supabase = await createClient()
@@ -39,6 +40,23 @@ export async function setAccountStatusAction(userId: string, status: "active" | 
   const { error } = existing
     ? await admin.from("profiles").update({ status, updated_at: now }).eq("id", userId)
     : await admin.from("profiles").insert({ id: userId, plan: "free", role: "user", status, updated_at: now })
+
+  if (error) throw new Error(error.message)
+  revalidatePath("/admin")
+}
+
+export async function setAccountPlanAction(userId: string, plan: Plan) {
+  if (plan !== "free" && plan !== "pro" && plan !== "school") {
+    throw new Error("Gói không hợp lệ.")
+  }
+  if (!userId) throw new Error("Thiếu tài khoản.")
+
+  const { admin } = await assertAdminActor()
+  const now = new Date().toISOString()
+  const { data: existing } = await admin.from("profiles").select("id").eq("id", userId).maybeSingle()
+  const { error } = existing
+    ? await admin.from("profiles").update({ plan, updated_at: now }).eq("id", userId)
+    : await admin.from("profiles").insert({ id: userId, plan, role: "user", status: "active", updated_at: now })
 
   if (error) throw new Error(error.message)
   revalidatePath("/admin")
