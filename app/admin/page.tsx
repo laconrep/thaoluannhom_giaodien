@@ -13,6 +13,7 @@ import {
 import { EmptyState } from "@/components/empty-state"
 import { formatDateShort } from "@/lib/utils-format"
 import { Users } from "lucide-react"
+import { AccountStatusButtons } from "@/app/admin/account-status-buttons"
 
 type AccountStatus = "active" | "disabled"
 type AccountRole = "user" | "admin"
@@ -110,7 +111,7 @@ export default async function AdminPage() {
         <header className="flex flex-col gap-1">
           <h1 className="font-heading text-2xl md:text-3xl font-bold">Tài khoản</h1>
           <p className="text-sm text-muted-foreground text-pretty">
-            Email đăng ký theo gói. Chỉ xem — thao tác kích hoạt và đổi gói ở phiên sau.
+            Email đăng ký theo gói. Có thể kích hoạt hoặc chấm dứt tài khoản. Đổi gói ở phiên sau.
           </p>
           {profileError && (
             <p className="text-sm text-destructive">
@@ -179,6 +180,7 @@ function PlanBlock({
               <TableHead>Đăng nhập gần nhất</TableHead>
               <TableHead>Trạng thái</TableHead>
               <TableHead>Quyền</TableHead>
+              <TableHead className="text-right">Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -200,6 +202,14 @@ function PlanBlock({
                   <Badge variant={row.role === "admin" ? "default" : "outline"}>
                     {row.role === "admin" ? "Admin" : "User"}
                   </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <AccountStatusButtons
+                    userId={row.id}
+                    email={row.email}
+                    status={row.status}
+                    locked={row.role === "admin"}
+                  />
                 </TableCell>
               </TableRow>
             ))}
