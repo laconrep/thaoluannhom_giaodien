@@ -54,8 +54,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Thiếu thông tin file hoặc sessionId" }, { status: 400 })
     }
 
-    if (fileSize === 0 || fileSize > 50 * 1024 * 1024) {
-      return NextResponse.json({ error: "File PowerPoint phải từ 1 byte đến 50 MB." }, { status: 400 })
+    if (fileSize === 0 || fileSize > 200 * 1024 * 1024) {
+      return NextResponse.json({ error: "File PowerPoint phải từ 1 byte đến 200 MB." }, { status: 400 })
     }
 
     if (!allowedTypes.has(fileType) && !/\.(pptx?|PPTX?)$/.test(fileName)) {

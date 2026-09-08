@@ -3,10 +3,11 @@
 -- Tạo các storage bucket mà ứng dụng sử dụng.
 -- ============================================================
 
--- Bucket lưu file PowerPoint của giáo viên (private)
-insert into storage.buckets (id, name, public)
-values ('presentations', 'presentations', false)
-on conflict (id) do nothing;
+-- Bucket lưu file PowerPoint của giáo viên (private, tối đa 200 MB)
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('presentations', 'presentations', false, 209715200)
+on conflict (id) do update set
+  file_size_limit = excluded.file_size_limit;
 
 -- Bucket lưu bài nộp của học sinh (private)
 insert into storage.buckets (id, name, public)

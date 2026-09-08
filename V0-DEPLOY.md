@@ -402,7 +402,7 @@ create index if not exists class_groups_leader_idx on public.class_groups(leader
 -- ============ STORAGE POWERPOINT ============
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
-  'presentations', 'presentations', false, 52428800,
+  'presentations', 'presentations', false, 209715200,
   array['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.ms-powerpoint', 'application/zip']
 )
 on conflict (id) do update set

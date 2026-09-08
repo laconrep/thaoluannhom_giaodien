@@ -31,7 +31,7 @@ File SQL có thể chạy lại an toàn và tự cài đặt:
 - Bảng upload PowerPoint và slide.
 - RLS policies, index và trigger cần thiết.
 - Realtime publication.
-- Storage bucket `presentations` với giới hạn 50 MB.
+- Storage bucket `presentations` với giới hạn 200 MB.
 - Schema cache PostgREST reload.
 
 ## 3. Kiểm tra nhanh sau khi chạy
@@ -58,7 +58,7 @@ from storage.buckets
 where id = 'presentations';
 ```
 
-Bucket cần có `file_size_limit = 52428800`.
+Bucket cần có `file_size_limit = 209715200` (200 MB).
 
 ## 4. Deploy ứng dụng
 

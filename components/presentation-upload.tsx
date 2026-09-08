@@ -21,8 +21,8 @@ export function PresentationUpload({
       toast.error("Chỉ hỗ trợ file PowerPoint (.ppt hoặc .pptx)")
       return
     }
-    if (file.size === 0 || file.size > 50 * 1024 * 1024) {
-      toast.error("File PowerPoint phải từ 1 byte đến 50 MB")
+    if (file.size === 0 || file.size > 200 * 1024 * 1024) {
+      toast.error("File PowerPoint phải từ 1 byte đến 200 MB")
       return
     }
 
@@ -125,7 +125,7 @@ export function PresentationUpload({
           <p className="text-sm font-medium text-foreground">
             {isLoading ? "Đang tải lên..." : "Kéo file PowerPoint vào đây hoặc click để chọn"}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">Hỗ trợ .ppt và .pptx, tối đa 50 MB</p>
+          <p className="text-xs text-muted-foreground mt-1">Hỗ trợ .ppt và .pptx, tối đa 200 MB</p>
         </div>
       ) : (
         <div className="bg-muted/50 rounded-lg p-4 flex items-center justify-between">

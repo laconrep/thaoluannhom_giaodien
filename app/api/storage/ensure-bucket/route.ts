@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     const { error: createError } = await supabase.storage.createBucket(bucket, {
       public: false,
-      fileSizeLimit: 50 * 1024 * 1024,
+      fileSizeLimit: bucket === "presentations" ? 200 * 1024 * 1024 : 50 * 1024 * 1024,
     })
     if (createError) {
       return NextResponse.json(
