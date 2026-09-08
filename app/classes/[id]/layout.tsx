@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { TeacherShell } from "@/components/teacher-shell"
 import { ClassTabs } from "./class-tabs"
 import { Users } from "lucide-react"
+import { ensureActiveUser } from "@/lib/account-status"
 
 export default async function ClassLayout({
   children,
@@ -17,6 +18,7 @@ export default async function ClassLayout({
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
+  await ensureActiveUser(user.id)
 
   const { data: cls } = await supabase
     .from("classes")

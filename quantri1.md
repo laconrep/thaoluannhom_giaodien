@@ -2,7 +2,7 @@
 
 Mục đích file này: phiên code sau đọc file này là đủ để code tiếp, không cần đọc lại toàn bộ repo.
 
-Cập nhật lần cuối: 2026-09-08 — Phiên 1 đã xong. Chưa có UI.
+Cập nhật lần cuối: 2026-09-08 — Phiên 2 đang làm / Phiên 1 đã xong.
 
 Admin duy nhất (allowlist cứng): `gagabux95@gmail.com`
 Các tài khoản khác không thấy link và không vào được `/admin`.
@@ -68,6 +68,7 @@ RLS profiles hiện `using (true)` (mở). Vẫn phải kiểm tra quyền ở s
 - [x] Thống nhất yêu cầu với user (trang admin, ẩn với user thường, activate/terminate, đổi gói).
 - [x] Viết kế hoạch 6 phiên trong file này.
 - [x] Phiên 1: `scripts/080_admin.sql` + `lib/admin.ts`.
+- [x] Phiên 2: chặn `/admin` + tài khoản disabled.
 
 ---
 
@@ -218,8 +219,9 @@ Files: `scripts/080_admin.sql`, `lib/admin.ts`
 Ghi chú: SQL thêm `profiles.role` + `profiles.status`, trigger tạo profile khi user mới, gán admin cho gagabux95@gmail.com. Helper `isAdminEmail` / `requireAdmin` ưu tiên allowlist email. Chưa UI. User cần chạy SQL trên Supabase.
 
 ### Phiên 2
-Status: CHƯA LÀM
-Ghi chú:
+Status: ĐÃ XONG
+Files: `lib/account-status.ts`, `app/admin/layout.tsx`, `lib/supabase/proxy.ts`, `app/dashboard/page.tsx`, `app/classes/[id]/layout.tsx`, `app/pricing/page.tsx`, `app/auth/login/page.tsx`
+Ghi chú: `/admin` cần login (middleware). Layout admin gọi `requireAdmin` — user thường bị đá dashboard. `ensureActiveUser` chặn status=disabled (thiếu cột thì bỏ qua). Login hiện message `reason=disabled`.
 
 ### Phiên 3
 Status: CHƯA LÀM

@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/empty-state"
 import { TeacherTour } from "@/components/tour/teacher-tour"
 import { dashboardTourSteps } from "@/components/tour/tour-config"
 import { TOUR_DASHBOARD_SEEN_KEY } from "@/components/tour/tour-store"
+import { ensureActiveUser } from "@/lib/account-status"
 
 type ClassWithCounts = {
   id: string
@@ -26,6 +27,7 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
+  await ensureActiveUser(user.id)
 
   const { data: classes } = await supabase
     .from("classes")

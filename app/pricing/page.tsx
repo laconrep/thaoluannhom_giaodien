@@ -5,6 +5,7 @@ import { upgradeToPlanAction } from "@/app/actions"
 import { PLANS, PLAN_DEFAULT, type Plan } from "@/lib/plans"
 import { Button } from "@/components/ui/button"
 import { GraduationCap, Check, ArrowLeft } from "lucide-react"
+import { ensureActiveUser } from "@/lib/account-status"
 
 export default async function PricingPage() {
   const supabase = await createClient()
@@ -12,6 +13,7 @@ export default async function PricingPage() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
+  await ensureActiveUser(user.id)
 
   const { data: profile } = await supabase
     .from("profiles")

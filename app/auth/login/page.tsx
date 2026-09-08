@@ -14,6 +14,7 @@ function LoginForm() {
   const router = useRouter()
   const params = useSearchParams()
   const next = params.get("next") ?? "/dashboard"
+  const disabled = params.get("reason") === "disabled"
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -58,6 +59,11 @@ function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
         />
       </div>
+      {disabled && !error && (
+        <p className="text-sm text-destructive">
+          Tài khoản đã bị chấm dứt. Liên hệ quản trị viên để kích hoạt lại.
+        </p>
+      )}
       {error && <p className="text-sm text-destructive">{error}</p>}
       <Button type="submit" disabled={loading}>
         {loading && <Spinner className="mr-2" />}

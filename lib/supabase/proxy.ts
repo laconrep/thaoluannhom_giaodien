@@ -42,7 +42,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   const path = request.nextUrl.pathname
-  const protectedPrefixes = ["/dashboard", "/classes"]
+  const protectedPrefixes = ["/dashboard", "/classes", "/admin"]
   const needsAuth = protectedPrefixes.some((p) => path.startsWith(p))
 
   if (needsAuth && !user) {
