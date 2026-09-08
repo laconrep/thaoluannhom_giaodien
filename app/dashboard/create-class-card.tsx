@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { createClassAction } from "@/app/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +12,7 @@ import { Plus } from "lucide-react"
 import { setSeen, TOUR_DASHBOARD_SEEN_KEY, STOP_EVENT, RESTART_EVENT } from "@/components/tour/tour-store"
 
 export function CreateClassCard() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -57,13 +59,17 @@ export function CreateClassCard() {
             setError(null)
             startTransition(async () => {
               try {
-                await createClassAction(fd)
+                const result = await createClassAction(fd)
+                if (!result.ok) {
+                  setError(result.error)
+                  return
+                }
+                router.push(`/classes/${result.classId}/roster`)
               } catch (caught) {
-                // redirect() làm server action trả promise reject với lỗi NEXT_REDIRECT.
-                // Không phải lỗi thật — navigation vẫn do router xử lý.
                 const digest = (caught as { digest?: string } | null)?.digest ?? ""
                 if (digest.startsWith("NEXT_REDIRECT")) return
-                const message = caught instanceof Error ? caught.message : "Không thể tạo lớp. Vui lòng thử lại."
+                const message =
+                  caught instanceof Error ? caught.message : "Không thể tạo lớp. Vui lòng thử lại."
                 setError(message)
               }
             })

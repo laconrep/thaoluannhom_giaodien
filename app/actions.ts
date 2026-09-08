@@ -34,7 +34,9 @@ export async function upgradeToPlanAction(plan: Plan) {
 
 /* ============ CLASSES ============ */
 
-export async function createClassAction(formData: FormData) {
+export async function createClassAction(
+  formData: FormData,
+): Promise<{ ok: true; classId: string } | { ok: false; error: string }> {
   const name = String(formData.get("name") ?? "").trim() || "Lớp mới"
   const capacity = Math.max(1, Math.min(80, Number(formData.get("capacity") ?? 48) || 48))
   const numGroups = Math.max(2, Math.min(12, Number(formData.get("numGroups") ?? 8) || 8))
@@ -45,54 +47,64 @@ export async function createClassAction(formData: FormData) {
   } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  // Kiểm tra quota theo gói
-  const plan = await getPlan(supabase, user.id)
-  const limits = planLimits(plan)
-  const { count } = await supabase
-    .from("classes")
-    .select("id", { count: "exact", head: true })
-    .eq("teacher_id", user.id)
-  if (count !== null && count >= limits.maxClasses) {
-    throw new Error(
-      `Gói ${plan} giới hạn ${limits.maxClasses} lớp. Hãy nâng cấp gói hoặc xóa bớt lớp cũ.`,
-    )
+  try {
+    const plan = await getPlan(supabase, user.id)
+    const limits = planLimits(plan)
+    const { count } = await supabase
+      .from("classes")
+      .select("id", { count: "exact", head: true })
+      .eq("teacher_id", user.id)
+    if (count !== null && count >= limits.maxClasses) {
+      return {
+        ok: false,
+        error: `Gói ${plan} giới hạn ${limits.maxClasses} lớp. Hãy nâng cấp gói hoặc xóa bớt lớp cũ.`,
+      }
+    }
+
+    const { data: cls, error } = await supabase
+      .from("classes")
+      .insert({ teacher_id: user.id, name, capacity })
+      .select("id")
+      .single()
+    if (error || !cls) return { ok: false, error: error?.message ?? "Không tạo được lớp" }
+
+    const slots = Array.from({ length: capacity }, (_, i) => ({
+      class_id: cls.id,
+      slot_number: i + 1,
+      name: null,
+    }))
+    const { error: studentsError } = await supabase.from("students").insert(slots)
+    if (studentsError) {
+      await supabase.from("classes").delete().eq("id", cls.id)
+      return { ok: false, error: `Không tạo được danh sách học sinh: ${studentsError.message}` }
+    }
+
+    const groups = Array.from({ length: numGroups }, (_, i) => ({
+      class_id: cls.id,
+      group_number: i + 1,
+      name: `Nhóm ${i + 1}`,
+      color: colorForIndex(i),
+      display_order: i + 1,
+    }))
+    const { error: groupsError } = await supabase.from("class_groups").insert(groups)
+    if (groupsError) {
+      await supabase.from("classes").delete().eq("id", cls.id)
+      return { ok: false, error: `Không tạo được nhóm cố định: ${groupsError.message}` }
+    }
+
+    revalidatePath("/dashboard")
+    revalidatePath(`/classes/${cls.id}`)
+    revalidatePath(`/classes/${cls.id}/roster`)
+    return { ok: true, classId: cls.id }
+  } catch (e: unknown) {
+    const digest =
+      typeof e === "object" && e !== null && "digest" in e
+        ? String((e as { digest?: string }).digest ?? "")
+        : ""
+    if (digest.startsWith("NEXT_REDIRECT") || digest.startsWith("NEXT_NOT_FOUND")) throw e
+    const message = e instanceof Error ? e.message : "Không tạo được lớp. Vui lòng thử lại."
+    return { ok: false, error: message }
   }
-
-  const { data: cls, error } = await supabase
-    .from("classes")
-    .insert({ teacher_id: user.id, name, capacity })
-    .select()
-    .single()
-  if (error || !cls) throw new Error(error?.message ?? "Không tạo được lớp")
-
-  // Tạo students slot trống
-  const slots = Array.from({ length: capacity }, (_, i) => ({
-    class_id: cls.id,
-    slot_number: i + 1,
-    name: null,
-  }))
-  const { error: studentsError } = await supabase.from("students").insert(slots)
-  if (studentsError) {
-    await supabase.from("classes").delete().eq("id", cls.id)
-    throw new Error(`Không tạo được danh sách học sinh: ${studentsError.message}`)
-  }
-
-  // Tạo nhóm cố định với màu riêng
-  const groups = Array.from({ length: numGroups }, (_, i) => ({
-    class_id: cls.id,
-    group_number: i + 1,
-    name: `Nhóm ${i + 1}`,
-    color: colorForIndex(i),
-    display_order: i + 1,
-  }))
-  const { error: groupsError } = await supabase.from("class_groups").insert(groups)
-  if (groupsError) {
-    await supabase.from("classes").delete().eq("id", cls.id)
-    throw new Error(`Không tạo được nhóm cố định: ${groupsError.message}`)
-  }
-
-  revalidatePath("/dashboard")
-  redirect(`/classes/${cls.id}/roster`)
 }
 
 export async function deleteClassAction(classId: string) {

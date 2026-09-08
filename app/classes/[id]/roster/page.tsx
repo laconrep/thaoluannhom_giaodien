@@ -6,8 +6,8 @@ export default async function RosterPage({ params }: { params: Promise<{ id: str
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: cls }, { data: students }, groups, { data: members }] = await Promise.all([
-    supabase.from("classes").select("id, name, capacity").eq("id", id).single(),
+  const [{ data: cls }, { data: students }, groups, membersRes] = await Promise.all([
+    supabase.from("classes").select("id, name, capacity").eq("id", id).maybeSingle(),
     supabase
       .from("students")
       .select("id, slot_number, name, device_token")
@@ -23,7 +23,7 @@ export default async function RosterPage({ params }: { params: Promise<{ id: str
   if (!cls) return null
 
   const memberMap: Record<string, string[]> = {}
-  for (const m of (members as any[]) ?? []) {
+  for (const m of (membersRes.error ? [] : ((membersRes.data as any[]) ?? [])) ) {
     memberMap[m.class_group_id] ??= []
     memberMap[m.class_group_id].push(m.student_id)
   }
