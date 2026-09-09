@@ -1,8 +1,15 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Joyride, EVENTS, STATUS, type EventData, type Step } from "react-joyride"
-import { RESTART_EVENT, rosterTourSeen, setRosterTourSeen } from "./tour-store"
+import { Joyride, EVENTS, type EventData, type Step } from "react-joyride"
+import {
+  RESTART_EVENT,
+  isHintSeen,
+  setSeen,
+  ROSTER_LIST_SEEN_KEY,
+  ROSTER_LEADER_SEEN_KEY,
+  ROSTER_NEXT_SEEN_KEY,
+} from "./tour-store"
 import {
   tourLocale,
   rosterListStep,
@@ -11,9 +18,6 @@ import {
 } from "./tour-config"
 import { useTourOptions } from "./use-tour-options"
 
-// Tour phân nhóm progressive: hint xuất hiện theo hành động thật của giáo viên —
-// vào trang (danh sách HS) → kéo ≥1 HS vào nhóm (hint nhóm trưởng) → gán leader
-// (hint chuyển tab). Hoàn tất bước cuối → setRosterTourSeen().
 type Stage = "idle" | "list" | "leader" | "next" | "done"
 
 type RosterTourProps = {
@@ -25,49 +29,50 @@ type RosterTourProps = {
 export function RosterTour({ ready, hasMembers, hasLeader }: RosterTourProps) {
   const [stage, setStage] = useState<Stage>("idle")
   const [run, setRun] = useState(false)
+  const [replaying, setReplaying] = useState(false)
+  const replayingRef = useRef(false)
   const prevStageRef = useRef<Stage>("idle")
-  const [enabled, setEnabled] = useState(false)
   const tourOptions = useTourOptions()
 
   useEffect(() => {
-    setEnabled(!rosterTourSeen())
-  }, [])
+    replayingRef.current = replaying
+  }, [replaying])
 
-  // Vào trang (đã có nhóm, chưa xem tour) → hint danh sách học sinh.
   useEffect(() => {
-    if (!enabled || !ready) return
-    if (stage === "idle") setStage("list")
-  }, [enabled, ready, stage])
-
-  // Kéo ≥1 HS vào nhóm → hint nhóm trưởng.
-  useEffect(() => {
-    if (!enabled) return
-    if (hasMembers && (stage === "idle" || stage === "list")) setStage("leader")
-  }, [hasMembers, enabled, stage])
-
-  // Gán nhóm trưởng → hint chuyển tab.
-  useEffect(() => {
-    if (!enabled) return
-    if (hasLeader && (stage === "idle" || stage === "list" || stage === "leader")) {
-      setStage("next")
+    if (!ready || replayingRef.current) return
+    if (hasLeader) {
+      if (!isHintSeen(ROSTER_NEXT_SEEN_KEY)) {
+        setSeen(ROSTER_LIST_SEEN_KEY)
+        setSeen(ROSTER_LEADER_SEEN_KEY)
+        setStage("next")
+      } else {
+        setStage("done")
+      }
+      return
     }
-  }, [hasLeader, enabled, stage])
+    if (hasMembers) {
+      if (!isHintSeen(ROSTER_LEADER_SEEN_KEY)) {
+        setSeen(ROSTER_LIST_SEEN_KEY)
+        setStage("leader")
+      } else {
+        setStage("done")
+      }
+      return
+    }
+    if (!isHintSeen(ROSTER_LIST_SEEN_KEY)) setStage("list")
+    else setStage("done")
+  }, [ready, hasMembers, hasLeader])
 
-  // Bật hint khi chuyển stage (Joyride remount theo key). Không tự bật lại khi
-  // người dùng đã đóng hint ở cùng stage — chỉ bật khi có hành động mới.
-  // Không gate theo `enabled` để replay (nút "Hướng dẫn") vẫn chạy sau khi đã xem;
-  // khi chưa xem, stage chỉ rời "idle" qua auto-start, còn khi đã xem stage chỉ
-  // đổi qua RESTART_EVENT.
   useEffect(() => {
     if (stage === prevStageRef.current) return
     prevStageRef.current = stage
     if (stage === "list" || stage === "leader" || stage === "next") setRun(true)
   }, [stage])
 
-  // Replay từ nút "Hướng dẫn" trên header.
   useEffect(() => {
     if (typeof window === "undefined") return
     const onRestart = () => {
+      setReplaying(true)
       setStage(hasLeader ? "next" : hasMembers ? "leader" : "list")
       setRun(false)
       window.setTimeout(() => setRun(true), 80)
@@ -92,15 +97,16 @@ export function RosterTour({ ready, hasMembers, hasLeader }: RosterTourProps) {
   function handleEvent(data: EventData) {
     if (data.type !== EVENTS.TOUR_END) return
     setRun(false)
-    if (data.status !== STATUS.FINISHED) return
-    if (stage === "next") {
-      setRosterTourSeen()
-      setEnabled(false)
-      setStage("done")
+    if (!replayingRef.current) {
+      if (stage === "list") setSeen(ROSTER_LIST_SEEN_KEY)
+      else if (stage === "leader") setSeen(ROSTER_LEADER_SEEN_KEY)
+      else if (stage === "next") setSeen(ROSTER_NEXT_SEEN_KEY)
     }
+    setReplaying(false)
+    setStage("done")
   }
 
-  if (stage === "done") return null
+  if (stage === "done" || stage === "idle") return null
 
   return (
     <Joyride

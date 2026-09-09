@@ -9,7 +9,7 @@ import { formatDateShort } from "@/lib/utils-format"
 import { Download, Share2 } from "lucide-react"
 import { TeacherTour } from "@/components/tour/teacher-tour"
 import { gradebookTourSteps } from "@/components/tour/tour-config"
-import { classTourSeenKey, getSeen, TOUR_ONBOARDING_SEEN_KEY, GRADEBOOK_TOUR_PENDING_KEY } from "@/components/tour/tour-store"
+import { GRADEBOOK_SEEN_KEY, GRADEBOOK_TOUR_PENDING_KEY, isHintSeen } from "@/components/tour/tour-store"
 
 type Session = {
   id: string
@@ -102,9 +102,10 @@ export function GradebookView({
       <TeacherTour
         tourId="gradebook"
         steps={gradebookTourSteps(classId)}
-        seenKey={classTourSeenKey("gradebook", classId)}
+        seenKey={GRADEBOOK_SEEN_KEY}
         autoStart
-        autoStartWhen={tabTriggered && !getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+        autoStartWhen={tabTriggered}
+        isSeen={() => isHintSeen(GRADEBOOK_SEEN_KEY, "gradebook")}
       />
       <Card data-tour="gradebook-table">
         <CardHeader className="flex-row items-start justify-between flex-wrap gap-3">

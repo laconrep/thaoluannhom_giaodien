@@ -9,12 +9,12 @@ import { Copy, RotateCw, QrCode, ExternalLink } from "lucide-react"
 import { TeacherTour } from "@/components/tour/teacher-tour"
 import { shareGradesStep, shareLinkStep } from "@/components/tour/tour-config"
 import {
-  classTourSeenKey,
-  getSeen,
+  isHintSeen,
   setSeen,
   RESTART_EVENT,
   STOP_EVENT,
-  TOUR_ONBOARDING_SEEN_KEY,
+  SHARE_LINK_SEEN_KEY,
+  SHARE_GRADES_SEEN_KEY,
 } from "@/components/tour/tour-store"
 
 export function ShareView({
@@ -30,16 +30,15 @@ export function ShareView({
   const [, startTransition] = useTransition()
   const [linkDismissed, setLinkDismissed] = useState(false)
   const [showGradesHint, setShowGradesHint] = useState(false)
-  const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [origin, setOrigin] = useState("")
   const [shareReplay, setShareReplay] = useState(false)
 
-  const linkSeenKey = classTourSeenKey("share-link", classId)
-  const gradesSeenKey = classTourSeenKey("share-grades", classId)
-
   useEffect(() => {
-    setOnboardingOpen(!getSeen(TOUR_ONBOARDING_SEEN_KEY))
     setOrigin(window.location.origin)
+    if (isHintSeen(SHARE_LINK_SEEN_KEY, "share-link")) setLinkDismissed(true)
+    if (isHintSeen(SHARE_LINK_SEEN_KEY, "share-link") && !isHintSeen(SHARE_GRADES_SEEN_KEY, "share-grades")) {
+      setShowGradesHint(true)
+    }
   }, [])
 
   useEffect(() => {
@@ -57,7 +56,7 @@ export function ShareView({
   const gradesUrl = `${origin}/c/${shareToken}/grades`
 
   function stopLinkHint() {
-    setSeen(linkSeenKey)
+    setSeen(SHARE_LINK_SEEN_KEY)
     setLinkDismissed(true)
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(STOP_EVENT))
@@ -65,11 +64,9 @@ export function ShareView({
   }
 
   function stopGradesHint() {
-    setSeen(gradesSeenKey)
+    setSeen(SHARE_GRADES_SEEN_KEY)
     setShowGradesHint(false)
     setShareReplay(false)
-    setSeen(TOUR_ONBOARDING_SEEN_KEY)
-    setOnboardingOpen(false)
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(STOP_EVENT))
     }
@@ -78,12 +75,12 @@ export function ShareView({
   function afterCopy(key: string) {
     setCopied(key)
     setTimeout(() => setCopied(null), 2000)
-      if (key === "class") {
-        stopLinkHint()
-        if (shareReplay || (!getSeen(TOUR_ONBOARDING_SEEN_KEY) && !getSeen(gradesSeenKey))) {
-          setShowGradesHint(true)
-        }
+    if (key === "class") {
+      stopLinkHint()
+      if (shareReplay || !isHintSeen(SHARE_GRADES_SEEN_KEY, "share-grades")) {
+        setShowGradesHint(true)
       }
+    }
     if (key === "grades") stopGradesHint()
   }
 
@@ -108,40 +105,30 @@ export function ShareView({
       <TeacherTour
         tourId="share-link"
         steps={[shareLinkStep()]}
-        seenKey={linkSeenKey}
+        seenKey={SHARE_LINK_SEEN_KEY}
         autoStart
-        autoStartWhen={(onboardingOpen || shareReplay) && !linkDismissed}
-        isSeen={shareReplay ? () => false : undefined}
+        autoStartWhen={!linkDismissed}
+        isSeen={shareReplay ? () => false : () => isHintSeen(SHARE_LINK_SEEN_KEY, "share-link")}
         onEnd={() => {
           setLinkDismissed(true)
-          setSeen(linkSeenKey)
-          if (shareReplay) {
+          setSeen(SHARE_LINK_SEEN_KEY)
+          if (shareReplay || !isHintSeen(SHARE_GRADES_SEEN_KEY, "share-grades")) {
             setShowGradesHint(true)
-            return
           }
-          if (getSeen(TOUR_ONBOARDING_SEEN_KEY)) return
-          if (getSeen(gradesSeenKey)) {
-            setSeen(TOUR_ONBOARDING_SEEN_KEY)
-            return
-          }
-          setShowGradesHint(true)
         }}
       />
       {showGradesHint && (
         <TeacherTour
           tourId="share-grades"
           steps={[shareGradesStep()]}
-          seenKey={gradesSeenKey}
+          seenKey={SHARE_GRADES_SEEN_KEY}
           autoStart
-          autoStartWhen={onboardingOpen || shareReplay}
           listenRestart={false}
-          isSeen={shareReplay ? () => false : undefined}
+          isSeen={shareReplay ? () => false : () => isHintSeen(SHARE_GRADES_SEEN_KEY, "share-grades")}
           onEnd={() => {
             setShowGradesHint(false)
             setShareReplay(false)
-            setSeen(gradesSeenKey)
-            setSeen(TOUR_ONBOARDING_SEEN_KEY)
-            setOnboardingOpen(false)
+            setSeen(SHARE_GRADES_SEEN_KEY)
           }}
         />
       )}

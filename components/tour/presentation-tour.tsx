@@ -1,13 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Joyride, EVENTS, STATUS, type EventData, type Step } from "react-joyride"
 import {
-  getSeen,
+  isHintSeen,
   setSeen,
-  PRESENTATION_TOUR_SEEN_KEY,
   RESTART_EVENT,
-  TOUR_ONBOARDING_SEEN_KEY,
+  PRESENTATION_EDGE_SEEN_KEY,
+  PRESENTATION_DRAWER_SEEN_KEY,
+  PRESENTATION_ALL_SESSIONS_SEEN_KEY,
+  PRESENTATION_CREATE_SESSION_SEEN_KEY,
 } from "./tour-store"
 import {
   tourLocale,
@@ -19,8 +21,6 @@ import {
 } from "./tour-config"
 import { useTourOptions } from "./use-tour-options"
 
-// Tour màn hình chiếu PowerPoint: từng hint xuất hiện theo hành động thật của
-// giáo viên — mở drawer → chỉnh thời gian/QR → "Tất cả phiên" → "Tạo phiên mới".
 type Stage = "idle" | "edge" | "drawer" | "all-sessions" | "create-session" | "done"
 
 type PresentationTourProps = {
@@ -39,55 +39,47 @@ export function PresentationTour({
   const [stage, setStage] = useState<Stage>("idle")
   const [run, setRun] = useState(false)
   const [replaying, setReplaying] = useState(false)
+  const replayingRef = useRef(false)
   const tourOptions = useTourOptions()
-  // Đọc localStorage trong effect (không đọc lúc render) để tránh hydration mismatch.
-  const [onboardingEnabled, setOnboardingEnabled] = useState(false)
 
   useEffect(() => {
-    setOnboardingEnabled(
-      !getSeen(TOUR_ONBOARDING_SEEN_KEY) && !getSeen(PRESENTATION_TOUR_SEEN_KEY),
-    )
-  }, [])
+    replayingRef.current = replaying
+  }, [replaying])
 
-  // Tự chạy khi onboarding chưa xong + chưa xem tour màn chiếu. Khi replay
-  // (nút "Hướng dẫn") được kích hoạt, cho phép chạy kể cả sau khi đã xem.
-  const enabled = onboardingEnabled || replaying
-
-  // Vào màn chiếu → bắt đầu từ hint mép trái. Không ghi đè stage khi replay
-  // giữa chừng (drawer / picker đang mở).
   useEffect(() => {
-    if (!enabled) return
-    if (active) setStage((s) => (s === "idle" || s === "done" ? "edge" : s))
-    else setRun(false)
-  }, [active, enabled])
-
-  // Giáo viên mở drawer → chuyển sang hint chỉnh thời gian/QR.
-  useEffect(() => {
-    if (!enabled) return
-    if (drawerOpen) setStage((s) => (s === "edge" || s === "idle" ? "drawer" : s))
-  }, [drawerOpen, enabled])
-
-  // Giáo viên bấm "Tất cả phiên" → hint "Tạo phiên mới".
-  useEffect(() => {
-    if (!enabled) return
-    if (sessionPickerOpen) {
-      setStage((s) => (s === "drawer" || s === "all-sessions" ? "create-session" : s))
-    }
-  }, [sessionPickerOpen, enabled])
-
-  // Giáo viên bấm "Tạo phiên mới" → kết thúc tour màn chiếu.
-  useEffect(() => {
-    if (!enabled) return
-    if (createSessionOpen && stage === "create-session") {
-      setSeen(PRESENTATION_TOUR_SEEN_KEY)
-      setOnboardingEnabled(false)
-      setReplaying(false)
+    if (replayingRef.current) return
+    if (!active) {
       setRun(false)
-      setStage("done")
+      setStage("idle")
+      return
     }
-  }, [createSessionOpen, stage, enabled])
 
-  // Replay từ nút "Hướng dẫn" trên header: reset về hint mép trái khi đang chiếu.
+    if (sessionPickerOpen && !createSessionOpen) {
+      setSeen(PRESENTATION_EDGE_SEEN_KEY)
+      setSeen(PRESENTATION_ALL_SESSIONS_SEEN_KEY)
+      if (!isHintSeen(PRESENTATION_CREATE_SESSION_SEEN_KEY)) setStage("create-session")
+      else setStage("done")
+      return
+    }
+
+    if (createSessionOpen) {
+      setSeen(PRESENTATION_CREATE_SESSION_SEEN_KEY)
+      setStage("done")
+      return
+    }
+
+    if (drawerOpen) {
+      setSeen(PRESENTATION_EDGE_SEEN_KEY)
+      if (!isHintSeen(PRESENTATION_DRAWER_SEEN_KEY)) setStage("drawer")
+      else if (!isHintSeen(PRESENTATION_ALL_SESSIONS_SEEN_KEY)) setStage("all-sessions")
+      else setStage("done")
+      return
+    }
+
+    if (!isHintSeen(PRESENTATION_EDGE_SEEN_KEY)) setStage("edge")
+    else setStage("done")
+  }, [active, drawerOpen, sessionPickerOpen, createSessionOpen])
+
   useEffect(() => {
     if (typeof window === "undefined") return
     const onRestart = () => {
@@ -119,7 +111,7 @@ export function PresentationTour({
   }, [stage])
 
   useEffect(() => {
-    if (!enabled) {
+    if (stage === "idle" || stage === "done") {
       setRun(false)
       return
     }
@@ -129,17 +121,27 @@ export function PresentationTour({
     else if (stage === "all-sessions") shouldRun = drawerOpen && !sessionPickerOpen
     else if (stage === "create-session") shouldRun = sessionPickerOpen
     setRun(shouldRun)
-  }, [stage, active, drawerOpen, sessionPickerOpen, enabled])
+  }, [stage, active, drawerOpen, sessionPickerOpen])
 
   function handleEvent(data: EventData) {
     if (data.type !== EVENTS.TOUR_END) return
     setRun(false)
-    if (data.status === STATUS.SKIPPED) return
-    // Nhánh multi-step (chỉnh thời gian + QR) kết thúc → dẫn sang "Tất cả phiên".
-    if (stage === "drawer") setStage("all-sessions")
+    if (!replayingRef.current) {
+      if (stage === "edge") setSeen(PRESENTATION_EDGE_SEEN_KEY)
+      else if (stage === "drawer") setSeen(PRESENTATION_DRAWER_SEEN_KEY)
+      else if (stage === "all-sessions") setSeen(PRESENTATION_ALL_SESSIONS_SEEN_KEY)
+      else if (stage === "create-session") setSeen(PRESENTATION_CREATE_SESSION_SEEN_KEY)
+    }
+
+    if (stage === "drawer" && data.status !== STATUS.SKIPPED) {
+      setStage("all-sessions")
+      return
+    }
+    setReplaying(false)
+    setStage("done")
   }
 
-  if (!enabled || stage === "done") return null
+  if (stage === "done" || stage === "idle") return null
 
   return (
     <Joyride

@@ -72,10 +72,13 @@ export function TeacherTour({
   // chủ động tắt hint đang hiện thay vì để Joyride chạy hết bước.
   useEffect(() => {
     if (typeof window === "undefined") return
-    const onStop = () => setRun(false)
+    const onStop = () => {
+      setRun(false)
+      markAsSeen()
+    }
     window.addEventListener(STOP_EVENT, onStop)
     return () => window.removeEventListener(STOP_EVENT, onStop)
-  }, [])
+  }, [markAsSeen])
 
   // Replay: chỉ chạy khi token đổi lúc tour đã mount, không tự chạy lúc mount.
   useEffect(() => {
@@ -96,10 +99,8 @@ export function TeacherTour({
     }
     if (data.type === EVENTS.TOUR_END) {
       setRun(false)
-      if (data.status === STATUS.FINISHED) {
-        markAsSeen()
-        onComplete?.()
-      }
+      markAsSeen()
+      if (data.status === STATUS.FINISHED) onComplete?.()
       onEnd?.()
     }
   }

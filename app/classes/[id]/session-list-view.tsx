@@ -26,14 +26,14 @@ import { formatDate } from "@/lib/utils-format"
 import { TeacherTour } from "@/components/tour/teacher-tour"
 import { sessionsNextStep, sessionsPresetsStep } from "@/components/tour/tour-config"
 import {
-  classTourSeenKey,
   consumeSessionsNextPending,
-  getSeen,
+  isHintSeen,
   RESTART_EVENT,
   setSeen,
   setSessionsNextPending,
   STOP_EVENT,
-  TOUR_ONBOARDING_SEEN_KEY,
+  SESSIONS_PRESETS_SEEN_KEY,
+  SESSIONS_NEXT_SEEN_KEY,
 } from "@/components/tour/tour-store"
 
 type Kind = "group" | "individual"
@@ -95,16 +95,12 @@ export function SessionListView({
   const hasFixed = fixedGroupsCount > 0
   const displayGroups = useFixed && hasFixed ? fixedGroupsCount : numGroups
 
-  const presetsSeenKey = classTourSeenKey("sessions-presets", classId)
-  const nextSeenKey = classTourSeenKey("sessions-next", classId)
-
   useEffect(() => {
-    if (getSeen(TOUR_ONBOARDING_SEEN_KEY)) return
-    if (getSeen(nextSeenKey)) return
+    if (isHintSeen(SESSIONS_NEXT_SEEN_KEY, "sessions-next")) return
     if (sessions.length === 0) return
     if (!consumeSessionsNextPending(classId)) return
     setShowNextHint(true)
-  }, [classId, sessions.length, nextSeenKey])
+  }, [classId, sessions.length])
 
   useEffect(() => {
     if (!open || !pendingPresetsReplay.current) return
@@ -143,14 +139,14 @@ export function SessionListView({
   }, [open, sessions.length, showNextHint])
 
   function stopPresetsHint() {
-    setSeen(presetsSeenKey)
+    setSeen(SESSIONS_PRESETS_SEEN_KEY)
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(STOP_EVENT))
     }
   }
 
   function stopNextHint() {
-    setSeen(nextSeenKey)
+    setSeen(SESSIONS_NEXT_SEEN_KEY)
     setShowNextHint(false)
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(STOP_EVENT))
@@ -182,13 +178,14 @@ export function SessionListView({
         <TeacherTour
           tourId="sessions-presets"
           steps={[sessionsPresetsStep()]}
-          seenKey={presetsSeenKey}
+          seenKey={SESSIONS_PRESETS_SEEN_KEY}
           autoStart
-          autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY) && !presetsDismissed}
+          autoStartWhen={!presetsDismissed}
+          isSeen={() => isHintSeen(SESSIONS_PRESETS_SEEN_KEY, "sessions-presets")}
           restartToken={presetsReplayTick}
           onEnd={() => {
             setPresetsDismissed(true)
-            setSeen(presetsSeenKey)
+            setSeen(SESSIONS_PRESETS_SEEN_KEY)
           }}
         />
       )}
@@ -196,13 +193,13 @@ export function SessionListView({
         <TeacherTour
           tourId="sessions-next"
           steps={[sessionsNextStep()]}
-          seenKey={nextSeenKey}
+          seenKey={SESSIONS_NEXT_SEEN_KEY}
           autoStart
-          autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+          isSeen={() => isHintSeen(SESSIONS_NEXT_SEEN_KEY, "sessions-next")}
           restartToken={nextReplayTick}
           onEnd={() => {
             setShowNextHint(false)
-            setSeen(nextSeenKey)
+            setSeen(SESSIONS_NEXT_SEEN_KEY)
           }}
         />
       )}
@@ -370,7 +367,7 @@ export function SessionListView({
                   variant="ghost"
                   onClick={() => {
                     setPresetsDismissed(true)
-                    setSeen(presetsSeenKey)
+                    setSeen(SESSIONS_PRESETS_SEEN_KEY)
                     setOpen(false)
                   }}
                 >

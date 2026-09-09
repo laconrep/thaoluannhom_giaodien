@@ -30,11 +30,7 @@ import { PresentationUpload } from "@/components/presentation-upload"
 import { PresentationViewer, startPresentationMode } from "@/components/presentation-viewer"
 import { TeacherTour } from "@/components/tour/teacher-tour"
 import { presentationStartStep } from "@/components/tour/tour-config"
-import {
-  getSeen,
-  PRESENTATION_START_SEEN_KEY,
-  TOUR_ONBOARDING_SEEN_KEY,
-} from "@/components/tour/tour-store"
+import { isHintSeen, PRESENTATION_START_SEEN_KEY } from "@/components/tour/tour-store"
 import { QRCodeSVG } from "qrcode.react"
 import {
   ArrowLeft,
@@ -879,7 +875,8 @@ export function GroupSessionBoard({
           steps={[presentationStartStep()]}
           seenKey={PRESENTATION_START_SEEN_KEY}
           autoStart
-          autoStartWhen={!!presentation && !getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+          autoStartWhen={!!presentation}
+          isSeen={() => isHintSeen(PRESENTATION_START_SEEN_KEY)}
         />
       )}
       {renderBoard(false)}
@@ -930,8 +927,8 @@ export function GroupSessionBoard({
         onClick={(e) => e.stopPropagation()}
       >
         <p className="font-heading font-semibold">Quét QR để HS mở link nộp bài</p>
-        <QRCodeSVG value={`${window.location.origin}/c/${shareToken}/session/${displaySession.id}`} size={220} />
-        <p className="text-xs text-muted-foreground break-all text-center max-w-[280px]">
+        <QRCodeSVG value={`${window.location.origin}/c/${shareToken}/session/${displaySession.id}`} size={550} />
+        <p className="text-xs text-muted-foreground break-all text-center max-w-[550px]">
           {`${window.location.origin}/c/${shareToken}/session/${displaySession.id}`}
         </p>
         <div className="flex gap-2">

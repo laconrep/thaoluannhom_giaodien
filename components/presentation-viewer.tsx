@@ -551,8 +551,8 @@ export function PresentationViewer({
                 onClick={(e) => e.stopPropagation()}
               >
                 <p className="font-heading font-semibold">Quét QR để HS mở link nộp bài</p>
-                <QRCodeSVG value={shareLink} size={220} />
-                <p className="text-xs text-muted-foreground break-all text-center max-w-[280px]">
+                <QRCodeSVG value={shareLink} size={550} />
+                <p className="text-xs text-muted-foreground break-all text-center max-w-[550px]">
                   {shareLink}
                 </p>
                 <div className="flex gap-2">
