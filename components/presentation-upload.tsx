@@ -5,6 +5,74 @@ import { Button } from "@/components/ui/button"
 import { Presentation, Upload, X } from "lucide-react"
 import { toast } from "sonner"
 
+function uploadWithProgress(
+  url: string,
+  file: File,
+  onProgress: (percent: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open("PUT", url)
+    xhr.setRequestHeader(
+      "Content-Type",
+      file.type || "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    )
+    xhr.setRequestHeader("x-upsert", "false")
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return
+      onProgress(Math.min(99, Math.round((e.loaded / e.total) * 100)))
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(100)
+        resolve()
+        return
+      }
+      reject(new Error(`Storage upload failed with status ${xhr.status}`))
+    }
+    xhr.onerror = () => reject(new Error("Không tải được file lên bộ nhớ."))
+    xhr.onabort = () => reject(new Error("Đã hủy tải lên."))
+    xhr.send(file)
+  })
+}
+
+function UploadProgressRing({ percent }: { percent: number }) {
+  const size = 56
+  const stroke = 5
+  const radius = (size - stroke) / 2
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (percent / 100) * circumference
+
+  return (
+    <div className="relative mx-auto mb-2 size-14" aria-label={`Đang tải lên ${percent}%`}>
+      <svg width={size} height={size} className="-rotate-90" viewBox={`0 0 ${size} ${size}`}>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          className="stroke-muted"
+          strokeWidth={stroke}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          className="stroke-primary"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <span className="absolute inset-0 grid place-items-center text-xs font-semibold tabular-nums">
+        {percent}%
+      </span>
+    </div>
+  )
+}
+
 export function PresentationUpload({
   sessionId,
   onUploadSuccess,
@@ -13,6 +81,8 @@ export function PresentationUpload({
   onUploadSuccess: (presentation: any) => void
 }) {
   const [isLoading, setIsLoading] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [uploadingName, setUploadingName] = useState<string | null>(null)
   const [presentation, setPresentation] = useState<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -38,6 +108,8 @@ export function PresentationUpload({
     }
 
     setIsLoading(true)
+    setProgress(0)
+    setUploadingName(file.name)
     try {
       const response = await fetch("/api/presentations/upload", {
         method: "POST",
@@ -62,20 +134,8 @@ export function PresentationUpload({
       }
 
       const data = await response.json()
-      const { error: storageError } = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/upload/sign/presentations/${data.upload.path}?token=${encodeURIComponent(data.upload.token)}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": file.type || "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "x-upsert": "false",
-          },
-          body: file,
-        },
-      ).then(async (uploadResponse) => ({
-        error: uploadResponse.ok ? null : new Error(`Storage upload failed with status ${uploadResponse.status}`),
-      }))
-      if (storageError) throw storageError
+      const uploadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/upload/sign/presentations/${data.upload.path}?token=${encodeURIComponent(data.upload.token)}`
+      await uploadWithProgress(uploadUrl, file, setProgress)
 
       setPresentation(data.presentation)
       onUploadSuccess(data.presentation)
@@ -85,6 +145,8 @@ export function PresentationUpload({
       toast.error(errorMessage)
     } finally {
       setIsLoading(false)
+      setProgress(0)
+      setUploadingName(null)
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
       }
@@ -105,8 +167,17 @@ export function PresentationUpload({
         <div
           className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors"
           onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onDrop={(e) => {
+            if (isLoading) {
+              e.preventDefault()
+              return
+            }
+            handleDrop(e)
+          }}
+          onClick={() => {
+            if (isLoading) return
+            fileInputRef.current?.click()
+          }}
         >
           <input
             ref={fileInputRef}
@@ -121,11 +192,19 @@ export function PresentationUpload({
             }}
           />
 
-          <Upload className="size-8 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-sm font-medium text-foreground">
-            {isLoading ? "Đang tải lên..." : "Kéo file PowerPoint vào đây hoặc click để chọn"}
+          {isLoading ? (
+            <UploadProgressRing percent={progress} />
+          ) : (
+            <Upload className="size-8 mx-auto mb-2 text-muted-foreground" />
+          )}
+          <p className="text-sm font-medium text-foreground truncate px-2">
+            {isLoading
+              ? uploadingName ?? "Đang tải lên..."
+              : "Kéo file PowerPoint vào đây hoặc click để chọn"}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">Hỗ trợ .ppt và .pptx, tối đa 200 MB</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {isLoading ? "Đang tải lên..." : "Hỗ trợ .ppt và .pptx, tối đa 200 MB"}
+          </p>
         </div>
       ) : (
         <div className="bg-muted/50 rounded-lg p-4 flex items-center justify-between">
