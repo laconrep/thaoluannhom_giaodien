@@ -10,7 +10,7 @@ import type {
   AnnotationItem,
 } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { Users, Download, FileText, Presentation, File as FileIcon } from "lucide-react"
+import { Users, Download, FileText, Presentation, File as FileIcon, RotateCw } from "lucide-react"
 
 function getFiles(sub?: SubmissionRow): SubmissionFile[] {
   if (!sub) return []
@@ -41,6 +41,7 @@ export function ResultsViewer({
 }) {
   const [activeId, setActiveId] = useState<string | null>(groups[0]?.id ?? null)
   const [activeFileIdx, setActiveFileIdx] = useState(0)
+  const [viewRotation, setViewRotation] = useState(0)
 
   const subsByGroup = useMemo(() => {
     const m: Record<string, SubmissionRow> = {}
@@ -91,6 +92,7 @@ export function ResultsViewer({
                   onClick={() => {
                     setActiveId(g.id)
                     setActiveFileIdx(0)
+                    setViewRotation(0)
                   }}
                   className={`shrink-0 md:shrink text-left p-3 rounded-lg border transition ${
                     activeId === g.id
@@ -127,14 +129,27 @@ export function ResultsViewer({
                     )}
 
                   </div>
-                  {session.allow_download && file?.url && (
-                    <Button asChild size="sm" variant="outline">
-                      <a href={file.url} download={file.name}>
-                        <Download className="size-4 mr-2" aria-hidden="true" />
-                        Tải xuống
-                      </a>
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {file?.kind === "image" && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setViewRotation((r) => (r + 90) % 360)}
+                      >
+                        <RotateCw className="size-4 mr-2" aria-hidden="true" />
+                        Xoay ảnh
+                      </Button>
+                    )}
+                    {session.allow_download && file?.url && (
+                      <Button asChild size="sm" variant="outline">
+                        <a href={file.url} download={file.name}>
+                          <Download className="size-4 mr-2" aria-hidden="true" />
+                          Tải xuống
+                        </a>
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -154,9 +169,12 @@ export function ResultsViewer({
                   {files.length > 1 && (
                     <div className="flex gap-2 overflow-x-auto p-2 border-b bg-muted/30">
                       {files.map((f, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setActiveFileIdx(i)}
+                         <button
+                           key={i}
+                           onClick={() => {
+                             setActiveFileIdx(i)
+                             setViewRotation(0)
+                           }}
                           className={`shrink-0 size-14 rounded border-2 overflow-hidden flex items-center justify-center ${
                             i === activeFileIdx ? "border-primary" : "border-transparent"
                           }`}
@@ -181,15 +199,29 @@ export function ResultsViewer({
                   )}
                   <div className="relative bg-muted/20 flex items-center justify-center min-h-[60vh]">
                     {file?.kind === "image" ? (
-                      <div className="relative">
-                        <img
-                          src={file.url || "/placeholder.svg"}
-                          alt=""
-                          className="max-w-full max-h-[75vh] object-contain"
-                          style={{ transform: `rotate(${file.rotation ?? 0}deg)` }}
-                        />
-                        {ann?.data && <AnnotationOverlay items={ann.data as AnnotationItem[]} fileIdx={activeFileIdx} />}
-                      </div>
+                      <>
+                        <div
+                          className="relative"
+                          style={{ transform: `rotate(${((file.rotation ?? 0) + viewRotation) % 360}deg)` }}
+                        >
+                          <img
+                            src={file.url || "/placeholder.svg"}
+                            alt=""
+                            className="max-w-full max-h-[75vh] object-contain"
+                          />
+                          {ann?.data && <AnnotationOverlay items={ann.data as AnnotationItem[]} fileIdx={activeFileIdx} />}
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="absolute bottom-3 right-3 shadow-md"
+                          onClick={() => setViewRotation((r) => (r + 90) % 360)}
+                        >
+                          <RotateCw className="size-4 mr-2" aria-hidden="true" />
+                          Xoay ảnh
+                        </Button>
+                      </>
                     ) : file?.kind === "pdf" ? (
                       <iframe src={file.url} className="w-full h-[80vh]" title={file.name} />
                     ) : file?.kind === "docx" || file?.kind === "pptx" ? (
