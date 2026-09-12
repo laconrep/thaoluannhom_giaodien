@@ -21,6 +21,15 @@ export async function POST(request: NextRequest) {
     const { error: createError } = await supabase.storage.createBucket(bucket, {
       public: false,
       fileSizeLimit: bucket === "presentations" ? 200 * 1024 * 1024 : 50 * 1024 * 1024,
+      ...(bucket === "presentations"
+        ? {
+            allowedMimeTypes: [
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+              "application/vnd.ms-powerpoint",
+              "application/zip",
+            ],
+          }
+        : {}),
     })
     if (createError) {
       return NextResponse.json(

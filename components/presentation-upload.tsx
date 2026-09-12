@@ -5,6 +5,24 @@ import { Button } from "@/components/ui/button"
 import { Presentation, Upload, X } from "lucide-react"
 import { toast } from "sonner"
 
+function storageErrorMessage(status: number): string {
+  if (status === 404) {
+    return "Kho lưu trữ PowerPoint chưa được tạo hoặc đường dẫn tải lên không tồn tại. Hãy thử lại."
+  }
+  if (status === 401 || status === 403) {
+    return "Không có quyền tải file lên kho lưu trữ. Hãy đăng nhập lại rồi thử lại."
+  }
+  if (status === 413) {
+    return "File quá lớn so với giới hạn kho lưu trữ (tối đa 200 MB)."
+  }
+  return "Không tải được file lên kho lưu trữ. Hãy thử lại."
+}
+
+function powerpointContentType(file: File): string {
+  if (/\.ppt$/i.test(file.name)) return "application/vnd.ms-powerpoint"
+  return "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+}
+
 function uploadWithProgress(
   url: string,
   file: File,
@@ -13,10 +31,7 @@ function uploadWithProgress(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open("PUT", url)
-    xhr.setRequestHeader(
-      "Content-Type",
-      file.type || "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    )
+    xhr.setRequestHeader("Content-Type", powerpointContentType(file))
     xhr.setRequestHeader("x-upsert", "false")
     xhr.upload.onprogress = (e) => {
       if (!e.lengthComputable) return
@@ -28,9 +43,10 @@ function uploadWithProgress(
         resolve()
         return
       }
-      reject(new Error(`Storage upload failed with status ${xhr.status}`))
+      reject(new Error(storageErrorMessage(xhr.status)))
     }
-    xhr.onerror = () => reject(new Error("Không tải được file lên bộ nhớ."))
+    xhr.onerror = () =>
+      reject(new Error("Không kết nối được kho lưu trữ. Kiểm tra mạng rồi thử lại."))
     xhr.onabort = () => reject(new Error("Đã hủy tải lên."))
     xhr.send(file)
   })
@@ -111,6 +127,16 @@ export function PresentationUpload({
     setProgress(0)
     setUploadingName(file.name)
     try {
+      try {
+        await fetch("/api/storage/ensure-bucket", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bucket: "presentations" }),
+        })
+      } catch {
+        // API upload vẫn tự tạo bucket nếu cần
+      }
+
       const response = await fetch("/api/presentations/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -126,20 +152,39 @@ export function PresentationUpload({
         let error: string
         try {
           const errorData = await response.json()
-          error = errorData.error || `Upload failed with status ${response.status}`
+          error = errorData.error || "Không tạo được đường dẫn tải lên."
         } catch {
-          error = `Upload failed with status ${response.status}`
+          error = "Không tạo được đường dẫn tải lên."
         }
         throw new Error(error)
       }
 
       const data = await response.json()
-      const uploadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/upload/sign/presentations/${data.upload.path}?token=${encodeURIComponent(data.upload.token)}`
+      const uploadUrl = typeof data.upload?.signedUrl === "string" ? data.upload.signedUrl : ""
+      const storagePath = typeof data.upload?.path === "string" ? data.upload.path : ""
+      if (!uploadUrl || !storagePath) {
+        throw new Error("Không tạo được đường dẫn tải lên. Kho lưu trữ PowerPoint chưa sẵn sàng.")
+      }
       await uploadWithProgress(uploadUrl, file, setProgress)
 
-      setPresentation(data.presentation)
-      onUploadSuccess(data.presentation)
-      toast.success(`Tải lên thành công: ${data.presentation.slideCount} slide`)
+      const confirmRes = await fetch("/api/presentations/upload/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          fileName: file.name,
+          fileSize: file.size,
+          path: storagePath,
+        }),
+      })
+      const confirmData = await confirmRes.json().catch(() => ({}))
+      if (!confirmRes.ok || !confirmData?.presentation) {
+        throw new Error(confirmData.error || "File đã tải lên nhưng không lưu được bài trình chiếu.")
+      }
+
+      setPresentation(confirmData.presentation)
+      onUploadSuccess(confirmData.presentation)
+      toast.success(`Tải lên thành công: ${confirmData.presentation.slideCount} slide`)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Lỗi khi tải lên"
       toast.error(errorMessage)
