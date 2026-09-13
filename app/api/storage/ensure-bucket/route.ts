@@ -3,12 +3,6 @@ import { createAdminClient } from "@/lib/supabase/admin"
 
 const SUBMISSIONS_BUCKET = "submissions"
 const PRESENTATIONS_BUCKET = "presentations"
-const PPT_MIME_TYPES = [
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "application/vnd.ms-powerpoint",
-  "application/zip",
-  "application/octet-stream",
-]
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as { bucket?: string }
@@ -26,7 +20,7 @@ export async function POST(request: NextRequest) {
       const { error: createError } = await supabase.storage.createBucket(bucket, {
         public: false,
         fileSizeLimit: bucket === PRESENTATIONS_BUCKET ? 200 * 1024 * 1024 : 50 * 1024 * 1024,
-        allowedMimeTypes: bucket === PRESENTATIONS_BUCKET ? PPT_MIME_TYPES : undefined,
+        allowedMimeTypes: null,
       })
       if (createError && !/already exists/i.test(createError.message)) {
         return NextResponse.json(
@@ -40,7 +34,7 @@ export async function POST(request: NextRequest) {
       await supabase.storage.updateBucket(PRESENTATIONS_BUCKET, {
         public: false,
         fileSizeLimit: 200 * 1024 * 1024,
-        allowedMimeTypes: PPT_MIME_TYPES,
+        allowedMimeTypes: null,
       })
     }
 

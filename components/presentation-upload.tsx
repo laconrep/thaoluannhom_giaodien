@@ -4,15 +4,24 @@ import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Presentation, Upload, X } from "lucide-react"
 import { toast } from "sonner"
-import {
-  buildSignedUploadUrl,
-  powerpointContentType,
-  storageUploadHeaders,
-} from "@/lib/storage-upload"
+import { createClient } from "@/lib/supabase/client"
+import { powerpointContentType, resolveSignedUploadUrl } from "@/lib/storage-upload"
 
-function uploadWithProgress(
+function parseStorageError(status: number, body: string): string {
+  try {
+    const json = JSON.parse(body) as { message?: string; error?: string; statusCode?: string }
+    const msg = json.message || json.error
+    if (msg) return msg
+  } catch {
+    /* ignore */
+  }
+  if (body) return body.slice(0, 300)
+  return `HTTP ${status}`
+}
+
+function xhrPut(
   url: string,
-  file: File,
+  body: XMLHttpRequestBodyInit,
   headers: Record<string, string>,
   onProgress: (percent: number) => void,
 ): Promise<void> {
@@ -32,19 +41,81 @@ function uploadWithProgress(
         resolve()
         return
       }
-      const detail = xhr.responseText?.slice(0, 300)
-      reject(
-        new Error(
-          detail
-            ? `Không tải được file lên kho lưu trữ (${xhr.status}): ${detail}`
-            : `Không tải được file lên kho lưu trữ (${xhr.status}).`,
-        ),
-      )
+      const err = new Error(
+        `Không tải được file lên kho lưu trữ: ${parseStorageError(xhr.status, xhr.responseText)}`,
+      ) as Error & { status?: number }
+      err.status = xhr.status
+      reject(err)
     }
     xhr.onerror = () => reject(new Error("Không tải được file lên kho lưu trữ."))
     xhr.onabort = () => reject(new Error("Đã hủy tải lên."))
-    xhr.send(file)
+    xhr.send(body)
   })
+}
+
+async function uploadToStorage(opts: {
+  signedUrl?: string
+  path: string
+  token: string
+  file: File
+  onProgress: (percent: number) => void
+}) {
+  const supabase = createClient()
+  const typedFile = new File([opts.file], opts.file.name, {
+    type: powerpointContentType(opts.file.name, opts.file.type),
+  })
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    ""
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  const authToken = session?.access_token || anonKey
+  const headers: Record<string, string> = {}
+  if (authToken) headers.Authorization = `Bearer ${authToken}`
+  if (anonKey) headers.apikey = anonKey
+
+  const uploadUrl = resolveSignedUploadUrl(opts.signedUrl, opts.path, opts.token)
+  if (uploadUrl) {
+    const form = new FormData()
+    form.append("cacheControl", "3600")
+    form.append("", typedFile)
+    try {
+      await xhrPut(uploadUrl, form, headers, opts.onProgress)
+      return
+    } catch (error) {
+      const status = (error as { status?: number }).status
+      if (status === 400) {
+        await xhrPut(
+          uploadUrl,
+          typedFile,
+          { ...headers, "Content-Type": typedFile.type },
+          opts.onProgress,
+        )
+        return
+      }
+      throw error
+    }
+  }
+
+  opts.onProgress(40)
+  const signed = await supabase.storage
+    .from("presentations")
+    .uploadToSignedUrl(opts.path, opts.token, typedFile)
+  if (!signed.error) {
+    opts.onProgress(100)
+    return
+  }
+
+  const direct = await supabase.storage.from("presentations").upload(opts.path, typedFile, {
+    upsert: true,
+    contentType: typedFile.type,
+  })
+  if (direct.error) {
+    throw new Error(signed.error.message || direct.error.message)
+  }
+  opts.onProgress(100)
 }
 
 function UploadProgressRing({ percent }: { percent: number }) {
@@ -150,24 +221,17 @@ export function PresentationUpload({
       }
 
       const data = await response.json()
-      if (!data?.upload?.token) {
+      if (!data?.upload?.token || !data?.upload?.path) {
         throw new Error("Không tạo được đường dẫn tải lên kho lưu trữ.")
       }
 
-      const contentType =
-        data.upload.contentType || powerpointContentType(file.name, file.type)
-      const uploadUrl = buildSignedUploadUrl(
-        "presentations",
-        data.upload.path,
-        data.upload.token,
-        data.upload.signedUrl,
-      )
-      await uploadWithProgress(
-        uploadUrl,
+      await uploadToStorage({
+        signedUrl: data.upload.signedUrl,
+        path: data.upload.path,
+        token: data.upload.token,
         file,
-        storageUploadHeaders(data.upload.token, contentType, true, data.upload.anonKey),
-        setProgress,
-      )
+        onProgress: setProgress,
+      })
 
       setPresentation(data.presentation)
       onUploadSuccess(data.presentation)

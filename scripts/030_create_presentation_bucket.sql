@@ -5,18 +5,10 @@
 
 -- Bucket lưu file PowerPoint của giáo viên (private, tối đa 200 MB)
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values (
-  'presentations', 'presentations', false, 209715200,
-  array[
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'application/vnd.ms-powerpoint',
-    'application/zip',
-    'application/octet-stream'
-  ]
-)
+values ('presentations', 'presentations', false, 209715200, null)
 on conflict (id) do update set
   file_size_limit = excluded.file_size_limit,
-  allowed_mime_types = excluded.allowed_mime_types;
+  allowed_mime_types = null;
 
 -- Bucket lưu bài nộp của học sinh (private)
 insert into storage.buckets (id, name, public)

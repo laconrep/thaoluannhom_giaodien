@@ -401,18 +401,10 @@ create index if not exists class_groups_leader_idx on public.class_groups(leader
 
 -- ============ STORAGE POWERPOINT ============
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values (
-  'presentations', 'presentations', false, 209715200,
-  array[
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'application/vnd.ms-powerpoint',
-    'application/zip',
-    'application/octet-stream'
-  ]
-)
+values ('presentations', 'presentations', false, 209715200, null)
 on conflict (id) do update set
   file_size_limit = excluded.file_size_limit,
-  allowed_mime_types = excluded.allowed_mime_types;
+  allowed_mime_types = null;
 
 drop policy if exists presentations_storage_insert on storage.objects;
 create policy presentations_storage_insert on storage.objects

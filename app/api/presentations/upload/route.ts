@@ -2,15 +2,9 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { NextRequest, NextResponse } from "next/server"
 import { PLAN_DEFAULT, planLimits, type Plan } from "@/lib/plans"
-import { buildSignedUploadUrl, powerpointContentType } from "@/lib/storage-upload"
+import { powerpointContentType } from "@/lib/storage-upload"
 
 const PRESENTATIONS_BUCKET = "presentations"
-const PPT_MIME_TYPES = [
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "application/vnd.ms-powerpoint",
-  "application/zip",
-  "application/octet-stream",
-]
 
 function getEstimatedSlideCount(fileSize: number): number {
   return Math.max(1, Math.min(100, Math.floor(fileSize / 50000)))
@@ -23,7 +17,7 @@ async function ensurePresentationsBucket(admin: NonNullable<ReturnType<typeof cr
     const { error: createError } = await admin.storage.createBucket(PRESENTATIONS_BUCKET, {
       public: false,
       fileSizeLimit: 200 * 1024 * 1024,
-      allowedMimeTypes: PPT_MIME_TYPES,
+      allowedMimeTypes: null,
     })
     if (createError && !/already exists/i.test(createError.message)) {
       throw new Error(createError.message)
@@ -32,7 +26,7 @@ async function ensurePresentationsBucket(admin: NonNullable<ReturnType<typeof cr
   await admin.storage.updateBucket(PRESENTATIONS_BUCKET, {
     public: false,
     fileSizeLimit: 200 * 1024 * 1024,
-    allowedMimeTypes: PPT_MIME_TYPES,
+    allowedMimeTypes: null,
   })
 }
 
@@ -69,7 +63,6 @@ export async function POST(request: NextRequest) {
     const fileType = typeof payload.fileType === "string" ? payload.fileType : ""
     const sessionId = typeof payload.sessionId === "string" ? payload.sessionId : ""
     const contentType = powerpointContentType(fileName, fileType)
-    const allowedTypes = new Set(PPT_MIME_TYPES)
 
     if (!fileName || !sessionId || !Number.isFinite(fileSize)) {
       return NextResponse.json({ error: "Thiếu thông tin file hoặc sessionId" }, { status: 400 })
@@ -79,7 +72,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File PowerPoint phải từ 1 byte đến 200 MB." }, { status: 400 })
     }
 
-    if (!allowedTypes.has(fileType) && !/\.(pptx?|PPTX?)$/.test(fileName)) {
+    if (!/\.(pptx?|PPTX?)$/.test(fileName) && !contentType.includes("powerpoint") && fileType !== "application/zip") {
       return NextResponse.json({ error: "Chỉ hỗ trợ file PowerPoint .ppt hoặc .pptx." }, { status: 415 })
     }
 
@@ -119,12 +112,12 @@ export async function POST(request: NextRequest) {
     const storageClient = admin ?? supabase
     let { data: signedUpload, error: signedUploadError } = await storageClient.storage
       .from(PRESENTATIONS_BUCKET)
-      .createSignedUploadUrl(storagePath, { upsert: true })
+      .createSignedUploadUrl(storagePath)
 
     if ((!signedUpload?.token || signedUploadError) && admin && admin !== supabase) {
       const fallback = await supabase.storage
         .from(PRESENTATIONS_BUCKET)
-        .createSignedUploadUrl(storagePath, { upsert: true })
+        .createSignedUploadUrl(storagePath)
       signedUpload = fallback.data
       signedUploadError = fallback.error
     }
@@ -157,24 +150,13 @@ export async function POST(request: NextRequest) {
     }
 
     const uploadPath = signedUpload.path || storagePath
-    const anonKey =
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-      process.env.SUPABASE_ANON_KEY ??
-      ""
     return NextResponse.json({
       success: true,
       upload: {
         path: uploadPath,
         token: signedUpload.token,
-        signedUrl: buildSignedUploadUrl(
-          PRESENTATIONS_BUCKET,
-          uploadPath,
-          signedUpload.token,
-          signedUpload.signedUrl,
-        ),
+        signedUrl: signedUpload.signedUrl,
         contentType,
-        anonKey,
       },
       presentation: {
         ...presentation,
