@@ -309,9 +309,15 @@ export function StudentSubmit({
         throw new Error(urlBody?.error ?? "Không tạo được đường dẫn tải lên.")
       }
       const uploadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/upload/sign/submissions/${urlBody.upload.path}?token=${encodeURIComponent(urlBody.upload.token)}`
+      const anonKey =
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+        urlBody.upload.token
       const putRes = await fetch(uploadUrl, {
         method: "PUT",
         headers: {
+          Authorization: `Bearer ${anonKey}`,
+          apikey: anonKey,
           "Content-Type": s.file.type || "application/octet-stream",
           "x-upsert": "true",
         },

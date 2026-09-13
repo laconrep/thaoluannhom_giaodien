@@ -4,10 +4,19 @@
 -- ============================================================
 
 -- Bucket lưu file PowerPoint của giáo viên (private, tối đa 200 MB)
-insert into storage.buckets (id, name, public, file_size_limit)
-values ('presentations', 'presentations', false, 209715200)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'presentations', 'presentations', false, 209715200,
+  array[
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.ms-powerpoint',
+    'application/zip',
+    'application/octet-stream'
+  ]
+)
 on conflict (id) do update set
-  file_size_limit = excluded.file_size_limit;
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
 
 -- Bucket lưu bài nộp của học sinh (private)
 insert into storage.buckets (id, name, public)
@@ -17,15 +26,19 @@ on conflict (id) do nothing;
 -- Cấp quyền cho role anon/authenticated dùng signed URL (upload + download qua signed URL)
 drop policy if exists presentations_storage_insert on storage.objects;
 create policy presentations_storage_insert on storage.objects
-  for insert with check (bucket_id = 'presentations');
+  for insert to anon, authenticated with check (bucket_id = 'presentations');
 
 drop policy if exists presentations_storage_read on storage.objects;
 create policy presentations_storage_read on storage.objects
-  for select using (bucket_id = 'presentations');
+  for select to anon, authenticated using (bucket_id = 'presentations');
+
+drop policy if exists presentations_storage_update on storage.objects;
+create policy presentations_storage_update on storage.objects
+  for update to anon, authenticated using (bucket_id = 'presentations') with check (bucket_id = 'presentations');
 
 drop policy if exists presentations_storage_delete on storage.objects;
 create policy presentations_storage_delete on storage.objects
-  for delete using (bucket_id = 'presentations');
+  for delete to anon, authenticated using (bucket_id = 'presentations');
 
 drop policy if exists submissions_storage_insert on storage.objects;
 create policy submissions_storage_insert on storage.objects

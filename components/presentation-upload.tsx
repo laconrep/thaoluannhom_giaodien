@@ -4,20 +4,24 @@ import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Presentation, Upload, X } from "lucide-react"
 import { toast } from "sonner"
+import {
+  buildSignedUploadUrl,
+  powerpointContentType,
+  storageUploadHeaders,
+} from "@/lib/storage-upload"
 
 function uploadWithProgress(
   url: string,
   file: File,
+  headers: Record<string, string>,
   onProgress: (percent: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open("PUT", url)
-    xhr.setRequestHeader(
-      "Content-Type",
-      file.type || "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    )
-    xhr.setRequestHeader("x-upsert", "false")
+    Object.entries(headers).forEach(([key, value]) => {
+      if (value) xhr.setRequestHeader(key, value)
+    })
     xhr.upload.onprogress = (e) => {
       if (!e.lengthComputable) return
       onProgress(Math.min(99, Math.round((e.loaded / e.total) * 100)))
@@ -28,9 +32,16 @@ function uploadWithProgress(
         resolve()
         return
       }
-      reject(new Error(`Storage upload failed with status ${xhr.status}`))
+      const detail = xhr.responseText?.slice(0, 300)
+      reject(
+        new Error(
+          detail
+            ? `Không tải được file lên kho lưu trữ (${xhr.status}): ${detail}`
+            : `Không tải được file lên kho lưu trữ (${xhr.status}).`,
+        ),
+      )
     }
-    xhr.onerror = () => reject(new Error("Không tải được file lên bộ nhớ."))
+    xhr.onerror = () => reject(new Error("Không tải được file lên kho lưu trữ."))
     xhr.onabort = () => reject(new Error("Đã hủy tải lên."))
     xhr.send(file)
   })
@@ -96,7 +107,6 @@ export function PresentationUpload({
       return
     }
 
-    // Kiểm tra magic number: pptx là ZIP (PK), ppt là OLE2 (D0 CF 11 E0)
     const head = new Uint8Array(await file.slice(0, 8).arrayBuffer())
     const isZip =
       head[0] === 0x50 && head[1] === 0x4b && [0x03, 0x05, 0x07].includes(head[2])
@@ -111,6 +121,12 @@ export function PresentationUpload({
     setProgress(0)
     setUploadingName(file.name)
     try {
+      await fetch("/api/storage/ensure-bucket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bucket: "presentations" }),
+      }).catch(() => null)
+
       const response = await fetch("/api/presentations/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,7 +134,7 @@ export function PresentationUpload({
           sessionId,
           fileName: file.name,
           fileSize: file.size,
-          fileType: file.type,
+          fileType: powerpointContentType(file.name, file.type),
         }),
       })
 
@@ -134,8 +150,24 @@ export function PresentationUpload({
       }
 
       const data = await response.json()
-      const uploadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/upload/sign/presentations/${data.upload.path}?token=${encodeURIComponent(data.upload.token)}`
-      await uploadWithProgress(uploadUrl, file, setProgress)
+      if (!data?.upload?.token) {
+        throw new Error("Không tạo được đường dẫn tải lên kho lưu trữ.")
+      }
+
+      const contentType =
+        data.upload.contentType || powerpointContentType(file.name, file.type)
+      const uploadUrl = buildSignedUploadUrl(
+        "presentations",
+        data.upload.path,
+        data.upload.token,
+        data.upload.signedUrl,
+      )
+      await uploadWithProgress(
+        uploadUrl,
+        file,
+        storageUploadHeaders(data.upload.token, contentType, true, data.upload.anonKey),
+        setProgress,
+      )
 
       setPresentation(data.presentation)
       onUploadSuccess(data.presentation)
