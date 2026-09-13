@@ -319,23 +319,23 @@ create index if not exists class_groups_leader_idx on public.class_groups(leader
 
 -- ============ STORAGE POWERPOINT ============
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values (
-  'presentations', 'presentations', false, 209715200,
-  array['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.ms-powerpoint', 'application/zip']
-)
+values ('presentations', 'presentations', false, 209715200, null)
 on conflict (id) do update set
   file_size_limit = excluded.file_size_limit,
-  allowed_mime_types = excluded.allowed_mime_types;
+  allowed_mime_types = null;
 
 drop policy if exists presentations_storage_insert on storage.objects;
-create policy presentations_storage_insert on storage.objects for insert to authenticated
-  with check (bucket_id = 'presentations');
+create policy presentations_storage_insert on storage.objects
+  for insert to anon, authenticated with check (bucket_id = 'presentations');
 drop policy if exists presentations_storage_select on storage.objects;
-create policy presentations_storage_select on storage.objects for select to authenticated
-  using (bucket_id = 'presentations');
+create policy presentations_storage_select on storage.objects
+  for select to anon, authenticated using (bucket_id = 'presentations');
 drop policy if exists presentations_storage_update on storage.objects;
-create policy presentations_storage_update on storage.objects for update to authenticated
-  using (bucket_id = 'presentations') with check (bucket_id = 'presentations');
+create policy presentations_storage_update on storage.objects
+  for update to anon, authenticated using (bucket_id = 'presentations') with check (bucket_id = 'presentations');
+drop policy if exists presentations_storage_delete on storage.objects;
+create policy presentations_storage_delete on storage.objects
+  for delete to anon, authenticated using (bucket_id = 'presentations');
 
 -- ============ STORAGE BÀI NỘP CỦA HỌC SINH ============
 insert into storage.buckets (id, name, public, file_size_limit)
