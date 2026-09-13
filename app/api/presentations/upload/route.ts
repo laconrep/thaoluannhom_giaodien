@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { createAdminClient, createServiceClient } from "@/lib/supabase/admin"
 import { NextRequest, NextResponse } from "next/server"
 import { PLAN_DEFAULT, planLimits, type Plan } from "@/lib/plans"
-import { powerpointContentType } from "@/lib/storage-upload"
-
-const PRESENTATIONS_BUCKET = "presentations"
+import {
+  MAX_PRESENTATION_BYTES,
+  PRESENTATIONS_BUCKET,
+  powerpointContentType,
+} from "@/lib/storage-upload"
 
 function getEstimatedSlideCount(fileSize: number): number {
   return Math.max(1, Math.min(100, Math.floor(fileSize / 50000)))
@@ -16,18 +18,26 @@ async function ensurePresentationsBucket(admin: NonNullable<ReturnType<typeof cr
   if (!exists) {
     const { error: createError } = await admin.storage.createBucket(PRESENTATIONS_BUCKET, {
       public: false,
-      fileSizeLimit: 200 * 1024 * 1024,
+      fileSizeLimit: MAX_PRESENTATION_BYTES,
       allowedMimeTypes: null,
     })
     if (createError && !/already exists/i.test(createError.message)) {
       throw new Error(createError.message)
     }
   }
-  await admin.storage.updateBucket(PRESENTATIONS_BUCKET, {
+  const { error: updateError } = await admin.storage.updateBucket(PRESENTATIONS_BUCKET, {
     public: false,
-    fileSizeLimit: 200 * 1024 * 1024,
+    fileSizeLimit: MAX_PRESENTATION_BYTES,
     allowedMimeTypes: null,
   })
+  if (updateError) {
+    const { data: bucketsAfter } = await admin.storage.listBuckets()
+    const current = bucketsAfter?.find((b) => b.id === PRESENTATIONS_BUCKET)
+    const limit = Number(current?.file_size_limit)
+    if (!Number.isFinite(limit) || limit < MAX_PRESENTATION_BYTES) {
+      throw new Error(updateError.message)
+    }
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -68,7 +78,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Thiếu thông tin file hoặc sessionId" }, { status: 400 })
     }
 
-    if (fileSize === 0 || fileSize > 200 * 1024 * 1024) {
+    if (fileSize === 0 || fileSize > MAX_PRESENTATION_BYTES) {
       return NextResponse.json({ error: "File PowerPoint phải từ 1 byte đến 200 MB." }, { status: 400 })
     }
 
@@ -96,12 +106,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not authorized to upload presentation" }, { status: 403 })
     }
 
-    const admin = createAdminClient()
-    if (admin) {
+    const service = createServiceClient()
+    const admin = service ?? createAdminClient()
+    if (service) {
       try {
-        await ensurePresentationsBucket(admin)
+        await ensurePresentationsBucket(service)
       } catch (e) {
-        console.warn("ensure presentations bucket skipped:", e)
+        const message = e instanceof Error ? e.message : "unknown error"
+        return NextResponse.json(
+          { error: `Không nâng được hạn mức kho lưu trữ lên 200 MB: ${message}` },
+          { status: 502 },
+        )
       }
     }
 

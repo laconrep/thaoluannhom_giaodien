@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Presentation, Upload, X } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
-import { powerpointContentType, resolveSignedUploadUrl } from "@/lib/storage-upload"
+import {
+  MAX_PRESENTATION_BYTES,
+  formatMegabytes,
+  friendlyStorageError,
+  powerpointContentType,
+  resolveSignedUploadUrl,
+} from "@/lib/storage-upload"
 
 function parseStorageError(status: number, body: string): string {
   try {
@@ -173,8 +179,8 @@ export function PresentationUpload({
       toast.error("Chỉ hỗ trợ file PowerPoint (.ppt hoặc .pptx)")
       return
     }
-    if (file.size === 0 || file.size > 200 * 1024 * 1024) {
-      toast.error("File PowerPoint phải từ 1 byte đến 200 MB")
+    if (file.size === 0 || file.size > MAX_PRESENTATION_BYTES) {
+      toast.error(`File PowerPoint phải từ 1 byte đến 200 MB. File hiện tại: ${formatMegabytes(file.size)}.`)
       return
     }
 
@@ -192,11 +198,18 @@ export function PresentationUpload({
     setProgress(0)
     setUploadingName(file.name)
     try {
-      await fetch("/api/storage/ensure-bucket", {
+      const ensureRes = await fetch("/api/storage/ensure-bucket", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bucket: "presentations" }),
       }).catch(() => null)
+      const ensureBody = await ensureRes?.json().catch(() => ({}))
+      const bucketLimit = Number(ensureBody?.fileSizeLimit)
+      if (ensureRes && (!ensureRes.ok || ensureBody?.ok === false) && Number.isFinite(bucketLimit) && bucketLimit < file.size) {
+        throw new Error(
+          `Kho lưu trữ chỉ cho phép ${formatMegabytes(bucketLimit)}. File hiện tại ${formatMegabytes(file.size)}.`,
+        )
+      }
 
       const response = await fetch("/api/presentations/upload", {
         method: "POST",
@@ -238,7 +251,7 @@ export function PresentationUpload({
       toast.success(`Tải lên thành công: ${data.presentation.slideCount} slide`)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Lỗi khi tải lên"
-      toast.error(errorMessage)
+      toast.error(friendlyStorageError(errorMessage, file.size))
     } finally {
       setIsLoading(false)
       setProgress(0)
