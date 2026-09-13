@@ -4,7 +4,6 @@ import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Presentation, Upload, X } from "lucide-react"
 import { toast } from "sonner"
-import { createClient } from "@/lib/supabase/client"
 import {
   MAX_PRESENTATION_BYTES,
   formatMegabytes,
@@ -66,62 +65,23 @@ async function uploadToStorage(opts: {
   file: File
   onProgress: (percent: number) => void
 }) {
-  const supabase = createClient()
-  const typedFile = new File([opts.file], opts.file.name, {
-    type: powerpointContentType(opts.file.name, opts.file.type),
-  })
+  const uploadUrl = resolveSignedUploadUrl(opts.signedUrl, opts.path, opts.token)
+  if (!uploadUrl) {
+    throw new Error("Thiếu đường dẫn kho lưu trữ.")
+  }
   const anonKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
     ""
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  const authToken = session?.access_token || anonKey
-  const headers: Record<string, string> = {}
-  if (authToken) headers.Authorization = `Bearer ${authToken}`
-  if (anonKey) headers.apikey = anonKey
-
-  const uploadUrl = resolveSignedUploadUrl(opts.signedUrl, opts.path, opts.token)
-  if (uploadUrl) {
-    const form = new FormData()
-    form.append("cacheControl", "3600")
-    form.append("", typedFile)
-    try {
-      await xhrPut(uploadUrl, form, headers, opts.onProgress)
-      return
-    } catch (error) {
-      const status = (error as { status?: number }).status
-      if (status === 400) {
-        await xhrPut(
-          uploadUrl,
-          typedFile,
-          { ...headers, "Content-Type": typedFile.type },
-          opts.onProgress,
-        )
-        return
-      }
-      throw error
-    }
+  const headers: Record<string, string> = {
+    "Content-Type": powerpointContentType(opts.file.name, opts.file.type),
+    "cache-control": "max-age=3600",
   }
-
-  opts.onProgress(40)
-  const signed = await supabase.storage
-    .from("presentations")
-    .uploadToSignedUrl(opts.path, opts.token, typedFile)
-  if (!signed.error) {
-    opts.onProgress(100)
-    return
+  if (anonKey) {
+    headers.Authorization = `Bearer ${anonKey}`
+    headers.apikey = anonKey
   }
-
-  const direct = await supabase.storage.from("presentations").upload(opts.path, typedFile, {
-    upsert: true,
-    contentType: typedFile.type,
-  })
-  if (direct.error) {
-    throw new Error(signed.error.message || direct.error.message)
-  }
-  opts.onProgress(100)
+  await xhrPut(uploadUrl, opts.file, headers, opts.onProgress)
 }
 
 function UploadProgressRing({ percent }: { percent: number }) {
@@ -198,11 +158,23 @@ export function PresentationUpload({
     setProgress(0)
     setUploadingName(file.name)
     try {
-      const ensureRes = await fetch("/api/storage/ensure-bucket", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bucket: "presentations" }),
-      }).catch(() => null)
+      const [ensureRes, response] = await Promise.all([
+        fetch("/api/storage/ensure-bucket", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bucket: "presentations" }),
+        }).catch(() => null),
+        fetch("/api/presentations/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: powerpointContentType(file.name, file.type),
+          }),
+        }),
+      ])
       const ensureBody = await ensureRes?.json().catch(() => ({}))
       const bucketLimit = Number(ensureBody?.fileSizeLimit)
       if (ensureRes && (!ensureRes.ok || ensureBody?.ok === false) && Number.isFinite(bucketLimit) && bucketLimit < file.size) {
@@ -210,17 +182,6 @@ export function PresentationUpload({
           `Kho lưu trữ chỉ cho phép ${formatMegabytes(bucketLimit)}. File hiện tại ${formatMegabytes(file.size)}.`,
         )
       }
-
-      const response = await fetch("/api/presentations/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId,
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: powerpointContentType(file.name, file.type),
-        }),
-      })
 
       if (!response.ok) {
         let error: string

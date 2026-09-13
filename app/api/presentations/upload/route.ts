@@ -108,26 +108,23 @@ export async function POST(request: NextRequest) {
 
     const service = createServiceClient()
     const admin = service ?? createAdminClient()
-    if (service) {
-      try {
-        await ensurePresentationsBucket(service)
-      } catch (e) {
-        const message = e instanceof Error ? e.message : "unknown error"
-        return NextResponse.json(
-          { error: `Không nâng được hạn mức kho lưu trữ lên 200 MB: ${message}` },
-          { status: 502 },
-        )
-      }
-    }
-
     const slideCount = getEstimatedSlideCount(fileSize)
     const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_")
     const timestamp = Date.now()
     const storagePath = `${user.id}/${sessionId}/${timestamp}_${safeFileName}`
     const storageClient = admin ?? supabase
-    let { data: signedUpload, error: signedUploadError } = await storageClient.storage
-      .from(PRESENTATIONS_BUCKET)
-      .createSignedUploadUrl(storagePath)
+    const [bucketResult, signedResult] = await Promise.all([
+      service ? ensurePresentationsBucket(service).then(() => null).catch((e: unknown) => e) : Promise.resolve(null),
+      storageClient.storage.from(PRESENTATIONS_BUCKET).createSignedUploadUrl(storagePath),
+    ])
+    if (bucketResult) {
+      const message = bucketResult instanceof Error ? bucketResult.message : "unknown error"
+      return NextResponse.json(
+        { error: `Không nâng được hạn mức kho lưu trữ lên 200 MB: ${message}` },
+        { status: 502 },
+      )
+    }
+    let { data: signedUpload, error: signedUploadError } = signedResult
 
     if ((!signedUpload?.token || signedUploadError) && admin && admin !== supabase) {
       const fallback = await supabase.storage
