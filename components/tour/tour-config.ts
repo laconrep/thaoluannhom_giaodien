@@ -72,7 +72,7 @@ export function sessionsPresetsStep(): Step {
     placement: "bottom",
     title: "Chọn thời lượng",
     content:
-      "Chọn nhanh preset 15/30/45 phút (và số nhóm nếu có). Xong rồi bấm \"Tạo và vào ngay\".",
+      "Chọn nhanh preset 15/30/45 phút hoặc \"Không thời hạn\" (và số nhóm nếu có). Xong rồi bấm \"Tạo và vào ngay\".",
   }
 }
 

@@ -446,6 +446,9 @@ export function StudentSubmit({
               {formatDuration(Math.max(0, remaining))}
             </div>
           )}
+          {running && !session.ends_at && (
+            <span className="text-xs bg-muted px-2 py-1 rounded-md">Không thời hạn</span>
+          )}
           {ended && <span className="text-xs bg-muted px-2 py-1 rounded-md">Đã hết giờ</span>}
         </div>
       </header>
@@ -748,7 +751,9 @@ export function StudentSubmit({
                   : "Nộp bài"}
             </Button>
             <p className="text-xs text-center text-muted-foreground">
-              Bài của bạn sẽ tự động được nộp khi hết giờ.
+              {session.ends_at
+                ? "Bài của bạn sẽ tự động được nộp khi hết giờ."
+                : "Phiên không thời hạn — bấm \"Nộp bài\" khi bạn hoàn thành."}
             </p>
           </div>
         )}
