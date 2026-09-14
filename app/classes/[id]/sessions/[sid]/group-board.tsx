@@ -966,6 +966,7 @@ export function GroupSessionBoard({
       <>
         <PresentationViewer
           presentationId={presentation.id}
+          initialPresentation={presentation}
           sessionId={displaySession.id}
           isTeacher={isTeacher}
           groupCount={displayGroups.length}

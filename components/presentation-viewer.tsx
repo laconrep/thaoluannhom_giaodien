@@ -27,6 +27,7 @@ import { setSeen, PRESENTATION_START_SEEN_KEY, RESTART_EVENT, STOP_EVENT } from 
 
 export interface PresentationViewerProps {
   presentationId: string
+  initialPresentation?: any
   sessionId: string
   isTeacher: boolean
   children: React.ReactNode
@@ -54,6 +55,7 @@ function colsFor(count: number): string {
 
 export function PresentationViewer({
   presentationId,
+  initialPresentation,
   sessionId,
   isTeacher,
   children,
@@ -72,7 +74,9 @@ export function PresentationViewer({
   sessionPickerOpen = false,
   createSessionOpen = false,
 }: PresentationViewerProps) {
-  const [presentation, setPresentation] = useState<any>(null)
+  const [presentation, setPresentation] = useState<any>(
+    initialPresentation?.id === presentationId ? initialPresentation : null,
+  )
   const [active, setActive] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [showQr, setShowQr] = useState(false)
@@ -124,6 +128,17 @@ export function PresentationViewer({
   }, [])
 
   useEffect(() => {
+    const seed =
+      initialPresentation?.id === presentationId ? initialPresentation : null
+    if (seed) {
+      setPresentation(seed)
+      setRemainingSeconds(
+        seed.ends_at ? Math.max(0, Math.ceil((new Date(seed.ends_at).getTime() - Date.now()) / 1000)) : null,
+      )
+      if (!isTeacher) setActive(Boolean(seed.is_visible))
+      if (seed.storage_path || seed.file_path) return
+    }
+
     const load = async () => {
       if (!presentationId) return
       const { data } = await supabase
@@ -139,7 +154,7 @@ export function PresentationViewer({
       if (!isTeacher) setActive(Boolean(data.is_visible))
     }
     load()
-  }, [presentationId, supabase, isTeacher])
+  }, [presentationId, initialPresentation, supabase, isTeacher])
 
   // Tạo signed URL 24h một lần để Office Online Viewer tải được file cả buổi học
   useEffect(() => {

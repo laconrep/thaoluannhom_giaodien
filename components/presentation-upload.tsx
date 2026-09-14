@@ -66,62 +66,45 @@ async function uploadToStorage(opts: {
   file: File
   onProgress: (percent: number) => void
 }) {
-  const supabase = createClient()
-  const typedFile = new File([opts.file], opts.file.name, {
-    type: powerpointContentType(opts.file.name, opts.file.type),
-  })
+  const uploadUrl = resolveSignedUploadUrl(opts.signedUrl, opts.path, opts.token)
+  if (!uploadUrl) {
+    throw new Error("Không tạo được đường dẫn tải lên kho lưu trữ.")
+  }
+
+  const contentType = powerpointContentType(opts.file.name, opts.file.type)
   const anonKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
     ""
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  const authToken = session?.access_token || anonKey
-  const headers: Record<string, string> = {}
-  if (authToken) headers.Authorization = `Bearer ${authToken}`
-  if (anonKey) headers.apikey = anonKey
-
-  const uploadUrl = resolveSignedUploadUrl(opts.signedUrl, opts.path, opts.token)
-  if (uploadUrl) {
-    const form = new FormData()
-    form.append("cacheControl", "3600")
-    form.append("", typedFile)
-    try {
-      await xhrPut(uploadUrl, form, headers, opts.onProgress)
-      return
-    } catch (error) {
-      const status = (error as { status?: number }).status
-      if (status === 400) {
-        await xhrPut(
-          uploadUrl,
-          typedFile,
-          { ...headers, "Content-Type": typedFile.type },
-          opts.onProgress,
-        )
-        return
-      }
-      throw error
-    }
+  const baseHeaders: Record<string, string> = {
+    "Content-Type": contentType,
+    "x-upsert": "true",
   }
 
-  opts.onProgress(40)
-  const signed = await supabase.storage
-    .from("presentations")
-    .uploadToSignedUrl(opts.path, opts.token, typedFile)
-  if (!signed.error) {
-    opts.onProgress(100)
+  try {
+    await xhrPut(uploadUrl, opts.file, baseHeaders, opts.onProgress)
     return
+  } catch (error) {
+    const status = (error as { status?: number }).status
+    if (status === 401 || status === 403) {
+      const authHeaders = { ...baseHeaders }
+      if (anonKey) {
+        authHeaders.Authorization = `Bearer ${anonKey}`
+        authHeaders.apikey = anonKey
+      }
+      await xhrPut(uploadUrl, opts.file, authHeaders, opts.onProgress)
+      return
+    }
+    if (status !== 400 && status !== 415) throw error
+    const supabase = createClient()
+    const signed = await supabase.storage
+      .from("presentations")
+      .uploadToSignedUrl(opts.path, opts.token, opts.file)
+    if (signed.error) {
+      throw new Error(signed.error.message)
+    }
+    opts.onProgress(100)
   }
-
-  const direct = await supabase.storage.from("presentations").upload(opts.path, typedFile, {
-    upsert: true,
-    contentType: typedFile.type,
-  })
-  if (direct.error) {
-    throw new Error(signed.error.message || direct.error.message)
-  }
-  opts.onProgress(100)
 }
 
 function UploadProgressRing({ percent }: { percent: number }) {
@@ -195,22 +178,9 @@ export function PresentationUpload({
     }
 
     setIsLoading(true)
-    setProgress(0)
+    setProgress(1)
     setUploadingName(file.name)
     try {
-      const ensureRes = await fetch("/api/storage/ensure-bucket", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bucket: "presentations" }),
-      }).catch(() => null)
-      const ensureBody = await ensureRes?.json().catch(() => ({}))
-      const bucketLimit = Number(ensureBody?.fileSizeLimit)
-      if (ensureRes && (!ensureRes.ok || ensureBody?.ok === false) && Number.isFinite(bucketLimit) && bucketLimit < file.size) {
-        throw new Error(
-          `Kho lưu trữ chỉ cho phép ${formatMegabytes(bucketLimit)}. File hiện tại ${formatMegabytes(file.size)}.`,
-        )
-      }
-
       const response = await fetch("/api/presentations/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
