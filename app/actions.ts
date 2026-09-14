@@ -698,14 +698,16 @@ async function revalidateSessionPage(sessionId: string) {
 export async function startSessionAction(sessionId: string, durationSeconds: number) {
   const supabase = await createClient()
   const startedAt = new Date()
-  const endsAt = new Date(startedAt.getTime() + durationSeconds * 1000)
+  // durationSeconds <= 0 nghĩa là "không thời hạn": phiên chạy tới khi GV tự kết thúc.
+  const unlimited = !durationSeconds || durationSeconds <= 0
+  const endsAt = unlimited ? null : new Date(startedAt.getTime() + durationSeconds * 1000)
   const { error } = await supabase
     .from("sessions")
     .update({
       status: "running",
-      duration_seconds: durationSeconds,
+      duration_seconds: unlimited ? 0 : durationSeconds,
       started_at: startedAt.toISOString(),
-      ends_at: endsAt.toISOString(),
+      ends_at: endsAt ? endsAt.toISOString() : null,
     })
     .eq("id", sessionId)
   if (error) throw new Error(error.message)
@@ -740,14 +742,16 @@ export async function endSessionAction(sessionId: string) {
 export async function reopenSessionAction(sessionId: string, extraSeconds: number) {
   const supabase = await createClient()
   const startedAt = new Date()
-  const endsAt = new Date(startedAt.getTime() + Math.max(30, extraSeconds) * 1000)
+  // extraSeconds <= 0 nghĩa là "không thời hạn": phiên chạy tới khi GV tự kết thúc.
+  const unlimited = !extraSeconds || extraSeconds <= 0
+  const endsAt = unlimited ? null : new Date(startedAt.getTime() + Math.max(30, extraSeconds) * 1000)
   const { error } = await supabase
     .from("sessions")
     .update({
       status: "running",
-      duration_seconds: extraSeconds,
+      duration_seconds: unlimited ? 0 : extraSeconds,
       started_at: startedAt.toISOString(),
-      ends_at: endsAt.toISOString(),
+      ends_at: endsAt ? endsAt.toISOString() : null,
     })
     .eq("id", sessionId)
   if (error) throw new Error(error.message)

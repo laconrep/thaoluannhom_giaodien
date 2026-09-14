@@ -268,6 +268,8 @@ export function PresentationViewer({
   }, [submissions])
 
   const sessionLeft = useCountdown(status === "running" ? endsAt : null, status)
+  // Phiên "không thời hạn": đang chạy nhưng không có mốc kết thúc (ends_at = null).
+  const sessionUnlimited = status === "running" && !endsAt
 
   const annsByGroup = useMemo(() => {
     const m: Record<string, AnnotationRow> = {}
@@ -412,9 +414,9 @@ export function PresentationViewer({
         <div
           className="absolute right-4 top-16 z-30 flex items-center justify-center rounded-full border-4 border-green-500 bg-transparent font-mono text-red-500 font-bold tabular-nums"
           style={{ width: "min(5vw, 5vh)", height: "min(5vw, 5vh)", fontSize: "min(1.4vw, 1.4vh)" }}
-          title="Thời gian còn lại của phiên thảo luận"
+          title={sessionUnlimited ? "Phiên không thời hạn" : "Thời gian còn lại của phiên thảo luận"}
         >
-          {formatClock(sessionLeft)}
+          {sessionUnlimited ? "∞" : formatClock(sessionLeft)}
         </div>
       )}
       {sourceUrl ? (
