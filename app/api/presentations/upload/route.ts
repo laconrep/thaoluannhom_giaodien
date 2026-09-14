@@ -12,61 +12,15 @@ function getEstimatedSlideCount(fileSize: number): number {
   return Math.max(1, Math.min(100, Math.floor(fileSize / 50000)))
 }
 
-async function ensurePresentationsBucket(admin: NonNullable<ReturnType<typeof createAdminClient>>) {
-  const { data: buckets } = await admin.storage.listBuckets()
-  const exists = buckets?.some((b) => b.id === PRESENTATIONS_BUCKET)
-  if (!exists) {
-    const { error: createError } = await admin.storage.createBucket(PRESENTATIONS_BUCKET, {
-      public: false,
-      fileSizeLimit: MAX_PRESENTATION_BYTES,
-      allowedMimeTypes: null,
-    })
-    if (createError && !/already exists/i.test(createError.message)) {
-      throw new Error(createError.message)
-    }
-  }
-  const { error: updateError } = await admin.storage.updateBucket(PRESENTATIONS_BUCKET, {
-    public: false,
-    fileSizeLimit: MAX_PRESENTATION_BYTES,
-    allowedMimeTypes: null,
-  })
-  if (updateError) {
-    const { data: bucketsAfter } = await admin.storage.listBuckets()
-    const current = bucketsAfter?.find((b) => b.id === PRESENTATIONS_BUCKET)
-    const limit = Number(current?.file_size_limit)
-    if (!Number.isFinite(limit) || limit < MAX_PRESENTATION_BYTES) {
-      throw new Error(updateError.message)
-    }
-  }
+function classTeacherId(session: { classes?: unknown }): string | null {
+  const nested = session.classes as { teacher_id?: string } | { teacher_id?: string }[] | null | undefined
+  if (!nested) return null
+  if (Array.isArray(nested)) return nested[0]?.teacher_id ?? null
+  return nested.teacher_id ?? null
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const [{ data: profile }, { count }] = await Promise.all([
-      supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle(),
-      supabase
-        .from("presentations")
-        .select("id", { count: "exact", head: true })
-        .eq("teacher_id", user.id),
-    ])
-    const plan = (profile?.plan as Plan | undefined) ?? PLAN_DEFAULT
-    const maxPresentations = planLimits(plan).maxPresentations
-    if (count !== null && count >= maxPresentations) {
-      return NextResponse.json(
-        { error: `Gói ${plan} giới hạn ${maxPresentations} bài trình chiếu. Hãy xóa bớt bài cũ hoặc nâng cấp gói.` },
-        { status: 429 },
-      )
-    }
-
     const payload = await request.json()
     const fileName = typeof payload.fileName === "string" ? payload.fileName : ""
     const fileSize = Number(payload.fileSize)
@@ -86,53 +40,70 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Chỉ hỗ trợ file PowerPoint .ppt hoặc .pptx." }, { status: 415 })
     }
 
-    const { data: session, error: sessionError } = await supabase
-      .from("sessions")
-      .select("id, class_id")
-      .eq("id", sessionId)
-      .single()
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-    if (sessionError || !session) {
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const [{ data: profile }, { count }, sessionResult] = await Promise.all([
+      supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle(),
+      supabase
+        .from("presentations")
+        .select("id", { count: "exact", head: true })
+        .eq("teacher_id", user.id),
+      supabase
+        .from("sessions")
+        .select("id, class_id, classes!inner(teacher_id)")
+        .eq("id", sessionId)
+        .single(),
+    ])
+    const plan = (profile?.plan as Plan | undefined) ?? PLAN_DEFAULT
+    const maxPresentations = planLimits(plan).maxPresentations
+    if (count !== null && count >= maxPresentations) {
+      return NextResponse.json(
+        { error: `Gói ${plan} giới hạn ${maxPresentations} bài trình chiếu. Hãy xóa bớt bài cũ hoặc nâng cấp gói.` },
+        { status: 429 },
+      )
+    }
+
+    const session = sessionResult.data
+    if (sessionResult.error || !session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 })
     }
 
-    const { data: cls } = await supabase
-      .from("classes")
-      .select("teacher_id")
-      .eq("id", session.class_id)
-      .single()
-
-    if (!cls || cls.teacher_id !== user.id) {
+    if (classTeacherId(session) !== user.id) {
       return NextResponse.json({ error: "Not authorized to upload presentation" }, { status: 403 })
     }
 
-    const service = createServiceClient()
-    const admin = service ?? createAdminClient()
-    if (service) {
-      try {
-        await ensurePresentationsBucket(service)
-      } catch (e) {
-        const message = e instanceof Error ? e.message : "unknown error"
-        return NextResponse.json(
-          { error: `Không nâng được hạn mức kho lưu trữ lên 200 MB: ${message}` },
-          { status: 502 },
-        )
-      }
-    }
-
+    const admin = createServiceClient() ?? createAdminClient()
     const slideCount = getEstimatedSlideCount(fileSize)
     const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_")
     const timestamp = Date.now()
     const storagePath = `${user.id}/${sessionId}/${timestamp}_${safeFileName}`
     const storageClient = admin ?? supabase
-    let { data: signedUpload, error: signedUploadError } = await storageClient.storage
-      .from(PRESENTATIONS_BUCKET)
-      .createSignedUploadUrl(storagePath)
+    const insertPayload = {
+      session_id: sessionId,
+      teacher_id: user.id,
+      file_name: fileName,
+      file_path: storagePath,
+      storage_path: storagePath,
+      slide_count: slideCount,
+    }
+
+    let [{ data: signedUpload, error: signedUploadError }, { data: presentation, error: presentationError }] =
+      await Promise.all([
+        storageClient.storage.from(PRESENTATIONS_BUCKET).createSignedUploadUrl(storagePath, { upsert: true }),
+        supabase.from("presentations").insert(insertPayload).select().single(),
+      ])
 
     if ((!signedUpload?.token || signedUploadError) && admin && admin !== supabase) {
       const fallback = await supabase.storage
         .from(PRESENTATIONS_BUCKET)
-        .createSignedUploadUrl(storagePath)
+        .createSignedUploadUrl(storagePath, { upsert: true })
       signedUpload = fallback.data
       signedUploadError = fallback.error
     }
@@ -143,19 +114,6 @@ export async function POST(request: NextRequest) {
         { status: 502 },
       )
     }
-
-    const { data: presentation, error: presentationError } = await supabase
-      .from("presentations")
-      .insert({
-        session_id: sessionId,
-        teacher_id: user.id,
-        file_name: fileName,
-        file_path: storagePath,
-        storage_path: storagePath,
-        slide_count: slideCount,
-      })
-      .select()
-      .single()
 
     if (presentationError || !presentation) {
       return NextResponse.json(
