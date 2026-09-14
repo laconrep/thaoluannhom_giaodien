@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Presentation, Upload, X } from "lucide-react"
 import { toast } from "sonner"
-import { createClient } from "@/lib/supabase/client"
 import {
   MAX_PRESENTATION_BYTES,
   formatMegabytes,
@@ -12,6 +11,12 @@ import {
   powerpointContentType,
   resolveSignedUploadUrl,
 } from "@/lib/storage-upload"
+
+type SignedSlot = {
+  path: string
+  token: string
+  signedUrl?: string
+}
 
 function parseStorageError(status: number, body: string): string {
   try {
@@ -25,6 +30,18 @@ function parseStorageError(status: number, body: string): string {
   return `HTTP ${status}`
 }
 
+function storageAuthHeaders(): Record<string, string> {
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    ""
+  if (!anonKey) return {}
+  return {
+    Authorization: `Bearer ${anonKey}`,
+    apikey: anonKey,
+  }
+}
+
 function xhrPut(
   url: string,
   body: XMLHttpRequestBodyInit,
@@ -34,6 +51,7 @@ function xhrPut(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open("PUT", url)
+    xhr.timeout = 0
     Object.entries(headers).forEach(([key, value]) => {
       if (value) xhr.setRequestHeader(key, value)
     })
@@ -55,56 +73,76 @@ function xhrPut(
     }
     xhr.onerror = () => reject(new Error("Không tải được file lên kho lưu trữ."))
     xhr.onabort = () => reject(new Error("Đã hủy tải lên."))
+    xhr.ontimeout = () => reject(new Error("Tải lên quá hạn."))
     xhr.send(body)
   })
 }
 
-async function uploadToStorage(opts: {
-  signedUrl?: string
-  path: string
-  token: string
-  file: File
-  onProgress: (percent: number) => void
-}) {
-  const uploadUrl = resolveSignedUploadUrl(opts.signedUrl, opts.path, opts.token)
+async function fetchSignedSlot(sessionId: string): Promise<SignedSlot> {
+  const response = await fetch("/api/presentations/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionId }),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok || !data?.upload?.token || !data?.upload?.path) {
+    throw new Error(data?.error || "Không tạo được đường dẫn tải lên kho lưu trữ.")
+  }
+  return {
+    path: data.upload.path,
+    token: data.upload.token,
+    signedUrl: data.upload.signedUrl,
+  }
+}
+
+async function uploadToStorage(slot: SignedSlot, file: File, onProgress: (percent: number) => void) {
+  const uploadUrl = resolveSignedUploadUrl(slot.signedUrl, slot.path, slot.token)
   if (!uploadUrl) {
     throw new Error("Không tạo được đường dẫn tải lên kho lưu trữ.")
   }
+  await xhrPut(
+    uploadUrl,
+    file,
+    {
+      ...storageAuthHeaders(),
+      "Content-Type": powerpointContentType(file.name, file.type),
+      "x-upsert": "true",
+    },
+    onProgress,
+  )
+}
 
-  const contentType = powerpointContentType(opts.file.name, opts.file.type)
-  const anonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    ""
-  const baseHeaders: Record<string, string> = {
-    "Content-Type": contentType,
-    "x-upsert": "true",
-  }
-
-  try {
-    await xhrPut(uploadUrl, opts.file, baseHeaders, opts.onProgress)
-    return
-  } catch (error) {
-    const status = (error as { status?: number }).status
-    if (status === 401 || status === 403) {
-      const authHeaders = { ...baseHeaders }
-      if (anonKey) {
-        authHeaders.Authorization = `Bearer ${anonKey}`
-        authHeaders.apikey = anonKey
-      }
-      await xhrPut(uploadUrl, opts.file, authHeaders, opts.onProgress)
-      return
+async function registerPresentation(opts: {
+  sessionId: string
+  file: File
+  storagePath: string
+}) {
+  const response = await fetch("/api/presentations/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: opts.sessionId,
+      fileName: opts.file.name,
+      fileSize: opts.file.size,
+      fileType: powerpointContentType(opts.file.name, opts.file.type),
+      storagePath: opts.storagePath,
+    }),
+  })
+  if (!response.ok) {
+    let error: string
+    try {
+      const errorData = await response.json()
+      error = errorData.error || `Upload failed with status ${response.status}`
+    } catch {
+      error = `Upload failed with status ${response.status}`
     }
-    if (status !== 400 && status !== 415) throw error
-    const supabase = createClient()
-    const signed = await supabase.storage
-      .from("presentations")
-      .uploadToSignedUrl(opts.path, opts.token, opts.file)
-    if (signed.error) {
-      throw new Error(signed.error.message)
-    }
-    opts.onProgress(100)
+    throw new Error(error)
   }
+  const data = await response.json()
+  if (!data?.presentation) {
+    throw new Error("Không lưu được thông tin bài trình chiếu.")
+  }
+  return data.presentation
 }
 
 function UploadProgressRing({ percent }: { percent: number }) {
@@ -156,6 +194,20 @@ export function PresentationUpload({
   const [uploadingName, setUploadingName] = useState<string | null>(null)
   const [presentation, setPresentation] = useState<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const slotRef = useRef<Promise<SignedSlot> | null>(null)
+
+  function prefetchSlot() {
+    slotRef.current = fetchSignedSlot(sessionId).catch((error) => {
+      slotRef.current = null
+      throw error
+    })
+    return slotRef.current
+  }
+
+  useEffect(() => {
+    prefetchSlot()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId])
 
   const handleFileSelect = async (file: File) => {
     if (!/\.pptx?$/i.test(file.name)) {
@@ -181,47 +233,22 @@ export function PresentationUpload({
     setProgress(1)
     setUploadingName(file.name)
     try {
-      const response = await fetch("/api/presentations/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId,
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: powerpointContentType(file.name, file.type),
-        }),
-      })
+      const slot = await (slotRef.current ?? prefetchSlot())
+      slotRef.current = null
+      prefetchSlot()
 
-      if (!response.ok) {
-        let error: string
-        try {
-          const errorData = await response.json()
-          error = errorData.error || `Upload failed with status ${response.status}`
-        } catch {
-          error = `Upload failed with status ${response.status}`
-        }
-        throw new Error(error)
-      }
+      const [presentationRow] = await Promise.all([
+        registerPresentation({ sessionId, file, storagePath: slot.path }),
+        uploadToStorage(slot, file, setProgress),
+      ])
 
-      const data = await response.json()
-      if (!data?.upload?.token || !data?.upload?.path) {
-        throw new Error("Không tạo được đường dẫn tải lên kho lưu trữ.")
-      }
-
-      await uploadToStorage({
-        signedUrl: data.upload.signedUrl,
-        path: data.upload.path,
-        token: data.upload.token,
-        file,
-        onProgress: setProgress,
-      })
-
-      setPresentation(data.presentation)
-      onUploadSuccess(data.presentation)
-      toast.success(`Tải lên thành công: ${data.presentation.slideCount} slide`)
+      setPresentation(presentationRow)
+      onUploadSuccess(presentationRow)
+      toast.success(`Tải lên thành công: ${presentationRow.slideCount} slide`)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Lỗi khi tải lên"
       toast.error(friendlyStorageError(errorMessage, file.size))
+      prefetchSlot()
     } finally {
       setIsLoading(false)
       setProgress(0)

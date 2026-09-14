@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     const fileSize = Number(payload.fileSize)
     const fileType = typeof payload.fileType === "string" ? payload.fileType : ""
     const sessionId = typeof payload.sessionId === "string" ? payload.sessionId : ""
+    const existingPath = typeof payload.storagePath === "string" ? payload.storagePath : ""
     const contentType = powerpointContentType(fileName, fileType)
 
     if (!fileName || !sessionId || !Number.isFinite(fileSize)) {
@@ -79,12 +80,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not authorized to upload presentation" }, { status: 403 })
     }
 
-    const admin = createServiceClient() ?? createAdminClient()
     const slideCount = getEstimatedSlideCount(fileSize)
     const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_")
-    const timestamp = Date.now()
-    const storagePath = `${user.id}/${sessionId}/${timestamp}_${safeFileName}`
-    const storageClient = admin ?? supabase
+    const storagePath =
+      existingPath && existingPath.startsWith(`${user.id}/${sessionId}/`)
+        ? existingPath
+        : `${user.id}/${sessionId}/${Date.now()}_${safeFileName}`
     const insertPayload = {
       session_id: sessionId,
       teacher_id: user.id,
@@ -94,25 +95,41 @@ export async function POST(request: NextRequest) {
       slide_count: slideCount,
     }
 
-    let [{ data: signedUpload, error: signedUploadError }, { data: presentation, error: presentationError }] =
-      await Promise.all([
+    let signedUpload: { path?: string; token?: string; signedUrl?: string } | null = null
+    let signedUploadError: { message?: string } | null = null
+    let presentation: any = null
+    let presentationError: { message?: string } | null = null
+
+    if (existingPath && existingPath.startsWith(`${user.id}/${sessionId}/`)) {
+      const inserted = await supabase.from("presentations").insert(insertPayload).select().single()
+      presentation = inserted.data
+      presentationError = inserted.error
+    } else {
+      const admin = createServiceClient() ?? createAdminClient()
+      const storageClient = admin ?? supabase
+      const [signedResult, inserted] = await Promise.all([
         storageClient.storage.from(PRESENTATIONS_BUCKET).createSignedUploadUrl(storagePath, { upsert: true }),
         supabase.from("presentations").insert(insertPayload).select().single(),
       ])
+      signedUpload = signedResult.data
+      signedUploadError = signedResult.error
+      presentation = inserted.data
+      presentationError = inserted.error
 
-    if ((!signedUpload?.token || signedUploadError) && admin && admin !== supabase) {
-      const fallback = await supabase.storage
-        .from(PRESENTATIONS_BUCKET)
-        .createSignedUploadUrl(storagePath, { upsert: true })
-      signedUpload = fallback.data
-      signedUploadError = fallback.error
-    }
+      if ((!signedUpload?.token || signedUploadError) && admin && admin !== supabase) {
+        const fallback = await supabase.storage
+          .from(PRESENTATIONS_BUCKET)
+          .createSignedUploadUrl(storagePath, { upsert: true })
+        signedUpload = fallback.data
+        signedUploadError = fallback.error
+      }
 
-    if (signedUploadError || !signedUpload?.token) {
-      return NextResponse.json(
-        { error: `Không tạo được đường dẫn upload: ${signedUploadError?.message ?? "unknown error"}` },
-        { status: 502 },
-      )
+      if (signedUploadError || !signedUpload?.token) {
+        return NextResponse.json(
+          { error: `Không tạo được đường dẫn upload: ${signedUploadError?.message ?? "unknown error"}` },
+          { status: 502 },
+        )
+      }
     }
 
     if (presentationError || !presentation) {
@@ -122,15 +139,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const uploadPath = signedUpload.path || storagePath
+    const uploadPath = signedUpload?.path || storagePath
     return NextResponse.json({
       success: true,
-      upload: {
-        path: uploadPath,
-        token: signedUpload.token,
-        signedUrl: signedUpload.signedUrl,
-        contentType,
-      },
+      upload: signedUpload?.token
+        ? {
+            path: uploadPath,
+            token: signedUpload.token,
+            signedUrl: signedUpload.signedUrl,
+            contentType,
+          }
+        : undefined,
       presentation: {
         ...presentation,
         id: presentation.id,
