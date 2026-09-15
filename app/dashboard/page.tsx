@@ -38,7 +38,7 @@ export default async function DashboardPage() {
   const list = (classes as ClassWithCounts[] | null) ?? []
 
   return (
-    <TeacherShell email={user.email}>
+    <TeacherShell email={user.email} userId={user.id}>
       <section className="mx-auto max-w-5xl px-4 py-8 flex flex-col gap-6">
         <header data-tour="dashboard-header" className="flex flex-col gap-1">
           <h1 className="font-heading text-2xl md:text-3xl font-bold">Lớp của tôi</h1>

@@ -203,6 +203,14 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+-- ============ TRẠNG THÁI TOUR HƯỚNG DẪN ============
+create table if not exists public.teacher_tour_seen (
+  teacher_id uuid not null references auth.users(id) on delete cascade,
+  tour_key text not null,
+  seen_at timestamptz not null default now(),
+  primary key (teacher_id, tour_key)
+);
+
 -- ============ BÀI TRÌNH CHIẾU ============
 create table if not exists public.presentations (
   id uuid primary key default gen_random_uuid(),
@@ -246,6 +254,7 @@ alter table public.annotations enable row level security;
 alter table public.student_scores enable row level security;
 alter table public.score_history enable row level security;
 alter table public.profiles enable row level security;
+alter table public.teacher_tour_seen enable row level security;
 alter table public.presentations enable row level security;
 alter table public.presentation_slides enable row level security;
 
@@ -288,6 +297,9 @@ create policy sh_public_all on public.score_history for all using (true) with ch
 
 drop policy if exists profiles_public_all on public.profiles;
 create policy profiles_public_all on public.profiles for all using (true) with check (true);
+
+drop policy if exists teacher_tour_seen_public_all on public.teacher_tour_seen;
+create policy teacher_tour_seen_public_all on public.teacher_tour_seen for all using (true) with check (true);
 
 drop policy if exists presentations_public_all on public.presentations;
 create policy presentations_public_all on public.presentations for all using (true) with check (true);

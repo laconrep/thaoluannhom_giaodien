@@ -5,16 +5,21 @@ import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { AvatarInitials } from "@/components/avatar-initials"
 import { TourReplayButton } from "@/components/tour/tour-replay-button"
+import { TourSeenProvider } from "@/components/tour/tour-state-provider"
 import { isAdminEmail } from "@/lib/admin"
+import { loadTourSeenState } from "@/lib/tour-state-server"
 
-export function TeacherShell({
+export async function TeacherShell({
   children,
   email,
+  userId,
 }: {
   children: React.ReactNode
   email?: string | null
+  userId?: string | null
 }) {
   const isAdmin = isAdminEmail(email)
+  const tourSeen = userId ? await loadTourSeenState(userId) : {}
   return (
     <div className="min-h-svh flex flex-col bg-background">
       <header className="border-b bg-card/95 backdrop-blur sticky top-0 z-30">
@@ -64,7 +69,9 @@ export function TeacherShell({
           </div>
         </div>
       </header>
-      <main className="flex-1">{children}</main>
+      <main className="flex-1">
+        <TourSeenProvider initialState={tourSeen}>{children}</TourSeenProvider>
+      </main>
     </div>
   )
 }

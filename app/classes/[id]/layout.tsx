@@ -29,7 +29,7 @@ export default async function ClassLayout({
   if (!cls || cls.teacher_id !== user.id) notFound()
 
   return (
-    <TeacherShell email={user.email}>
+    <TeacherShell email={user.email} userId={user.id}>
       <div className="border-b bg-card">
         <div className="mx-auto max-w-7xl px-4 pt-3 pb-0">
           <div className="flex items-end justify-between gap-3 flex-wrap">

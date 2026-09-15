@@ -1,7 +1,6 @@
 export const TOUR_ONBOARDING_SEEN_KEY = "teacher_tour_seen_v1"
 export const TOUR_DASHBOARD_SEEN_KEY = "teacher_tour_dashboard_seen_v1"
 export const TOUR_ROSTER_SEEN_KEY = "teacher_tour_roster_seen_v1"
-export const TOUR_ROSTER_SEEN_PREFIX = "roster_intro_seen_"
 export const PRESENTATION_START_SEEN_KEY = "teacher_tour_presentation_start_seen_v1"
 export const PRESENTATION_TOUR_SEEN_KEY = "teacher_tour_presentation_seen_v1"
 export const GRADEBOOK_TOUR_PENDING_KEY = "teacher_tour_gradebook_pending_v1"
@@ -13,26 +12,56 @@ export function classTourSeenKey(tourName: string, classId: string) {
   return `teacher_tour_${tourName}_${classId}`
 }
 
+// Trạng thái "đã xem tour" thuộc về tài khoản giáo viên và được lưu trên server
+// (bảng teacher_tour_seen). Client hydrate một lần từ server rồi đọc/ghi đồng bộ
+// qua bộ nhớ trong, nhờ vậy tour không lặp lại khi đăng nhập ở trình duyệt khác.
+let seenState: Record<string, boolean> = {}
+let hydrated = false
+let persister: ((key: string) => void) | null = null
+
+export function hydrateTourSeenState(initial: Record<string, boolean>) {
+  seenState = { ...initial }
+  hydrated = true
+  if (typeof window !== "undefined") clearLegacyTourKeys()
+}
+
+export function registerTourSeenPersister(fn: ((key: string) => void) | null) {
+  persister = fn
+}
+
 export function getSeen(key: string): boolean {
+  if (hydrated) return seenState[key] === true
+  // Trước khi hydrate (hoặc ngoài khu vực giáo viên) vẫn đọc localStorage để
+  // không phá vỡ hành vi cũ.
   if (typeof window === "undefined") return false
   return window.localStorage.getItem(key) === "1"
 }
 
 export function setSeen(key: string) {
-  if (typeof window === "undefined") return
-  window.localStorage.setItem(key, "1")
+  seenState[key] = true
+  if (hydrated) {
+    persister?.(key)
+    return
+  }
+  if (typeof window !== "undefined") window.localStorage.setItem(key, "1")
 }
 
-// Tour phân nhóm chỉ hiện lần đầu tiên (toàn cục).
-// Giữ tương thích: ai đã xem modal cũ theo từng lớp (roster_intro_seen_*) cũng được tính là đã xem.
-export function rosterTourSeen(): boolean {
-  if (getSeen(TOUR_ROSTER_SEEN_KEY)) return true
-  if (typeof window === "undefined") return false
-  for (let i = 0; i < window.localStorage.length; i++) {
-    const key = window.localStorage.key(i)
-    if (key && key.startsWith(TOUR_ROSTER_SEEN_PREFIX)) return true
+// Dọn cờ cũ trong localStorage: trạng thái giờ do server quản lý theo tài khoản,
+// giữ lại sẽ khiến tài khoản khác dùng chung trình duyệt bị "dính" trạng thái.
+function clearLegacyTourKeys() {
+  const store = window.localStorage
+  const keys: string[] = []
+  for (let i = 0; i < store.length; i++) {
+    const key = store.key(i)
+    if (!key) continue
+    if (key.startsWith("teacher_tour_") || key.startsWith("roster_intro_seen_")) keys.push(key)
   }
-  return false
+  for (const key of keys) store.removeItem(key)
+}
+
+// Tour phân nhóm chỉ hiện lần đầu tiên cho mỗi tài khoản.
+export function rosterTourSeen(): boolean {
+  return getSeen(TOUR_ROSTER_SEEN_KEY)
 }
 
 export function setRosterTourSeen() {
