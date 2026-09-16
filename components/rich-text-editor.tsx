@@ -1,19 +1,22 @@
 "use client"
 
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react"
-import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react"
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
+import { EditorContent, useEditor, useEditorState } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import Underline from "@tiptap/extension-underline"
 import Placeholder from "@tiptap/extension-placeholder"
+import Image from "@tiptap/extension-image"
 import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table"
 import {
   Bold,
   Heading1,
   Heading2,
   Heading3,
+  ImagePlus,
   Italic,
   List,
   ListOrdered,
+  Loader2,
   Redo2,
   Strikethrough,
   Table as TableIcon,
@@ -21,6 +24,7 @@ import {
   Underline as UnderlineIcon,
   Undo2,
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -30,6 +34,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import {
+  MAX_SUBMISSION_IMAGE_BYTES,
+  SUBMISSION_IMAGE_ACCEPT,
+  SUBMISSION_IMAGE_MIME_TYPES,
+  submissionMediaPath,
+  submissionMediaSignedUploadUrl,
+} from "@/lib/submission-media"
 
 export type RichTextEditorProps = {
   value: string
@@ -40,6 +51,8 @@ export type RichTextEditorProps = {
   placeholder?: string
   minHeight?: string | number
   className?: string
+  /** Bối cảnh đặt ảnh trong bucket submission-media. Thiếu thì ẩn nút chèn ảnh. */
+  uploadContext?: { sessionId: string; targetId: string }
 }
 
 type ToolbarButtonProps = {
@@ -78,9 +91,12 @@ export function RichTextEditor({
   placeholder,
   minHeight = 320,
   className,
+  uploadContext,
 }: RichTextEditorProps) {
   const onChangeRef = useRef(onChange)
   const allowPasteRef = useRef(allowPaste)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
 
   useEffect(() => {
     onChangeRef.current = onChange
@@ -97,6 +113,7 @@ export function RichTextEditor({
       StarterKit.configure({ underline: false }),
       Underline,
       Placeholder.configure({ placeholder: placeholder ?? "" }),
+      Image.configure({ allowBase64: false }),
       Table.configure({ resizable: false }),
       TableRow,
       TableHeader,
@@ -151,7 +168,56 @@ export function RichTextEditor({
     },
   })
 
+  async function handleImageFile(file: File | undefined) {
+    if (!file) return
+    if (!SUBMISSION_IMAGE_MIME_TYPES.includes(file.type)) {
+      toast.error("Chỉ hỗ trợ ảnh PNG, JPG, WEBP hoặc GIF.")
+      return
+    }
+    if (file.size > MAX_SUBMISSION_IMAGE_BYTES) {
+      toast.error(`Ảnh tối đa ${Math.round(MAX_SUBMISSION_IMAGE_BYTES / 1024 / 1024)} MB.`)
+      return
+    }
+    if (!uploadContext) {
+      toast.error("Chưa xác định được vị trí lưu ảnh.")
+      return
+    }
+
+    setUploadingImage(true)
+    try {
+      const path = submissionMediaPath({
+        sessionId: uploadContext.sessionId,
+        targetId: uploadContext.targetId,
+        fileName: file.name,
+      })
+      const res = await fetch("/api/submissions/inline-image-upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body?.upload?.token || !body?.publicUrl) {
+        throw new Error(body?.error ?? "Không tạo được đường dẫn tải ảnh.")
+      }
+
+      const uploadRes = await fetch(submissionMediaSignedUploadUrl(body.upload.path, body.upload.token), {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      })
+      if (!uploadRes.ok) throw new Error("Tải ảnh lên kho lưu trữ thất bại.")
+
+      editor?.chain().focus().setImage({ src: body.publicUrl, alt: file.name }).run()
+    } catch (error: any) {
+      toast.error(error?.message || "Có lỗi khi chèn ảnh.")
+    } finally {
+      setUploadingImage(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
   const isDisabled = disabled || !editor
+  const imageDisabled = isDisabled || uploadingImage || !uploadContext
   const minHeightValue = typeof minHeight === "number" ? `${minHeight}px` : minHeight
 
   return (
@@ -331,6 +397,14 @@ export function RichTextEditor({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        <ToolbarButton
+          label={uploadingImage ? "Đang tải ảnh" : "Chèn ảnh"}
+          disabled={imageDisabled}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {uploadingImage ? <Loader2 className="animate-spin" /> : <ImagePlus />}
+        </ToolbarButton>
+
         <span className="rich-text-editor__separator" aria-hidden="true" />
 
         <ToolbarButton
@@ -352,6 +426,14 @@ export function RichTextEditor({
       <div className="rich-text-editor__body">
         <EditorContent editor={editor} />
       </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={SUBMISSION_IMAGE_ACCEPT}
+        className="hidden"
+        onChange={(event) => handleImageFile(event.target.files?.[0])}
+      />
     </div>
   )
 }

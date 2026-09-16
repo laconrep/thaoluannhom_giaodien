@@ -292,13 +292,19 @@ npm run build
     vào ô nộp bài.
 
 #### Phiên 2.3 — Editor: ảnh
-- [ ] Thêm extension Image
-- [ ] Nút chèn ảnh: file picker → kiểm tra `SUBMISSION_IMAGE_*` (≤ 5 MB) → signed URL
+- [x] Thêm extension Image
+- [x] Nút chèn ảnh: file picker → kiểm tra `SUBMISSION_IMAGE_*` (≤ 5 MB) → signed URL
       → PUT → `setImage({ src: publicUrl })`
-- [ ] Trạng thái đang tải + toast lỗi
-- [ ] Chạy tsc/eslint/build + test tay
+- [x] Trạng thái đang tải + toast lỗi
+- [x] Chạy tsc/eslint/build
 - [ ] Commit + push
-- Ghi chú: —
+- Ghi chú:
+  - Editor nhận thêm prop `uploadContext?: { sessionId, targetId }` để dựng đường dẫn ảnh
+    bằng `submissionMediaPath`. **Phiên 3 phải truyền `{ sessionId: session.id, targetId: selectedId }`**;
+    nếu thiếu, nút chèn ảnh tự disable.
+  - Ảnh dùng `Image.configure({ allowBase64: false })` → dán ảnh base64 sẽ bị chặn, buộc
+    đi qua bucket public (đúng quyết định ở mục 2).
+  - Chưa test tay upload thật (cần Supabase + bucket `submission-media`); cần thử ở phiên 3.
 
 #### Phiên 2.4 — Editor: allowPaste + placeholder + hoàn thiện
 - [ ] Chặn `paste` nội dung khi `allowPaste=false`, vẫn cho chèn ảnh; chặn `drop`
