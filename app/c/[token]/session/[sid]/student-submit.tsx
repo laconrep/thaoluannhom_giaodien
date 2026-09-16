@@ -23,11 +23,12 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { RichTextEditor } from "@/components/rich-text-editor"
 import { createClient } from "@/lib/supabase/client"
 import { useCountdown } from "@/lib/use-countdown"
 import { formatDuration } from "@/lib/utils-format"
+import { isRichTextEmpty } from "@/lib/rich-text"
 import { fireConfetti } from "@/lib/confetti"
 import {
   studentClaimGroupAction,
@@ -356,7 +357,7 @@ export function StudentSubmit({
         res = await submitGroupReportAction({
           sessionId: session.id,
           sessionGroupId: selectedId,
-          textContent: text.trim() || null,
+          textContent: isRichTextEmpty(text) ? null : text,
           files,
           isAuto: auto,
         })
@@ -364,7 +365,7 @@ export function StudentSubmit({
         res = await submitIndividualReportAction({
           sessionId: session.id,
           sessionSlotId: selectedId,
-          textContent: text.trim() || null,
+          textContent: isRichTextEmpty(text) ? null : text,
           files,
           isAuto: auto,
         })
@@ -386,7 +387,7 @@ export function StudentSubmit({
 
   useEffect(() => {
     if (!identityLoaded || !ended || autoSubmitted.current || submitted || !selectedId) return
-    if (!text.trim() && !staged.length) return
+    if (isRichTextEmpty(text) && !staged.length) return
     autoSubmitted.current = true
     handleSubmit(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -600,26 +601,23 @@ export function StudentSubmit({
 
               <TabsContent value="text" className="space-y-2 mt-4">
                 <Label className="text-base">Nội dung bài báo cáo</Label>
-                <Textarea
+                <RichTextEditor
                   value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  onPaste={(e) => {
-                    if (!allowPaste) {
-                      e.preventDefault()
-                      toast.warning("Không thể dán nội dung. Hãy tự gõ nhé.")
-                    }
-                  }}
-                  onDrop={(e) => {
-                    if (!allowPaste) e.preventDefault()
-                  }}
+                  onChange={setText}
                   disabled={!running || busy}
-                  rows={12}
-                  placeholder="Gõ nội dung báo cáo của nhóm..."
+                  allowPaste={allowPaste}
+                  placeholder={
+                    kind === "group"
+                      ? "Gõ nội dung báo cáo của nhóm..."
+                      : "Gõ nội dung bài làm của em..."
+                  }
+                  minHeight="70vh"
                   className="font-sans text-lg leading-relaxed"
-                  style={{ fontSize: "18px" }}
+                  uploadContext={{ sessionId: session.id, targetId: selectedId }}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Chữ được hiển thị cỡ lớn để cả lớp xem rõ khi giáo viên chiếu lên.
+                  Có thể kẻ bảng và chèn ảnh. Chữ được hiển thị cỡ lớn để cả lớp xem rõ khi giáo
+                  viên chiếu lên.
                 </p>
               </TabsContent>
 
@@ -737,7 +735,7 @@ export function StudentSubmit({
 
             <Button
               className="w-full h-14 text-base font-semibold"
-              disabled={busy || !running || (!text.trim() && staged.length === 0)}
+              disabled={busy || !running || (isRichTextEmpty(text) && staged.length === 0)}
               onClick={() => handleSubmit(false)}
             >
               <Send className="w-5 h-5 mr-2" />

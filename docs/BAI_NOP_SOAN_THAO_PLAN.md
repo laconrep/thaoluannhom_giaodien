@@ -237,7 +237,7 @@ npm run build
 | 2.2 | Editor: chèn/sửa bảng | XONG | `24fdce7` |
 | 2.3 | Editor: chèn ảnh trong bài | XONG | `f7590eb` |
 | 2.4 | Editor: allowPaste + placeholder + hoàn thiện | XONG | `a9cf222` |
-| 3 | Gắn vào ô nộp bài học sinh | CHƯA LÀM | — |
+| 3 | Gắn vào ô nộp bài học sinh | XONG | (cập nhật sau) |
 | 4 | Render ở màn giáo viên + kết quả | CHƯA LÀM | — |
 
 ### Chi tiết từng phiên
@@ -322,12 +322,24 @@ npm run build
   - Trước khi merge cần chạy `pnpm install` để đồng bộ `pnpm-lock.yaml` (máy này chỉ dùng npm).
 
 #### Phiên 3 — Ô nộp bài HS
-- [ ] Thay Textarea bằng RichTextEditor
-- [ ] Đổi điều kiện rỗng sang `isRichTextEmpty`
-- [ ] Sanitize trong 2 server action ở `app/actions.ts`
-- [ ] Chạy tsc/eslint/build + test tay
-- [ ] Commit + push
-- Ghi chú: —
+- [x] Thay Textarea bằng RichTextEditor (`components/rich-text-editor.tsx`), truyền
+      `allowPaste`, `disabled`, `placeholder`, `minHeight="70vh"`, `text-lg` (18px) và
+      `uploadContext={{ sessionId, targetId: selectedId }}`
+- [x] Đổi điều kiện rỗng sang `isRichTextEmpty` (nộp tay, auto-submit, nút Nộp bài)
+- [x] Sanitize trong 2 server action ở `app/actions.ts` (`sanitizeSubmissionHtml`)
+- [x] Chạy tsc/eslint/build (đều pass; eslint còn 1 warning `<img>` cũ ở preview tệp)
+- [ ] Test tay trên trình duyệt (môi trường không có Supabase → gộp sang phiên 4)
+- [x] Commit + push
+- Ghi chú:
+  - Bỏ import `Textarea` (không còn dùng); thêm import `RichTextEditor` + `isRichTextEmpty`.
+  - `uploadContext` nằm trong nhánh `{selectedId && ...}` nên luôn có `targetId`; thiếu thì
+    nút chèn ảnh tự disable (đã thiết kế ở 2.3).
+  - **Chưa khôi phục lại nội dung đã nộp khi mở lại trang** — hành vi này giống hệt
+    `<Textarea>` cũ (state `text` luôn khởi tạo rỗng), nằm ngoài phạm vi phiên 3.
+  - `sanitizeSubmissionHtml` chạy trong server action (Node) nên DOMPurify chạy được; build
+    production đã xác nhận không lỗi runtime import.
+  - Chưa test tay thao tác bảng/ảnh thật vì không có Supabase + bucket `submission-media`;
+    đã build + typecheck + lint, cần thử ở phiên 4 cùng lúc kiểm tra render.
 
 #### Phiên 4 — Render toàn bộ
 - [ ] `group-card.tsx`, `individual-board.tsx`, `group-board.tsx`, `results-viewer.tsx`, `annotation-editor.tsx`
@@ -337,8 +349,8 @@ npm run build
 
 ## 10. Quy ước git
 
-- Nhánh dùng chung cho phiên 2–4: `260916-feat-submission-rich-text-editor` (tạo từ
-  `origin/main` sau khi PR #12 gộp phiên 1). Nhánh cũ `260915-...` đã gộp, **không dùng lại**.
-- Mỗi phiên con của phiên 2 commit riêng 1 lần với message ở trên, push lên cùng nhánh
-  (PR tự gộp).
+- Phiên 2 dùng nhánh `260916-feat-submission-rich-text-editor` (PR #13 đã gộp vào `main`).
+- Phiên 3 dùng nhánh mới `260916-feat-student-submit-rich-text` (tạo từ `main` sau PR #13).
+- Phiên 4 tạo nhánh mới từ `main` sau khi PR phiên 3 gộp (đặt tên `260916-feat-render-rich-text`).
+- Mỗi phiên commit riêng 1 lần với message ở trên, push lên nhánh của phiên đó (tạo PR riêng).
 - Không commit file rác `lib/ensure-presentations-bucket.ts` (leftover, không liên quan).
