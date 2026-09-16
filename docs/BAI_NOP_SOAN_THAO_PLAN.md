@@ -278,12 +278,18 @@ npm run build
   - Placeholder đã gắn ở phiên này (prop `placeholder`); phiên 2.4 chỉ kiểm tra lại.
 
 #### Phiên 2.2 — Editor: bảng
-- [ ] Thêm extension Table + row/cell/header
-- [ ] Toolbar chèn bảng 3x3, thêm/xoá hàng, thêm/xoá cột, xoá bảng
-- [ ] Style bảng trong editor (viền ô đang chọn)
-- [ ] Chạy tsc/eslint/build + test tay
+- [x] Thêm extension Table + row/cell/header
+- [x] Toolbar chèn bảng 3x3, thêm/xoá hàng, thêm/xoá cột, gộp/tách ô, bật/tắt header, xoá bảng
+- [x] Style bảng trong editor (viền ô đang chọn, `.tableWrapper` cuộn ngang)
+- [x] Chạy tsc/eslint/build
 - [ ] Commit + push
-- Ghi chú: —
+- Ghi chú:
+  - Dùng DropdownMenu "Bảng" (nhãn chữ) thay vì nhiều nút icon rời cho dễ hiểu; các mục
+    sửa bảng tự disable khi con trỏ không nằm trong bảng (`state.inTable`, `canMergeCells`,
+    `canSplitCell`).
+  - `Table.configure({ resizable: false })` — không cần kéo cột, tránh phức tạp.
+  - Chưa test tay trên trình duyệt (môi trường chỉ chạy build); cần thử ở phiên 3 khi gắn
+    vào ô nộp bài.
 
 #### Phiên 2.3 — Editor: ảnh
 - [ ] Thêm extension Image

@@ -5,6 +5,7 @@ import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/r
 import StarterKit from "@tiptap/starter-kit"
 import Underline from "@tiptap/extension-underline"
 import Placeholder from "@tiptap/extension-placeholder"
+import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table"
 import {
   Bold,
   Heading1,
@@ -15,10 +16,19 @@ import {
   ListOrdered,
   Redo2,
   Strikethrough,
+  Table as TableIcon,
+  Trash2,
   Underline as UnderlineIcon,
   Undo2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 
 export type RichTextEditorProps = {
@@ -87,6 +97,10 @@ export function RichTextEditor({
       StarterKit.configure({ underline: false }),
       Underline,
       Placeholder.configure({ placeholder: placeholder ?? "" }),
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
     ],
     content: value || "",
     editorProps: {
@@ -128,6 +142,9 @@ export function RichTextEditor({
         h3: current.isActive("heading", { level: 3 }),
         bulletList: current.isActive("bulletList"),
         orderedList: current.isActive("orderedList"),
+        inTable: current.isActive("table"),
+        canMergeCells: current.can().mergeCells(),
+        canSplitCell: current.can().splitCell(),
         canUndo: current.can().undo(),
         canRedo: current.can().redo(),
       }
@@ -222,6 +239,97 @@ export function RichTextEditor({
         >
           <ListOrdered />
         </ToolbarButton>
+
+        <span className="rich-text-editor__separator" aria-hidden="true" />
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant={state?.inTable ? "secondary" : "ghost"}
+              aria-label="Bảng"
+              title="Bảng"
+              disabled={isDisabled}
+            >
+              <TableIcon />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuItem
+              onSelect={() =>
+                editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+              }
+            >
+              <TableIcon /> Chèn bảng 3 × 3
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={!state?.inTable}
+              onSelect={() => editor?.chain().focus().addRowBefore().run()}
+            >
+              Thêm hàng bên trên
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!state?.inTable}
+              onSelect={() => editor?.chain().focus().addRowAfter().run()}
+            >
+              Thêm hàng bên dưới
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!state?.inTable}
+              onSelect={() => editor?.chain().focus().deleteRow().run()}
+            >
+              Xoá hàng
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={!state?.inTable}
+              onSelect={() => editor?.chain().focus().addColumnBefore().run()}
+            >
+              Thêm cột bên trái
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!state?.inTable}
+              onSelect={() => editor?.chain().focus().addColumnAfter().run()}
+            >
+              Thêm cột bên phải
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!state?.inTable}
+              onSelect={() => editor?.chain().focus().deleteColumn().run()}
+            >
+              Xoá cột
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={!state?.inTable}
+              onSelect={() => editor?.chain().focus().toggleHeaderRow().run()}
+            >
+              Bật/tắt hàng tiêu đề
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!state?.canMergeCells}
+              onSelect={() => editor?.chain().focus().mergeCells().run()}
+            >
+              Gộp ô đang chọn
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!state?.canSplitCell}
+              onSelect={() => editor?.chain().focus().splitCell().run()}
+            >
+              Tách ô
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={!state?.inTable}
+              onSelect={() => editor?.chain().focus().deleteTable().run()}
+            >
+              <Trash2 /> Xoá bảng
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <span className="rich-text-editor__separator" aria-hidden="true" />
 

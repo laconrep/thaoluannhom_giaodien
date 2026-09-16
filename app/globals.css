@@ -353,4 +353,21 @@
   color: var(--muted-foreground);
   pointer-events: none;
 }
+.rich-text-editor .ProseMirror .tableWrapper {
+  overflow-x: auto;
+}
+.rich-text-editor .ProseMirror th,
+.rich-text-editor .ProseMirror td {
+  position: relative;
+}
+.rich-text-editor .ProseMirror .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--primary) 15%, transparent);
+  pointer-events: none;
+}
+.rich-text-editor .ProseMirror .ProseMirror-selectednode {
+  outline: 2px solid var(--ring);
+}
 
