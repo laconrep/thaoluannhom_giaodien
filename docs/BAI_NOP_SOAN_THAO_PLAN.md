@@ -307,13 +307,19 @@ npm run build
   - Chưa test tay upload thật (cần Supabase + bucket `submission-media`); cần thử ở phiên 3.
 
 #### Phiên 2.4 — Editor: allowPaste + placeholder + hoàn thiện
-- [ ] Chặn `paste` nội dung khi `allowPaste=false`, vẫn cho chèn ảnh; chặn `drop`
-- [ ] Placeholder khi trống; đồng bộ `disabled`
-- [ ] Dọn listener/unmount; `immediatelyRender: false` nếu cần
-- [ ] a11y `aria-label`/`title` cho nút toolbar
-- [ ] Chạy tsc/eslint/build + test tay
+- [x] Chặn `paste` nội dung khi `allowPaste=false`, vẫn cho chèn ảnh; chặn `drop`
+- [x] Placeholder khi trống (đã gắn từ 2.1); đồng bộ `disabled`
+- [x] Dọn listener/unmount (`mountedRef`); `immediatelyRender: false`
+- [x] a11y `aria-label`/`title` cho nút toolbar + `role="toolbar"`
+- [x] Chạy tsc/eslint/build
 - [ ] Commit + push
-- Ghi chú: —
+- Ghi chú:
+  - `handlePaste`/`handleDrop` đọc `allowPasteRef` (ref) để không phải khởi tạo lại editor khi
+    prop đổi. Khi `allowPaste=false`, chặn dán/drop nội dung từ ngoài; `moved=true` (kéo thả
+    trong editor) vẫn cho phép.
+  - **Phiên 2 đã xong.** Việc test tay (gõ/bảng/ảnh/allowPaste) chưa làm được vì môi trường
+    không có Supabase → gộp kiểm thử thủ công vào phiên 3 khi gắn vào ô nộp bài.
+  - Trước khi merge cần chạy `pnpm install` để đồng bộ `pnpm-lock.yaml` (máy này chỉ dùng npm).
 
 #### Phiên 3 — Ô nộp bài HS
 - [ ] Thay Textarea bằng RichTextEditor

@@ -96,7 +96,15 @@ export function RichTextEditor({
   const onChangeRef = useRef(onChange)
   const allowPasteRef = useRef(allowPaste)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const mountedRef = useRef(true)
   const [uploadingImage, setUploadingImage] = useState(false)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     onChangeRef.current = onChange
@@ -123,6 +131,18 @@ export function RichTextEditor({
     editorProps: {
       attributes: {
         class: "submission-rich-text rich-text-editor__content",
+      },
+      // allowPaste=false: chỉ chặn dán/drop nội dung từ ngoài; nút chèn ảnh vẫn dùng được.
+      handlePaste: (_view, event) => {
+        if (allowPasteRef.current) return false
+        event.preventDefault()
+        toast.warning("Không thể dán nội dung. Hãy tự gõ hoặc dùng nút chèn ảnh nhé.")
+        return true
+      },
+      handleDrop: (_view, event, _slice, moved) => {
+        if (allowPasteRef.current || moved) return false
+        event.preventDefault()
+        return true
       },
     },
     onUpdate: ({ editor: current }) => {
@@ -211,7 +231,7 @@ export function RichTextEditor({
     } catch (error: any) {
       toast.error(error?.message || "Có lỗi khi chèn ảnh.")
     } finally {
-      setUploadingImage(false)
+      if (mountedRef.current) setUploadingImage(false)
       if (fileInputRef.current) fileInputRef.current.value = ""
     }
   }
