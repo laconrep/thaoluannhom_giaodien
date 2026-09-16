@@ -238,7 +238,7 @@ npm run build
 | 2.3 | Editor: chèn ảnh trong bài | XONG | `f7590eb` |
 | 2.4 | Editor: allowPaste + placeholder + hoàn thiện | XONG | `a9cf222` |
 | 3 | Gắn vào ô nộp bài học sinh | XONG | `7a8a991` |
-| 4 | Render ở màn giáo viên + kết quả | CHƯA LÀM | — |
+| 4 | Render ở màn giáo viên + kết quả | XONG | `40e847e` |
 
 ### Chi tiết từng phiên
 
@@ -342,10 +342,29 @@ npm run build
     đã build + typecheck + lint, cần thử ở phiên 4 cùng lúc kiểm tra render.
 
 #### Phiên 4 — Render toàn bộ
-- [ ] `group-card.tsx`, `individual-board.tsx`, `group-board.tsx`, `results-viewer.tsx`, `annotation-editor.tsx`
-- [ ] Chạy tsc/eslint/build + test tay có bảng/ảnh
-- [ ] Commit + push
-- Ghi chú: —
+- [x] `group-card.tsx` (`hasContent` + thẻ nhóm render `SubmissionText plain maxChars`)
+- [x] `individual-board.tsx` (thumbnail render `SubmissionText plain maxChars={80}`)
+- [x] `group-board.tsx` (Slideshow — màn chiếu GV render `SubmissionText` đầy đủ)
+- [x] `results-viewer.tsx` (trang kết quả HS render `SubmissionText` đầy đủ)
+- [x] `annotation-editor.tsx`: đổi `hasText` sang `isRichTextEmpty`; nhánh text render
+      `SubmissionText` (giữ nguyên khung `p-10`/`20mm` + cỡ chữ của màn chấm)
+- [x] Chạy tsc/eslint/build (0 error; chỉ còn warning `<img>`/eslint-disable cũ)
+- [ ] Test tay trên trình duyệt (môi trường không có Supabase + bucket `submission-media`)
+- [x] Commit + push
+- Ghi chú:
+  - Các điểm nhỏ (thẻ nhóm, thumbnail cá nhân) dùng `plain` + `maxChars` để giữ layout như cũ,
+    không nhúng bảng/ảnh vào ô nhỏ.
+  - Màn chiếu `Slideshow` và màn chấm `AnnotationEditor` vẫn giữ inline style cỡ chữ/khung;
+    `SubmissionText` lồng bên trong nên `.submission-rich-text` kế thừa cỡ chữ.
+  - `annotation-editor.tsx` không chỉ render text mà còn ghi chú/đánh dấu lên trên: chỉ thay
+    nội dung bên trong khung, giữ nguyên khung + handler con trỏ nên không ảnh hưởng vị trí
+    annotation (annotation theo toạ độ chuột, không neo theo chữ).
+  - `presentation-viewer.tsx:687` và `group-board.tsx:890` chỉ truyền `text_content` xuống
+    `AnnotationEditor` → đã render HTML đúng, không cần sửa thêm.
+  - **Hết 4 phiên.** Việc còn lại khi có môi trường Supabase: chạy
+    `scripts/100_submission_media_bucket.sql`, rồi thử tay soạn bảng/ảnh ở ô nộp bài và kiểm
+    tra hiển thị ở màn chiếu GV, thẻ nhóm, view cá nhân, trang kết quả HS, màn chấm bài.
+  - Trước khi merge cần chạy `pnpm install` để đồng bộ `pnpm-lock.yaml` (máy này chỉ dùng npm).
 
 ## 10. Quy ước git
 
