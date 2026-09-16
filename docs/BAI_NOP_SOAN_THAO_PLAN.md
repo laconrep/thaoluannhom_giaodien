@@ -237,7 +237,7 @@ npm run build
 | 2.2 | Editor: chèn/sửa bảng | XONG | `24fdce7` |
 | 2.3 | Editor: chèn ảnh trong bài | XONG | `f7590eb` |
 | 2.4 | Editor: allowPaste + placeholder + hoàn thiện | XONG | `a9cf222` |
-| 3 | Gắn vào ô nộp bài học sinh | XONG | (cập nhật sau) |
+| 3 | Gắn vào ô nộp bài học sinh | XONG | `7a8a991` |
 | 4 | Render ở màn giáo viên + kết quả | CHƯA LÀM | — |
 
 ### Chi tiết từng phiên
