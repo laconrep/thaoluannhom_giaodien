@@ -233,10 +233,10 @@ npm run build
 | Phiên | Nội dung | Trạng thái | Commit |
 |-------|----------|-----------|--------|
 | 1 | Nền tảng: deps, sanitize, renderer, bucket ảnh | XONG | `a3feef4` |
-| 2.1 | Editor: khung + toolbar định dạng cơ bản | CHƯA LÀM | — |
-| 2.2 | Editor: chèn/sửa bảng | CHƯA LÀM | — |
-| 2.3 | Editor: chèn ảnh trong bài | CHƯA LÀM | — |
-| 2.4 | Editor: allowPaste + placeholder + hoàn thiện | CHƯA LÀM | — |
+| 2.1 | Editor: khung + toolbar định dạng cơ bản | XONG | `6e616d5` |
+| 2.2 | Editor: chèn/sửa bảng | XONG | `24fdce7` |
+| 2.3 | Editor: chèn ảnh trong bài | XONG | `f7590eb` |
+| 2.4 | Editor: allowPaste + placeholder + hoàn thiện | XONG | `a9cf222` |
 | 3 | Gắn vào ô nộp bài học sinh | CHƯA LÀM | — |
 | 4 | Render ở màn giáo viên + kết quả | CHƯA LÀM | — |
 
@@ -268,7 +268,7 @@ npm run build
 - [x] Đồng bộ `value` ⇄ editor không gây vòng lặp; `onUpdate` phát HTML
 - [x] Style `.rich-text-editor` + `.ProseMirror` trong `app/globals.css`
 - [x] Chạy tsc/eslint/build
-- [ ] Commit + push
+- [x] Commit + push
 - Ghi chú:
   - Dùng `useEditorState` để toolbar cập nhật trạng thái active/canUndo/canRedo (Tiptap v3
     không tự re-render theo transaction).
@@ -282,7 +282,7 @@ npm run build
 - [x] Toolbar chèn bảng 3x3, thêm/xoá hàng, thêm/xoá cột, gộp/tách ô, bật/tắt header, xoá bảng
 - [x] Style bảng trong editor (viền ô đang chọn, `.tableWrapper` cuộn ngang)
 - [x] Chạy tsc/eslint/build
-- [ ] Commit + push
+- [x] Commit + push
 - Ghi chú:
   - Dùng DropdownMenu "Bảng" (nhãn chữ) thay vì nhiều nút icon rời cho dễ hiểu; các mục
     sửa bảng tự disable khi con trỏ không nằm trong bảng (`state.inTable`, `canMergeCells`,
@@ -297,7 +297,7 @@ npm run build
       → PUT → `setImage({ src: publicUrl })`
 - [x] Trạng thái đang tải + toast lỗi
 - [x] Chạy tsc/eslint/build
-- [ ] Commit + push
+- [x] Commit + push
 - Ghi chú:
   - Editor nhận thêm prop `uploadContext?: { sessionId, targetId }` để dựng đường dẫn ảnh
     bằng `submissionMediaPath`. **Phiên 3 phải truyền `{ sessionId: session.id, targetId: selectedId }`**;
@@ -312,7 +312,7 @@ npm run build
 - [x] Dọn listener/unmount (`mountedRef`); `immediatelyRender: false`
 - [x] a11y `aria-label`/`title` cho nút toolbar + `role="toolbar"`
 - [x] Chạy tsc/eslint/build
-- [ ] Commit + push
+- [x] Commit + push
 - Ghi chú:
   - `handlePaste`/`handleDrop` đọc `allowPasteRef` (ref) để không phải khởi tạo lại editor khi
     prop đổi. Khi `allowPaste=false`, chặn dán/drop nội dung từ ngoài; `moved=true` (kéo thả
