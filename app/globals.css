@@ -309,3 +309,48 @@
   font-weight: 600;
 }
 
+/* Trình soạn thảo bài nộp (Tiptap) — dùng lại style nội dung của .submission-rich-text */
+.rich-text-editor {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--background);
+  overflow: hidden;
+}
+.rich-text-editor:focus-within {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 30%, transparent);
+}
+.rich-text-editor[data-disabled="true"] {
+  opacity: 0.65;
+}
+.rich-text-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.375rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--muted);
+}
+.rich-text-editor__separator {
+  width: 1px;
+  align-self: stretch;
+  margin: 0.125rem 0.25rem;
+  background: var(--border);
+}
+.rich-text-editor__body {
+  background: var(--background);
+}
+.rich-text-editor .ProseMirror {
+  min-height: var(--rte-min-height, 20rem);
+  padding: 0.75rem 1rem;
+  outline: none;
+}
+.rich-text-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
