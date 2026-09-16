@@ -99,22 +99,64 @@ Phạm vi:
 Kiểm chứng: `npx tsc --noEmit`, `npx eslint <file đổi>`, `npm run build`.
 Commit: `feat(submission): add rich text foundation and public media bucket`.
 
-### Phiên 2 — Component editor (Tiptap)
+### Phiên 2 — Component editor (Tiptap) — tách thành 2.1–2.4
+
+> Tách nhỏ để mỗi phiên chỉ chạm một nhóm tính năng, dễ kiểm chứng và dễ rollback.
+> Toàn bộ code vẫn nằm trong `components/rich-text-editor.tsx` + style `.rich-text-editor`
+> trong `app/globals.css`. Sau mỗi phiên con: cập nhật Nhật ký tiến độ → commit → push.
+
+#### Phiên 2.1 — Khung editor + toolbar định dạng cơ bản
 
 Phạm vi:
 1. Tạo `components/rich-text-editor.tsx` (client):
-   - Props: `value: string`, `onChange(html)`, `disabled?`, `allowPaste: boolean`, `placeholder?`.
-   - Toolbar: đậm, nghiêng, gạch chân, gạch ngang, H1/H2/H3, danh sách chấm/gạch đầu dòng,
-     **chèn bảng** + thêm/xoá hàng/cột, **chèn ảnh**, hoàn tác/làm lại.
-   - Chèn ảnh: mở file picker → upload qua `/api/submissions/inline-image-upload-url`
-     → `editor.chain().focus().setImage({ src: publicUrl })`.
-   - `allowPaste=false`: chặn `paste` chứa nội dung (giữ luật hiện tại); **nút chèn ảnh
-     vẫn hoạt động**.
+   - Props: `value: string`, `onChange(html: string)`, `disabled?`, `allowPaste: boolean`,
+     `placeholder?`, `minHeight?`, `className?`.
+   - Khởi tạo Tiptap `useEditor` với `StarterKit` (đậm/nghiêng/gạch ngang/heading/danh sách/
+     undo-redo) + `@tiptap/extension-underline`.
+   - Toolbar: đậm, nghiêng, gạch chân, gạch ngang, H1/H2/H3, danh sách chấm, danh sách số,
+     hoàn tác, làm lại. Nút hiển thị trạng thái active, tôn trọng `disabled`.
    - `onUpdate` đẩy HTML ra ngoài; tránh vòng lặp set lại `value` khi không đổi.
-2. Đảm bảo không rò rỉ listener khi unmount.
+2. Style `.rich-text-editor` trong `app/globals.css`: khung viền, thanh công cụ wrap,
+   vùng `.ProseMirror` dùng chung `.submission-rich-text`, focus ring.
 
-Kiểm chứng: `tsc`, `eslint`, `npm run build`.
-Commit: `feat(submission): add tiptap rich text editor component`.
+Kiểm chứng: `npx tsc --noEmit`, `npx eslint components/rich-text-editor.tsx`, `npm run build`.
+Commit: `feat(submission): add rich text editor shell and basic toolbar`.
+
+#### Phiên 2.2 — Chèn và sửa bảng
+
+Phạm vi (vẫn trong `components/rich-text-editor.tsx`):
+1. Thêm `@tiptap/extension-table` (+ row/cell/header).
+2. Toolbar bảng: chèn bảng 3x3, thêm/xoá hàng, thêm/xoá cột, gộp/bỏ gộp ô (nếu tiện), xoá bảng.
+3. Style bảng trong editor dùng chung `.submission-rich-text table` đã có; thêm viền ô đang
+   chọn khi soạn.
+
+Kiểm chứng: `tsc`, `eslint`, `npm run build`; thử tay chèn bảng, thêm/xoá hàng cột.
+Commit: `feat(submission): add table tools to rich text editor`.
+
+#### Phiên 2.3 — Chèn ảnh trong bài
+
+Phạm vi:
+1. Thêm `@tiptap/extension-image`.
+2. Nút chèn ảnh: mở file picker → kiểm tra MIME + kích thước dùng hằng số
+   `SUBMISSION_IMAGE_*` trong `lib/submission-media.ts` (tối đa 5 MB) → xin signed URL tại
+   `/api/submissions/inline-image-upload-url` → PUT file → `setImage({ src: publicUrl })`.
+3. Trạng thái đang tải + thông báo lỗi (toast) khi upload thất bại.
+
+Kiểm chứng: `tsc`, `eslint`, `npm run build`; thử tay upload ảnh < 5 MB và tệp sai định dạng.
+Commit: `feat(submission): add inline image upload to rich text editor`.
+
+#### Phiên 2.4 — allowPaste, placeholder và hoàn thiện
+
+Phạm vi:
+1. `allowPaste=false`: chặn sự kiện `paste` chứa nội dung (giữ luật hiện tại); **nút chèn ảnh
+   vẫn hoạt động**. Chặn `drop` tệp khi `!allowPaste`.
+2. Placeholder khi bài trống; đồng bộ khi `disabled` đổi trạng thái.
+3. Dọn dẹp: không rò rỉ listener khi unmount, không set state sau khi unmount, cấu hình
+   `immediatelyRender: false` nếu cần để tránh hydration mismatch của Next.
+4. Rà soát a11y: `aria-label`/`title` cho nút toolbar.
+
+Kiểm chứng: `tsc`, `eslint`, `npm run build`; thử tay gõ/bảng/ảnh + bật/tắt allowPaste.
+Commit: `feat(submission): enforce allowPaste and polish rich text editor`.
 
 ### Phiên 3 — Gắn vào ô nộp bài của học sinh
 
@@ -191,7 +233,10 @@ npm run build
 | Phiên | Nội dung | Trạng thái | Commit |
 |-------|----------|-----------|--------|
 | 1 | Nền tảng: deps, sanitize, renderer, bucket ảnh | XONG | `a3feef4` |
-| 2 | Component editor Tiptap | CHƯA LÀM | — |
+| 2.1 | Editor: khung + toolbar định dạng cơ bản | XONG | `6e616d5` |
+| 2.2 | Editor: chèn/sửa bảng | XONG | `24fdce7` |
+| 2.3 | Editor: chèn ảnh trong bài | XONG | `f7590eb` |
+| 2.4 | Editor: allowPaste + placeholder + hoàn thiện | XONG | `a9cf222` |
 | 3 | Gắn vào ô nộp bài học sinh | CHƯA LÀM | — |
 | 4 | Render ở màn giáo viên + kết quả | CHƯA LÀM | — |
 
@@ -216,12 +261,65 @@ npm run build
   - Bucket `submission-media` giới hạn 5 MB/ảnh, chỉ nhận png/jpg/jpeg/webp/gif.
 
 
-#### Phiên 2 — Editor
-- [ ] `components/rich-text-editor.tsx` (toolbar, bảng, ảnh, allowPaste, placeholder)
-- [ ] Chặn dán nội dung khi `allowPaste=false`, vẫn cho chèn ảnh
-- [ ] Chạy tsc/eslint/build
-- [ ] Commit + push
-- Ghi chú: —
+#### Phiên 2.1 — Editor: khung + toolbar cơ bản
+- [x] `components/rich-text-editor.tsx`: `useEditor` (StarterKit + Underline), props
+      `value/onChange/disabled/allowPaste/placeholder/minHeight/className`
+- [x] Toolbar đậm/nghiêng/gạch chân/gạch ngang/H1-H3/danh sách/undo-redo (active state)
+- [x] Đồng bộ `value` ⇄ editor không gây vòng lặp; `onUpdate` phát HTML
+- [x] Style `.rich-text-editor` + `.ProseMirror` trong `app/globals.css`
+- [x] Chạy tsc/eslint/build
+- [x] Commit + push
+- Ghi chú:
+  - Dùng `useEditorState` để toolbar cập nhật trạng thái active/canUndo/canRedo (Tiptap v3
+    không tự re-render theo transaction).
+  - `StarterKit.configure({ underline: false })` + tự thêm `Underline` để tránh trùng extension.
+  - `immediatelyRender: false` cho SSR (Next); `setContent(next, { emitUpdate: false })` khi
+    đồng bộ value để không phát onChange ngược.
+  - Placeholder đã gắn ở phiên này (prop `placeholder`); phiên 2.4 chỉ kiểm tra lại.
+
+#### Phiên 2.2 — Editor: bảng
+- [x] Thêm extension Table + row/cell/header
+- [x] Toolbar chèn bảng 3x3, thêm/xoá hàng, thêm/xoá cột, gộp/tách ô, bật/tắt header, xoá bảng
+- [x] Style bảng trong editor (viền ô đang chọn, `.tableWrapper` cuộn ngang)
+- [x] Chạy tsc/eslint/build
+- [x] Commit + push
+- Ghi chú:
+  - Dùng DropdownMenu "Bảng" (nhãn chữ) thay vì nhiều nút icon rời cho dễ hiểu; các mục
+    sửa bảng tự disable khi con trỏ không nằm trong bảng (`state.inTable`, `canMergeCells`,
+    `canSplitCell`).
+  - `Table.configure({ resizable: false })` — không cần kéo cột, tránh phức tạp.
+  - Chưa test tay trên trình duyệt (môi trường chỉ chạy build); cần thử ở phiên 3 khi gắn
+    vào ô nộp bài.
+
+#### Phiên 2.3 — Editor: ảnh
+- [x] Thêm extension Image
+- [x] Nút chèn ảnh: file picker → kiểm tra `SUBMISSION_IMAGE_*` (≤ 5 MB) → signed URL
+      → PUT → `setImage({ src: publicUrl })`
+- [x] Trạng thái đang tải + toast lỗi
+- [x] Chạy tsc/eslint/build
+- [x] Commit + push
+- Ghi chú:
+  - Editor nhận thêm prop `uploadContext?: { sessionId, targetId }` để dựng đường dẫn ảnh
+    bằng `submissionMediaPath`. **Phiên 3 phải truyền `{ sessionId: session.id, targetId: selectedId }`**;
+    nếu thiếu, nút chèn ảnh tự disable.
+  - Ảnh dùng `Image.configure({ allowBase64: false })` → dán ảnh base64 sẽ bị chặn, buộc
+    đi qua bucket public (đúng quyết định ở mục 2).
+  - Chưa test tay upload thật (cần Supabase + bucket `submission-media`); cần thử ở phiên 3.
+
+#### Phiên 2.4 — Editor: allowPaste + placeholder + hoàn thiện
+- [x] Chặn `paste` nội dung khi `allowPaste=false`, vẫn cho chèn ảnh; chặn `drop`
+- [x] Placeholder khi trống (đã gắn từ 2.1); đồng bộ `disabled`
+- [x] Dọn listener/unmount (`mountedRef`); `immediatelyRender: false`
+- [x] a11y `aria-label`/`title` cho nút toolbar + `role="toolbar"`
+- [x] Chạy tsc/eslint/build
+- [x] Commit + push
+- Ghi chú:
+  - `handlePaste`/`handleDrop` đọc `allowPasteRef` (ref) để không phải khởi tạo lại editor khi
+    prop đổi. Khi `allowPaste=false`, chặn dán/drop nội dung từ ngoài; `moved=true` (kéo thả
+    trong editor) vẫn cho phép.
+  - **Phiên 2 đã xong.** Việc test tay (gõ/bảng/ảnh/allowPaste) chưa làm được vì môi trường
+    không có Supabase → gộp kiểm thử thủ công vào phiên 3 khi gắn vào ô nộp bài.
+  - Trước khi merge cần chạy `pnpm install` để đồng bộ `pnpm-lock.yaml` (máy này chỉ dùng npm).
 
 #### Phiên 3 — Ô nộp bài HS
 - [ ] Thay Textarea bằng RichTextEditor
@@ -239,6 +337,8 @@ npm run build
 
 ## 10. Quy ước git
 
-- Nhánh dùng chung: `260915-feat-submission-rich-text-editor` (tạo từ `origin/main`).
-- Mỗi phiên commit 1 lần với message ở trên, push lên cùng nhánh (PR tự gộp).
+- Nhánh dùng chung cho phiên 2–4: `260916-feat-submission-rich-text-editor` (tạo từ
+  `origin/main` sau khi PR #12 gộp phiên 1). Nhánh cũ `260915-...` đã gộp, **không dùng lại**.
+- Mỗi phiên con của phiên 2 commit riêng 1 lần với message ở trên, push lên cùng nhánh
+  (PR tự gộp).
 - Không commit file rác `lib/ensure-presentations-bucket.ts` (leftover, không liên quan).
