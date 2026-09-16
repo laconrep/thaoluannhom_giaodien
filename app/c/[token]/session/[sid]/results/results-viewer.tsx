@@ -10,7 +10,9 @@ import type {
   AnnotationItem,
 } from "@/lib/types"
 import { Button } from "@/components/ui/button"
+import { SubmissionText } from "@/components/submission-text"
 import { Users, Download, FileText, Presentation, File as FileIcon, RotateCw } from "lucide-react"
+import { isRichTextEmpty } from "@/lib/rich-text"
 
 function getFiles(sub?: SubmissionRow): SubmissionFile[] {
   if (!sub) return []
@@ -153,14 +155,15 @@ export function ResultsViewer({
                 </div>
               </div>
 
-              {sub?.text_content && (
+              {!isRichTextEmpty(sub?.text_content) && (
                 <div className="bg-card rounded-lg border p-4">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
                     Phần viết
                   </p>
-                  <p className="whitespace-pre-wrap text-lg leading-relaxed">
-                    {sub.text_content}
-                  </p>
+                  <SubmissionText
+                    value={sub?.text_content}
+                    className="text-lg leading-relaxed"
+                  />
                 </div>
               )}
 

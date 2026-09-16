@@ -14,10 +14,12 @@ import type {
 } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { AnnotationEditor } from "@/components/annotation-editor"
+import { SubmissionText } from "@/components/submission-text"
 import { TimerPanel } from "@/components/timer-panel"
 import { Switch } from "@/components/ui/switch"
 import { AvatarInitials } from "@/components/avatar-initials"
 import { toast } from "sonner"
+import { isRichTextEmpty } from "@/lib/rich-text"
 import {
   ArrowLeft,
   Link as LinkIcon,
@@ -288,10 +290,13 @@ export function IndividualBoard({
                           {firstFile.kind.toUpperCase()}
                         </span>
                       </div>
-                    ) : sub?.text_content ? (
-                      <p className="absolute inset-0 p-1 text-[9px] overflow-hidden leading-tight">
-                        {sub.text_content.slice(0, 80)}
-                      </p>
+                    ) : !isRichTextEmpty(sub?.text_content) ? (
+                      <SubmissionText
+                        value={sub?.text_content}
+                        plain
+                        maxChars={80}
+                        className="absolute inset-0 p-1 text-[9px] overflow-hidden leading-tight"
+                      />
                     ) : null}
                     {files.length > 1 && (
                       <span className="absolute bottom-0.5 right-0.5 bg-card/90 backdrop-blur rounded px-1 py-[1px] border text-[9px] font-semibold">
