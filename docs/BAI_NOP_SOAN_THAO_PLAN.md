@@ -190,7 +190,7 @@ npm run build
 
 | Phiên | Nội dung | Trạng thái | Commit |
 |-------|----------|-----------|--------|
-| 1 | Nền tảng: deps, sanitize, renderer, bucket ảnh | CHƯA LÀM | — |
+| 1 | Nền tảng: deps, sanitize, renderer, bucket ảnh | XONG | `SESSION1_HASH` |
 | 2 | Component editor Tiptap | CHƯA LÀM | — |
 | 3 | Gắn vào ô nộp bài học sinh | CHƯA LÀM | — |
 | 4 | Render ở màn giáo viên + kết quả | CHƯA LÀM | — |
@@ -198,15 +198,23 @@ npm run build
 ### Chi tiết từng phiên
 
 #### Phiên 1 — Nền tảng
-- [ ] Cài Tiptap + isomorphic-dompurify
-- [ ] `lib/rich-text.ts` (isRichTextEmpty, sanitize, plainTextToHtml, submissionToRenderableHtml, htmlToPlainText)
-- [ ] `components/submission-text.tsx`
-- [ ] Style `.submission-rich-text` trong `app/globals.css`
-- [ ] `scripts/100_submission_media_bucket.sql` + cập nhật `one-click-supabase.sql`
-- [ ] `app/api/submissions/inline-image-upload-url/route.ts`
-- [ ] Chạy tsc/eslint/build
-- [ ] Commit + push
-- Ghi chú: —
+- [x] Cài Tiptap + isomorphic-dompurify
+- [x] `lib/rich-text.ts` (isRichTextEmpty, sanitize, plainTextToHtml, submissionToRenderableHtml, htmlToPlainText, thêm `toPlainText`, `escapeHtml`, `isHtmlContent`)
+- [x] `components/submission-text.tsx` (props: `value`, `className`, `plain`, `maxChars`, `fallback`)
+- [x] Style `.submission-rich-text` trong `app/globals.css` (đặt ở cuối file)
+- [x] `scripts/100_submission_media_bucket.sql` + cập nhật `one-click-supabase.sql`
+- [x] `app/api/submissions/inline-image-upload-url/route.ts`
+- [x] (Tùy chọn đã làm) `app/api/storage/ensure-bucket/route.ts` hỗ trợ bucket `submission-media`
+- [x] Chạy tsc/eslint/build + test logic rich-text bằng node
+- [x] Commit + push
+- Ghi chú cho phiên sau:
+  - Thêm `lib/submission-media.ts` (hằng số bucket, `submissionMediaSignedUploadUrl`, `submissionMediaPublicUrl`, `submissionMediaPath`) — **phiên 2 dùng các hàm này** thay vì tự ghép URL.
+  - `sanitizeSubmissionHtml` **loại bỏ `<img src="data:...">`** trước khi sanitize (DOMPurify mặc định vẫn cho ảnh base64).
+  - `@tiptap/extension-underline` có thể **dư thừa**: Tiptap v3 StarterKit đã gồm Underline. Nếu console cảnh báo trùng extension thì bỏ dep này (nhớ gỡ khỏi `package.json`).
+  - `pnpm-lock.yaml` **chưa cập nhật** (máy này pnpm lỗi, phải dùng npm). Trước khi merge cần chạy `pnpm install` để đồng bộ lockfile.
+  - `submissionToRenderableHtml` hiện **chưa có call site**; phiên 4 ưu tiên dùng `<SubmissionText />`, chỉ dùng hàm này khi cần chuỗi HTML thô.
+  - Bucket `submission-media` giới hạn 5 MB/ảnh, chỉ nhận png/jpg/jpeg/webp/gif.
+
 
 #### Phiên 2 — Editor
 - [ ] `components/rich-text-editor.tsx` (toolbar, bảng, ảnh, allowPaste, placeholder)

@@ -226,3 +226,86 @@
   box-shadow: none !important;
   margin-bottom: 12px !important;
 }
+
+/* Nội dung bài nộp dạng HTML (trình soạn thảo kiểu Word): bảng, ảnh, danh sách.
+   Dùng cho cả màn giáo viên và trang kết quả của học sinh. */
+.submission-rich-text {
+  font-size: inherit;
+  line-height: 1.6;
+  word-break: break-word;
+}
+.submission-rich-text > *:first-child { margin-top: 0; }
+.submission-rich-text > *:last-child { margin-bottom: 0; }
+.submission-rich-text p { margin: 0.5em 0; }
+.submission-rich-text h1,
+.submission-rich-text h2,
+.submission-rich-text h3 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0.8em 0 0.4em;
+}
+.submission-rich-text h1 { font-size: 1.6em; }
+.submission-rich-text h2 { font-size: 1.35em; }
+.submission-rich-text h3 { font-size: 1.15em; }
+.submission-rich-text ul,
+.submission-rich-text ol {
+  margin: 0.5em 0;
+  padding-left: 1.4em;
+}
+.submission-rich-text ul { list-style: disc; }
+.submission-rich-text ol { list-style: decimal; }
+.submission-rich-text li { margin: 0.2em 0; }
+.submission-rich-text blockquote {
+  margin: 0.6em 0;
+  padding-left: 0.8em;
+  border-left: 3px solid var(--border);
+  color: var(--muted-foreground);
+}
+.submission-rich-text a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+.submission-rich-text code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--muted);
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-sm);
+}
+.submission-rich-text pre {
+  background: var(--muted);
+  padding: 0.6em 0.8em;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+.submission-rich-text hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0.8em 0;
+}
+.submission-rich-text img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+  display: block;
+  margin: 0.5em 0;
+}
+.submission-rich-text table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.6em 0;
+  table-layout: auto;
+}
+.submission-rich-text th,
+.submission-rich-text td {
+  border: 1px solid var(--border);
+  padding: 0.4em 0.6em;
+  vertical-align: top;
+  text-align: left;
+}
+.submission-rich-text th {
+  background: var(--muted);
+  font-weight: 600;
+}
+
