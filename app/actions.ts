@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { colorForIndex } from "@/lib/group-colors"
 import { PLAN_DEFAULT, planLimits, type Plan } from "@/lib/plans"
+import { sanitizeSubmissionHtml } from "@/lib/rich-text"
 
 /* ============ PLANS / QUOTA ============ */
 
@@ -1188,6 +1189,7 @@ export async function submitGroupReportAction(args: {
   try {
     const supabase = await createClient()
     await assertSessionAcceptsSubmission(supabase, args.sessionId)
+    const textContent = args.textContent ? sanitizeSubmissionHtml(args.textContent) : null
     const { data: existing } = await supabase
       .from("submissions")
       .select("id")
@@ -1201,7 +1203,7 @@ export async function submitGroupReportAction(args: {
       const { error } = await supabase
         .from("submissions")
         .update({
-          text_content: args.textContent,
+          text_content: textContent,
           files: filesArr,
           image_url: firstImage?.url ?? null,
           submitted_at: new Date().toISOString(),
@@ -1213,7 +1215,7 @@ export async function submitGroupReportAction(args: {
       const { error } = await supabase.from("submissions").insert({
         session_id: args.sessionId,
         session_group_id: args.sessionGroupId,
-        text_content: args.textContent,
+        text_content: textContent,
         files: filesArr,
         image_url: firstImage?.url ?? null,
         is_auto_submitted: args.isAuto ?? false,
@@ -1236,6 +1238,7 @@ export async function submitIndividualReportAction(args: {
   try {
     const supabase = await createClient()
     await assertSessionAcceptsSubmission(supabase, args.sessionId)
+    const textContent = args.textContent ? sanitizeSubmissionHtml(args.textContent) : null
     const { data: existing } = await supabase
       .from("submissions")
       .select("id")
@@ -1249,7 +1252,7 @@ export async function submitIndividualReportAction(args: {
       const { error } = await supabase
         .from("submissions")
         .update({
-          text_content: args.textContent,
+          text_content: textContent,
           files: filesArr,
           image_url: firstImage?.url ?? null,
           submitted_at: new Date().toISOString(),
@@ -1261,7 +1264,7 @@ export async function submitIndividualReportAction(args: {
       const { error } = await supabase.from("submissions").insert({
         session_id: args.sessionId,
         session_slot_id: args.sessionSlotId,
-        text_content: args.textContent,
+        text_content: textContent,
         files: filesArr,
         image_url: firstImage?.url ?? null,
         is_auto_submitted: args.isAuto ?? false,
