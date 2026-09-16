@@ -190,7 +190,7 @@ npm run build
 
 | Phiên | Nội dung | Trạng thái | Commit |
 |-------|----------|-----------|--------|
-| 1 | Nền tảng: deps, sanitize, renderer, bucket ảnh | XONG | `SESSION1_HASH` |
+| 1 | Nền tảng: deps, sanitize, renderer, bucket ảnh | XONG | `a3feef4` |
 | 2 | Component editor Tiptap | CHƯA LÀM | — |
 | 3 | Gắn vào ô nộp bài học sinh | CHƯA LÀM | — |
 | 4 | Render ở màn giáo viên + kết quả | CHƯA LÀM | — |
