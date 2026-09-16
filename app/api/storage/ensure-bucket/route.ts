@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/admin"
 import { MAX_PRESENTATION_BYTES, PRESENTATIONS_BUCKET } from "@/lib/storage-upload"
+import {
+  MAX_SUBMISSION_IMAGE_BYTES,
+  SUBMISSION_MEDIA_BUCKET,
+  SUBMISSION_IMAGE_MIME_TYPES,
+} from "@/lib/submission-media"
 
 const SUBMISSIONS_BUCKET = "submissions"
 
@@ -13,11 +18,31 @@ function parseLimit(value: unknown): number | null {
   return null
 }
 
+type BucketConfig = {
+  public: boolean
+  fileSizeLimit: number
+  allowedMimeTypes: string[] | null
+}
+
+function configFor(bucket: string): BucketConfig {
+  if (bucket === PRESENTATIONS_BUCKET) {
+    return { public: false, fileSizeLimit: MAX_PRESENTATION_BYTES, allowedMimeTypes: null }
+  }
+  if (bucket === SUBMISSION_MEDIA_BUCKET) {
+    return {
+      public: true,
+      fileSizeLimit: MAX_SUBMISSION_IMAGE_BYTES,
+      allowedMimeTypes: SUBMISSION_IMAGE_MIME_TYPES,
+    }
+  }
+  return { public: false, fileSizeLimit: 50 * 1024 * 1024, allowedMimeTypes: null }
+}
+
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as { bucket?: string }
   const bucket = body.bucket ?? SUBMISSIONS_BUCKET
-  const isPresentations = bucket === PRESENTATIONS_BUCKET
-  const fileSizeLimit = isPresentations ? MAX_PRESENTATION_BYTES : 50 * 1024 * 1024
+  const config = configFor(bucket)
+  const fileSizeLimit = config.fileSizeLimit
 
   const supabase = createServiceClient()
   if (!supabase) {
@@ -36,9 +61,9 @@ export async function POST(request: NextRequest) {
     const current = buckets?.find((b) => b.id === bucket)
     if (!current) {
       const { error: createError } = await supabase.storage.createBucket(bucket, {
-        public: false,
+        public: config.public,
         fileSizeLimit,
-        allowedMimeTypes: null,
+        allowedMimeTypes: config.allowedMimeTypes,
       })
       if (createError && !/already exists/i.test(createError.message)) {
         return NextResponse.json({ ok: false, error: createError.message, bucket }, { status: 502 })
@@ -46,9 +71,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { error: updateError } = await supabase.storage.updateBucket(bucket, {
-      public: false,
+      public: config.public,
       fileSizeLimit,
-      allowedMimeTypes: null,
+      allowedMimeTypes: config.allowedMimeTypes,
     })
     if (updateError) {
       const after = (await supabase.storage.listBuckets()).data?.find((b) => b.id === bucket)
