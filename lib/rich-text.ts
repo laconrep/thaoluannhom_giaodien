@@ -1,11 +1,13 @@
-import DOMPurify from "isomorphic-dompurify"
-
 // Nội dung bài nộp được lưu ở cột submissions.text_content dưới 2 dạng:
 //  - Bài cũ: văn bản thuần (plain text).
 //  - Bài mới: HTML do trình soạn thảo tạo ra (có thể chứa bảng, ảnh).
 // Các hàm dưới đây giúp nhận biết và chuẩn hoá an toàn cho cả 2 dạng.
+//
+// Sanitize không dùng isomorphic-dompurify/jsdom: trên Vercel serverless,
+// html-encoding-sniffer require() ESM @exodus/bytes và làm hỏng mọi server action
+// (chọn nhóm, nộp bài, chụp ảnh).
 
-const ALLOWED_TAGS = [
+const ALLOWED_TAGS = new Set([
   "p",
   "br",
   "strong",
@@ -34,9 +36,11 @@ const ALLOWED_TAGS = [
   "code",
   "pre",
   "hr",
-]
+])
 
-const ALLOWED_ATTR = [
+const VOID_TAGS = new Set(["br", "img", "hr"])
+
+const ALLOWED_ATTR = new Set([
   "href",
   "target",
   "rel",
@@ -47,7 +51,37 @@ const ALLOWED_ATTR = [
   "rowspan",
   "colwidth",
   "class",
-]
+])
+
+const URI_ATTRS = new Set(["href", "src"])
+
+const DROP_CONTENT_TAGS = new Set([
+  "script",
+  "style",
+  "iframe",
+  "object",
+  "embed",
+  "link",
+  "meta",
+  "noscript",
+  "template",
+  "svg",
+  "math",
+  "form",
+  "input",
+  "textarea",
+  "button",
+  "select",
+  "option",
+  "video",
+  "audio",
+  "source",
+  "canvas",
+  "applet",
+  "base",
+  "frame",
+  "frameset",
+])
 
 // Chỉ cho phép link http/https/mailto/tel và đường dẫn tương đối.
 // Chặn javascript:, data: (không nhúng base64 vào bài nộp) và các scheme lạ.
@@ -57,6 +91,8 @@ const BLOCK_TAG_REGEXP =
   /<(p|br|div|span|strong|b|em|i|u|s|del|h[1-6]|ul|ol|li|blockquote|table|thead|tbody|tr|th|td|img|a|code|pre|hr)\b[^>]*>/i
 
 const TAG_REGEXP = /<\/?[a-z][^>]*>/gi
+
+const ATTR_REGEXP = /([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/gi
 
 export function isHtmlContent(raw: string | null | undefined): boolean {
   if (!raw) return false
@@ -72,19 +108,92 @@ export function escapeHtml(text: string): string {
     .replace(/'/g, "&#39;")
 }
 
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => {
+      const code = Number.parseInt(hex, 16)
+      return Number.isFinite(code) ? String.fromCodePoint(code) : ""
+    })
+    .replace(/&#(\d+);/g, (_, dec) => {
+      const code = Number.parseInt(dec, 10)
+      return Number.isFinite(code) ? String.fromCodePoint(code) : ""
+    })
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&amp;/gi, "&")
+}
+
+function stripControlChars(value: string): string {
+  return value.replace(/[\u0000-\u001f\u007f]/g, "")
+}
+
+function isSafeUri(value: string): boolean {
+  const decoded = stripControlChars(decodeHtmlEntities(value)).trim()
+  if (!decoded) return false
+  if (/^(?:javascript|vbscript|data)\s*:/i.test(decoded)) return false
+  return ALLOWED_URI_REGEXP.test(decoded)
+}
+
+function escapeAttr(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;")
+}
+
+function sanitizeAttrs(tag: string, rawAttrs: string): { attrs: string; dropTag: boolean } {
+  let out = ""
+  let hasSafeSrc = tag !== "img"
+  ATTR_REGEXP.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = ATTR_REGEXP.exec(rawAttrs))) {
+    const name = match[1].toLowerCase()
+    if (name.startsWith("on") || name === "style" || name.startsWith("xmlns")) continue
+    if (!ALLOWED_ATTR.has(name)) continue
+    const rawValue = match[2] ?? match[3] ?? match[4] ?? ""
+    if (URI_ATTRS.has(name)) {
+      if (!isSafeUri(rawValue)) continue
+      const decoded = stripControlChars(decodeHtmlEntities(rawValue)).trim()
+      if (name === "src" && tag === "img") {
+        if (/^data:/i.test(decoded)) continue
+        hasSafeSrc = true
+      }
+    }
+    if (name === "target" && rawValue !== "_blank" && rawValue !== "_self") continue
+    if ((name === "colspan" || name === "rowspan") && !/^\d{1,4}$/.test(rawValue)) continue
+    if (name === "class" && !/^[\w\s-]*$/.test(rawValue)) continue
+    if (name === "rel" && !/^[\w\s-]*$/.test(rawValue)) continue
+    out += ` ${name}="${escapeAttr(rawValue)}"`
+  }
+  if (tag === "a" && /\starget="_blank"/.test(out) && !/\srel=/.test(out)) {
+    out += ` rel="noopener noreferrer"`
+  }
+  return { attrs: out, dropTag: tag === "img" && !hasSafeSrc }
+}
+
+function dropDangerousBlocks(html: string): string {
+  let out = html.replace(/<!--[\s\S]*?-->/g, "")
+  out = out.replace(/<\?[\s\S]*?\?>/g, "")
+  out = out.replace(/<!\[CDATA\[[\s\S]*?\]\]>/gi, "")
+  out = out.replace(/<!DOCTYPE[\s\S]*?>/gi, "")
+  const drop = Array.from(DROP_CONTENT_TAGS).join("|")
+  out = out.replace(new RegExp(`<(?:${drop})\\b[^>]*>[\\s\\S]*?<\\/(?:${drop})>`, "gi"), "")
+  out = out.replace(new RegExp(`<(?:${drop})\\b[^>]*\\/?>`, "gi"), "")
+  return out
+}
+
 export function sanitizeSubmissionHtml(html: string): string {
   if (!html) return ""
-  // DOMPurify mặc định vẫn cho phép ảnh base64 (data:), nhưng quy ước của app là
-  // ảnh phải được tải lên storage → loại bỏ trước khi sanitize.
-  const withoutDataImages = html.replace(/<img\b[^>]*>/gi, (tag) =>
-    /src\s*=\s*["']\s*data:/i.test(tag) ? "" : tag,
-  )
-  return DOMPurify.sanitize(withoutDataImages, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    ALLOWED_URI_REGEXP,
-    FORBID_ATTR: ["style", "onerror", "onload", "onclick"],
-    KEEP_CONTENT: true,
+  const prepared = dropDangerousBlocks(html)
+  return prepared.replace(/<\/?([a-zA-Z][a-zA-Z0-9:-]*)\b([^>]*)>/g, (full, rawTag, rawAttrs) => {
+    const isClose = full.startsWith("</")
+    const tag = String(rawTag).toLowerCase()
+    if (!ALLOWED_TAGS.has(tag)) return ""
+    if (isClose) return VOID_TAGS.has(tag) ? "" : `</${tag}>`
+    const { attrs, dropTag } = sanitizeAttrs(tag, rawAttrs ?? "")
+    if (dropTag) return ""
+    if (VOID_TAGS.has(tag)) return `<${tag}${attrs}>`
+    return `<${tag}${attrs}>`
   })
 }
 
