@@ -30,6 +30,7 @@ import { useCountdown } from "@/lib/use-countdown"
 import { formatDuration } from "@/lib/utils-format"
 import { isRichTextEmpty } from "@/lib/rich-text"
 import { fireConfetti } from "@/lib/confetti"
+import { fileExtension, putToSignedUploadUrl } from "@/lib/storage-upload"
 import {
   studentClaimGroupAction,
   submitGroupReportAction,
@@ -266,6 +267,8 @@ export function StudentSubmit({
       }
       return next
     })
+    if (fileInputRef.current) fileInputRef.current.value = ""
+    if (cameraInputRef.current) cameraInputRef.current.value = ""
   }
 
   function removeStaged(id: string) {
@@ -288,7 +291,11 @@ export function StudentSubmit({
   async function uploadAll(): Promise<SubmissionFile[]> {
     if (!staged.length) return []
     try {
-      const res = await fetch("/api/storage/ensure-bucket", { method: "POST" })
+      const res = await fetch("/api/storage/ensure-bucket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bucket: "submissions" }),
+      })
       const body = await res.json().catch(() => ({}))
       if (!res.ok || !body?.ok) console.warn("ensure submissions bucket failed:", body?.error)
     } catch (e) {
@@ -296,10 +303,10 @@ export function StudentSubmit({
     }
     const uploaded: SubmissionFile[] = []
     for (const s of staged) {
-      const ext = s.file.name.split(".").pop() ?? "bin"
+      const safeExt = fileExtension(s.file)
       const path = `${session.id}/${selectedId}/${Date.now()}-${Math.random()
         .toString(36)
-        .slice(2, 8)}.${ext}`
+        .slice(2, 8)}.${safeExt}`
       const urlRes = await fetch("/api/submissions/upload-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -309,28 +316,17 @@ export function StudentSubmit({
       if (!urlRes.ok || !urlBody?.upload?.token) {
         throw new Error(urlBody?.error ?? "Không tạo được đường dẫn tải lên.")
       }
-      const uploadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/upload/sign/submissions/${urlBody.upload.path}?token=${encodeURIComponent(urlBody.upload.token)}`
-      const anonKey =
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-        urlBody.upload.token
-      const putRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${anonKey}`,
-          apikey: anonKey,
-          "Content-Type": s.file.type || "application/octet-stream",
-          "x-upsert": "true",
-        },
-        body: s.file,
+      await putToSignedUploadUrl({
+        signedUrl: urlBody.upload.signedUrl,
+        path: urlBody.upload.path || path,
+        token: urlBody.upload.token,
+        bucket: "submissions",
+        file: s.file,
       })
-      if (!putRes.ok) {
-        throw new Error(`Không tải được tệp ${s.file.name}. Vui lòng thử lại.`)
-      }
       const signedRes = await fetch("/api/submissions/signed-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path }),
+        body: JSON.stringify({ path: urlBody.upload.path || path }),
       })
       const signedBody = await signedRes.json().catch(() => ({}))
       if (!signedRes.ok || !signedBody?.signedUrl) {
@@ -580,15 +576,6 @@ export function StudentSubmit({
 
         {selectedId && (
           <div className="space-y-4">
-            {!allowPaste && (
-              <Card className="p-3 text-xs flex items-center gap-2 bg-accent/15 border-accent/40">
-                <Ban className="size-4 shrink-0" aria-hidden="true" />
-                <span>
-                  Giáo viên không cho phép dán nội dung từ nơi khác. Hãy tự gõ bài hoặc tải tệp lên.
-                </span>
-              </Card>
-            )}
-
             <Tabs defaultValue="text">
               <TabsList className="w-full">
                 <TabsTrigger value="text" className="flex-1">
@@ -600,6 +587,15 @@ export function StudentSubmit({
               </TabsList>
 
               <TabsContent value="text" className="space-y-2 mt-4">
+                {!allowPaste && (
+                  <Card className="p-3 text-xs flex items-center gap-2 bg-accent/15 border-accent/40">
+                    <Ban className="size-4 shrink-0" aria-hidden="true" />
+                    <span>
+                      Giáo viên không cho phép dán nội dung từ nơi khác. Hãy tự gõ bài hoặc tải tệp
+                      lên.
+                    </span>
+                  </Card>
+                )}
                 <Label className="text-base">Nội dung bài báo cáo</Label>
                 <RichTextEditor
                   value={text}

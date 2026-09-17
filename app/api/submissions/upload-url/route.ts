@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { createAdminClient, createServiceClient } from "@/lib/supabase/admin"
 
 const SUBMISSIONS_BUCKET = "submissions"
 
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Thiếu đường dẫn tệp." }, { status: 400 })
     }
 
-    const supabase = createAdminClient()
+    const supabase = createServiceClient() ?? createAdminClient()
     if (!supabase) {
       return NextResponse.json({ error: "Supabase chưa được cấu hình." }, { status: 500 })
     }
@@ -27,7 +27,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ ok: true, upload: { path: data.path, token: data.token } })
+    return NextResponse.json({
+      ok: true,
+      upload: { path: data.path, token: data.token, signedUrl: data.signedUrl },
+    })
   } catch (e: any) {
     return NextResponse.json(
       { error: `Không tạo được đường dẫn tải lên: ${e?.message ?? "lỗi không xác định"}` },
