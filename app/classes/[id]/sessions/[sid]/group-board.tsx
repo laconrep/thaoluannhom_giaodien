@@ -22,7 +22,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { AnnotationEditor } from "@/components/annotation-editor"
 import { GroupCardsGrid } from "@/components/group-card"
+import { SubmissionText } from "@/components/submission-text"
 import { getFiles } from "@/lib/submission-files"
+import { isRichTextEmpty } from "@/lib/rich-text"
 import { TimerPanel } from "@/components/timer-panel"
 import { Switch } from "@/components/ui/switch"
 import { sounds, isSoundEnabled, setSoundEnabled } from "@/lib/sounds"
@@ -1085,12 +1087,12 @@ function Slideshow({
               </div>
             ))}
           </div>
-        ) : sub?.text_content ? (
+        ) : !isRichTextEmpty(sub?.text_content) ? (
           <div
-            className="max-w-5xl mx-auto whitespace-pre-wrap text-neutral-900 leading-relaxed"
+            className="max-w-5xl mx-auto text-neutral-900 leading-relaxed"
             style={{ fontSize: `${fontSize}px`, lineHeight: 1.55 }}
           >
-            {sub.text_content}
+            <SubmissionText value={sub?.text_content} />
           </div>
         ) : (
           <div className="h-full grid place-items-center">

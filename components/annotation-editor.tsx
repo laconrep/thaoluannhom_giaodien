@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import type { AnnotationItem, SubmissionFile } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SubmissionText } from "@/components/submission-text"
 import { useFullscreen } from "@/lib/use-fullscreen"
 import { renderAsync } from "docx-preview"
 import { cn } from "@/lib/utils"
+import { isRichTextEmpty } from "@/lib/rich-text"
 import {
   Pen,
   Highlighter,
@@ -82,7 +84,7 @@ export function AnnotationEditor({
   onClose: () => void
 }) {
   const hasFiles = files.length > 0
-  const hasText = !!textContent && textContent.trim().length > 0
+  const hasText = !isRichTextEmpty(textContent)
   const [currentIdx, setCurrentIdx] = useState<number>(hasFiles ? 0 : -1)
   const [rotations, setRotations] = useState<number[]>(() =>
     files.map((f) => f.rotation ?? 0),
@@ -931,7 +933,7 @@ export function AnnotationEditor({
             {currentIdx === -1 ? (
               <div
                 className={cn(
-                  "whitespace-pre-wrap leading-relaxed",
+                  "leading-relaxed",
                   presentationMode ? "p-10 text-neutral-900" : "text-foreground",
                 )}
                 style={{
@@ -942,9 +944,12 @@ export function AnnotationEditor({
                   padding: presentationMode ? undefined : "20mm",
                 }}
               >
-                {textContent || (
-                  <span className="text-muted-foreground">Nhóm này chưa nộp nội dung.</span>
-                )}
+                <SubmissionText
+                  value={textContent}
+                  fallback={
+                    <span className="text-muted-foreground">Nhóm này chưa nộp nội dung.</span>
+                  }
+                />
               </div>
             ) : isImage && currentFile ? (
               <div className="relative p-2">

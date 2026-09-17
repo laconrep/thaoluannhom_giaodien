@@ -3,6 +3,7 @@
 import { useState } from "react"
 import type { AnnotationRow, SessionGroupRow, SubmissionFile, SubmissionRow } from "@/lib/types"
 import { Card } from "@/components/ui/card"
+import { SubmissionText } from "@/components/submission-text"
 import {
   File as FileIcon,
   FileText,
@@ -12,6 +13,7 @@ import {
   Unlock,
 } from "lucide-react"
 import { getFiles } from "@/lib/submission-files"
+import { isRichTextEmpty } from "@/lib/rich-text"
 
 function FileThumb({ f }: { f: SubmissionFile }) {
   if (f.kind === "image") {
@@ -66,7 +68,7 @@ export function GroupCardsGrid({
         const sub = subsByGroup[g.id]
         const ann = annsByGroup[g.id]
         const files = getFiles(sub)
-        const hasContent = files.length > 0 || !!sub?.text_content
+        const hasContent = files.length > 0 || !isRichTextEmpty(sub?.text_content)
         const isLive = !!liveMap[g.id]
         const confirming = confirmGroupId === g.id
         return (
@@ -157,10 +159,13 @@ export function GroupCardsGrid({
                 <div className="absolute inset-0">
                   <FileThumb f={files[0]} />
                 </div>
-              ) : sub?.text_content ? (
-                <div className="absolute inset-0 p-3 text-sm whitespace-pre-wrap overflow-hidden leading-relaxed">
-                  {sub.text_content}
-                </div>
+              ) : !isRichTextEmpty(sub?.text_content) ? (
+                <SubmissionText
+                  value={sub?.text_content}
+                  plain
+                  maxChars={200}
+                  className="absolute inset-0 p-3 text-sm overflow-hidden leading-relaxed"
+                />
               ) : (
                 <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground p-4 text-center">
                   {g.claimed ? "Chưa nộp bài" : "Chưa có nhóm chọn"}
