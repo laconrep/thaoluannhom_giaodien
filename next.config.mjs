@@ -4,7 +4,6 @@ const nextConfig = {
     unoptimized: true,
   },
   allowedDevOrigins: ['.monkeycode-ai.live'],
-  serverExternalPackages: ['isomorphic-dompurify', 'jsdom'],
 }
 
 export default nextConfig

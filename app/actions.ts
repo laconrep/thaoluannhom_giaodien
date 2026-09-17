@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { colorForIndex } from "@/lib/group-colors"
 import { PLAN_DEFAULT, planLimits, type Plan } from "@/lib/plans"
+import { sanitizeSubmissionHtml } from "@/lib/rich-text"
 
 /* ============ PLANS / QUOTA ============ */
 
@@ -1188,7 +1189,6 @@ export async function submitGroupReportAction(args: {
   try {
     const supabase = await createClient()
     await assertSessionAcceptsSubmission(supabase, args.sessionId)
-    const { sanitizeSubmissionHtml } = await import("@/lib/rich-text")
     const textContent = args.textContent ? sanitizeSubmissionHtml(args.textContent) : null
     const { data: existing } = await supabase
       .from("submissions")
@@ -1238,7 +1238,6 @@ export async function submitIndividualReportAction(args: {
   try {
     const supabase = await createClient()
     await assertSessionAcceptsSubmission(supabase, args.sessionId)
-    const { sanitizeSubmissionHtml } = await import("@/lib/rich-text")
     const textContent = args.textContent ? sanitizeSubmissionHtml(args.textContent) : null
     const { data: existing } = await supabase
       .from("submissions")
