@@ -69,6 +69,7 @@ export type SessionGroupRow = {
   label: string
   claimed: boolean
   claimed_at: string | null
+  claimed_devices?: string[] | null
 }
 
 export type SessionSlotRow = {

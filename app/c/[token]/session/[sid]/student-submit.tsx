@@ -128,9 +128,14 @@ export function StudentSubmit({
   const [dragOver, setDragOver] = useState(false)
   const [selfStudentId, setSelfStudentId] = useState<string | null>(null)
   const [identityLoaded, setIdentityLoaded] = useState(false)
+  const [myDevice, setMyDevice] = useState("")
   const autoSubmitted = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setMyDevice(deviceId())
+  }, [])
 
   const remaining = useCountdown(session.ends_at ?? null, session.status)
   const ended = session.status === "ended" || (session.ends_at != null && remaining <= 0)
@@ -194,15 +199,27 @@ export function StudentSubmit({
     const saved = localStorage.getItem(selectedKey(session.id))
     if (!saved) return
     if (kind === "group") {
-      if (groups.some((g) => g.id === saved)) setSelectedId(saved)
-    } else {
-      if (slots.some((s) => s.id === saved)) setSelectedId(saved)
+      const g = groups.find((x) => x.id === saved)
+      if (!g) return
+      const hasDeviceList = Array.isArray(g.claimed_devices)
+      const mine = hasDeviceList && !!myDevice && g.claimed_devices!.includes(myDevice)
+      if (!hasDeviceList || mine) setSelectedId(saved)
+    } else if (slots.some((s) => s.id === saved)) {
+      setSelectedId(saved)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.id, kind])
+  }, [session.id, kind, groups, slots, myDevice])
 
   useEffect(() => {
-    if (kind !== "group" || !selectedId) return
+    if (kind !== "group") return
+    const mine = groups.find((g) => Array.isArray(g.claimed_devices) && g.claimed_devices.includes(myDevice))
+    if (mine) {
+      if (selectedId !== mine.id) {
+        setSelectedId(mine.id)
+        if (typeof window !== "undefined") localStorage.setItem(selectedKey(session.id), mine.id)
+      }
+      return
+    }
+    if (!selectedId) return
     const g = groups.find((x) => x.id === selectedId)
     if (g && !g.claimed) {
       setSelectedId(null)
@@ -212,19 +229,33 @@ export function StudentSubmit({
         localStorage.removeItem(selectedKey(session.id))
       }
     }
-  }, [groups, kind, selectedId, session.id])
+  }, [groups, kind, selectedId, session.id, myDevice])
 
   async function pickGroup(gid: string) {
+    const device = myDevice || deviceId()
+    if (device && device !== myDevice) setMyDevice(device)
+    const lockedTo = groups.find(
+      (g) => Array.isArray(g.claimed_devices) && device && g.claimed_devices.includes(device),
+    )?.id
+    if (lockedTo && lockedTo !== gid) {
+      toast.error("Em đã chọn một nhóm rồi. Không thể chọn nhóm khác.")
+      return
+    }
     setBusy(true)
     try {
-      const res = await studentClaimGroupAction(gid, deviceId(), selfStudentId)
+      const res = await studentClaimGroupAction(gid, device, selfStudentId)
       if (!res.ok) toast.error(res.error ?? "Không thể chọn nhóm.")
       else {
-        // Cập nhật ngay state cục bộ. Nếu chờ Realtime/polling, effect bảo vệ bên dưới
-        // sẽ thấy nhóm vẫn chưa claimed và xóa selectedId ngay sau khi click.
         setGroups((prev) =>
           prev.map((g) =>
-            g.id === gid ? { ...g, claimed: true, claimed_at: new Date().toISOString() } : g,
+            g.id === gid
+              ? {
+                  ...g,
+                  claimed: true,
+                  claimed_at: new Date().toISOString(),
+                  claimed_devices: Array.from(new Set([...(g.claimed_devices ?? []), device])),
+                }
+              : g,
           ),
         )
         setSelectedId(gid)
@@ -360,6 +391,7 @@ export function StudentSubmit({
           textContent: isRichTextEmpty(text) ? null : text,
           files,
           isAuto: auto,
+          deviceToken: myDevice,
         })
       } else {
         res = await submitIndividualReportAction({
@@ -531,21 +563,36 @@ export function StudentSubmit({
               <Users className="w-5 h-5" /> Chọn nhóm của bạn
             </h2>
             <p className="text-sm text-muted-foreground mb-3">
-              Bấm vào nhóm của mình. Tất cả các bạn trong cùng nhóm chọn cùng một ô.
+              Mỗi máy chỉ chọn được 1 nhóm. Đã chọn rồi thì không chọn hay nộp nhóm khác được.
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {groups.map((g) => (
+              {groups.map((g) => {
+                const mine =
+                  !!myDevice && Array.isArray(g.claimed_devices) && g.claimed_devices.includes(myDevice)
+                const lockedElsewhere = groups.some(
+                  (x) =>
+                    x.id !== g.id &&
+                    !!myDevice &&
+                    Array.isArray(x.claimed_devices) &&
+                    x.claimed_devices.includes(myDevice),
+                )
+                return (
                 <Button
                   key={g.id}
                   variant={g.claimed ? "secondary" : "default"}
-                  disabled={busy || !running}
+                  disabled={busy || !running || lockedElsewhere}
                   onClick={() => pickGroup(g.id)}
                   className="h-20 flex-col gap-1"
                 >
                   <span className="font-heading font-semibold text-base">{g.label}</span>
-                  {g.claimed && <span className="text-xs">Đã có người vào</span>}
+                  {mine ? (
+                    <span className="text-xs">Nhóm của em</span>
+                  ) : g.claimed ? (
+                    <span className="text-xs">Đã có người vào</span>
+                  ) : null}
                 </Button>
-              ))}
+                )
+              })}
             </div>
             {!running && (
               <p className="text-sm text-muted-foreground mt-3">Chờ giáo viên bắt đầu phiên.</p>

@@ -758,11 +758,18 @@ export async function reopenSessionAction(sessionId: string, extraSeconds: numbe
 
 export async function unlockGroupAction(sessionGroupId: string, clearSubmission = false) {
   const supabase = await createClient()
-  // Mở khóa nhóm: trả claimed về false
-  const { error } = await supabase
+  // Mở khóa nhóm: trả claimed về false, xóa danh sách máy đã chọn
+  let { error } = await supabase
     .from("session_groups")
-    .update({ claimed: false, claimed_at: null })
+    .update({ claimed: false, claimed_at: null, claimed_devices: [] })
     .eq("id", sessionGroupId)
+  if (error && /claimed_devices/i.test(error.message)) {
+    const fallback = await supabase
+      .from("session_groups")
+      .update({ claimed: false, claimed_at: null })
+      .eq("id", sessionGroupId)
+    error = fallback.error
+  }
   if (error) throw new Error(error.message)
 
   if (clearSubmission) {
@@ -1034,42 +1041,64 @@ export async function studentSetNameAction(studentId: string, name: string, devi
 
 export async function studentClaimGroupAction(
   sessionGroupId: string,
-  _deviceToken?: string,
+  deviceToken?: string,
   studentId?: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
+  const device = (deviceToken ?? "").trim()
+  if (!device) return { ok: false, error: "Thiếu thông tin thiết bị." }
 
-  // Kiểm tra nhóm có tồn tại không
-  const { data: sg } = await supabase
+  const full = await supabase
     .from("session_groups")
-    .select("id, claimed, class_group_id, session_id")
+    .select("id, claimed, class_group_id, session_id, claimed_devices")
     .eq("id", sessionGroupId)
     .maybeSingle()
+  const hasDeviceCol = !(full.error && /claimed_devices/i.test(full.error.message))
+  const sg = hasDeviceCol
+    ? full.data
+    : (
+        await supabase
+          .from("session_groups")
+          .select("id, claimed, class_group_id, session_id")
+          .eq("id", sessionGroupId)
+          .maybeSingle()
+      ).data
   if (!sg) return { ok: false, error: "Không tìm thấy nhóm" }
 
-  // Claim is conditional so concurrent requests cannot create an invalid state.
-  if (!sg.claimed) {
-    const { data: claimed, error } = await supabase
-      .from("session_groups")
-      .update({ claimed: true, claimed_at: new Date().toISOString() })
-      .eq("id", sessionGroupId)
-      .eq("claimed", false)
-      .select("id")
-      .maybeSingle()
-    if (error) return { ok: false, error: error.message }
-    if (!claimed) return { ok: false, error: "Nhóm vừa được người khác chọn." }
+  const sessionGroupsRes = hasDeviceCol
+    ? await supabase.from("session_groups").select("id, claimed_devices").eq("session_id", sg.session_id)
+    : await supabase.from("session_groups").select("id").eq("session_id", sg.session_id)
+  const sessionGroups = sessionGroupsRes.data ?? []
+  const alreadyInOther = sessionGroups.find(
+    (g: { id: string; claimed_devices?: string[] | null }) =>
+      g.id !== sessionGroupId && Array.isArray(g.claimed_devices) && g.claimed_devices.includes(device),
+  )
+  if (alreadyInOther) {
+    return { ok: false, error: "Em đã chọn một nhóm rồi. Không thể chọn nhóm khác." }
   }
 
-  // Với phiên chia lại (không có class_group_id), lưu HS vào session_group_members
-  // để hệ thống biết ai thuộc nhóm nào (dùng cho tự gán điểm)
+  const devices: string[] = Array.isArray((sg as { claimed_devices?: string[] }).claimed_devices)
+    ? ((sg as { claimed_devices?: string[] }).claimed_devices as string[])
+    : []
+  if (devices.includes(device)) return { ok: true }
+
+  const patch: Record<string, unknown> = {
+    claimed: true,
+  }
+  if (!sg.claimed) patch.claimed_at = new Date().toISOString()
+  if (hasDeviceCol) patch.claimed_devices = Array.from(new Set([...devices, device]))
+
+  const { data: claimed, error } = await supabase
+    .from("session_groups")
+    .update(patch)
+    .eq("id", sessionGroupId)
+    .select("id")
+    .maybeSingle()
+  if (error) return { ok: false, error: error.message }
+  if (!claimed) return { ok: false, error: "Không chọn được nhóm." }
+
   if (studentId && !sg.class_group_id) {
-    // Gỡ HS khỏi các nhóm khác trong cùng phiên (nếu lỡ claim nhầm)
-    const { data: otherGroups } = await supabase
-      .from("session_groups")
-      .select("id")
-      .eq("session_id", sg.session_id)
-      .neq("id", sessionGroupId)
-    const otherIds = (otherGroups ?? []).map((g) => g.id)
+    const otherIds = (sessionGroups ?? []).map((g) => g.id).filter((id) => id !== sessionGroupId)
     if (otherIds.length > 0) {
       await supabase
         .from("session_group_members")
@@ -1077,7 +1106,6 @@ export async function studentClaimGroupAction(
         .eq("student_id", studentId)
         .in("session_group_id", otherIds)
     }
-    // Thêm vào nhóm hiện tại
     await supabase
       .from("session_group_members")
       .upsert(
@@ -1184,10 +1212,54 @@ export async function submitGroupReportAction(args: {
   textContent: string | null
   files: unknown
   isAuto?: boolean
+  deviceToken?: string
 }): Promise<{ ok: boolean; error?: string }> {
   try {
     const supabase = await createClient()
     await assertSessionAcceptsSubmission(supabase, args.sessionId)
+    const full = await supabase
+      .from("session_groups")
+      .select("id, claimed, session_id, claimed_devices")
+      .eq("id", args.sessionGroupId)
+      .maybeSingle()
+    const hasDeviceCol = !(full.error && /claimed_devices/i.test(full.error.message))
+    const targetGroup = hasDeviceCol
+      ? full.data
+      : (
+          await supabase
+            .from("session_groups")
+            .select("id, claimed, session_id")
+            .eq("id", args.sessionGroupId)
+            .maybeSingle()
+        ).data
+    if (!targetGroup || targetGroup.session_id !== args.sessionId) {
+      return { ok: false, error: "Không tìm thấy nhóm." }
+    }
+    if (!targetGroup.claimed) {
+      return { ok: false, error: "Nhóm này chưa được chọn, không thể nộp bài." }
+    }
+    const device = (args.deviceToken ?? "").trim()
+    const devices: string[] = Array.isArray(
+      (targetGroup as { claimed_devices?: string[] }).claimed_devices,
+    )
+      ? ((targetGroup as { claimed_devices?: string[] }).claimed_devices as string[])
+      : []
+    if (hasDeviceCol && device && devices.length > 0 && !devices.includes(device)) {
+      return { ok: false, error: "Nhóm này đã có người chọn. Em không thể nộp bài vào nhóm khác." }
+    }
+    if (hasDeviceCol && device) {
+      const { data: others } = await supabase
+        .from("session_groups")
+        .select("id, claimed_devices")
+        .eq("session_id", args.sessionId)
+        .neq("id", args.sessionGroupId)
+      const inOther = (others ?? []).some(
+        (g) => Array.isArray(g.claimed_devices) && g.claimed_devices.includes(device),
+      )
+      if (inOther) {
+        return { ok: false, error: "Em đã chọn một nhóm rồi. Không thể nộp bài nhóm khác." }
+      }
+    }
     const { sanitizeSubmissionHtml } = await import("@/lib/rich-text")
     const textContent = args.textContent ? sanitizeSubmissionHtml(args.textContent) : null
     const { data: existing } = await supabase
