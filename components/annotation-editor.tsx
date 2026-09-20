@@ -117,6 +117,10 @@ export function AnnotationEditor({
   const [docxWidth, setDocxWidth] = useState<number | null>(null)
   const [docxError, setDocxError] = useState(false)
   const [docxLoading, setDocxLoading] = useState(false)
+  const pdfBoxRef = useRef<HTMLDivElement | null>(null)
+  const [pdfWidth, setPdfWidth] = useState<number | null>(null)
+  const [pdfError, setPdfError] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(() => (hasFiles ? files[0]?.kind === "pdf" : false))
   const panRef = useRef<{ active: boolean; startX: number; startY: number; scrollX: number; scrollY: number }>({
     active: false,
     startX: 0,
@@ -155,9 +159,9 @@ export function AnnotationEditor({
   // PPT: khi đang dùng công cụ chấm (không phải bàn tay) thì khóa iframe để
   // không tương tác được với file, chuột chỉ dùng để đặt dấu/vẽ.
   const annotateLocked = isPptx && tool !== "pan"
-  const canAnnotate = isImage || currentIdx === -1 || isDocx || isPptx
+  const canAnnotate = isImage || currentIdx === -1 || isDocx || isPptx || (isPdf && !pdfError && !pdfLoading)
   const annotationKey = currentIdx
-  const showAnnotations = canAnnotate && !presentationMode && !isPdf
+  const showAnnotations = canAnnotate && !presentationMode
 
   // Render tệp .docx bằng docx-preview thành DOM thuần (thay iframe Office):
   // scroll trang tự nhiên theo viewport, dấu bám nội dung, chấm chính xác như ảnh.
@@ -194,6 +198,68 @@ export function AnnotationEditor({
         }
       } finally {
         if (!cancelled) setDocxLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+      if (el) el.replaceChildren()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIdx])
+
+  useEffect(() => {
+    const el = pdfBoxRef.current
+    if (!isPdf || !currentFile || !el) {
+      setPdfWidth(null)
+      setPdfError(false)
+      return
+    }
+    let cancelled = false
+    setPdfLoading(true)
+    setPdfError(false)
+    ;(async () => {
+      try {
+        const pdfjs = await import("pdfjs-dist")
+        pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"
+        const res = await fetch(currentFile.url)
+        if (!res.ok) throw new Error("Không tải được PDF")
+        const data = await res.arrayBuffer()
+        if (cancelled) return
+        const pdf = await pdfjs.getDocument({ data }).promise
+        if (cancelled) return
+        el.replaceChildren()
+        const targetWidth = 900
+        let maxWidth = 0
+        for (let n = 1; n <= pdf.numPages; n++) {
+          if (cancelled) return
+          const page = await pdf.getPage(n)
+          const unscaled = page.getViewport({ scale: 1 })
+          const scale = targetWidth / unscaled.width
+          const viewport = page.getViewport({ scale })
+          const canvas = document.createElement("canvas")
+          canvas.width = viewport.width
+          canvas.height = viewport.height
+          canvas.className = "block bg-white shadow-sm mx-auto pointer-events-none"
+          canvas.style.width = `${viewport.width}px`
+          canvas.style.height = `${viewport.height}px`
+          canvas.style.marginBottom = n < pdf.numPages ? "16px" : "0"
+          const ctx = canvas.getContext("2d")
+          if (!ctx) throw new Error("Không tạo được canvas")
+          await page.render({ canvasContext: ctx, viewport, canvas }).promise
+          if (cancelled) return
+          el.appendChild(canvas)
+          maxWidth = Math.max(maxWidth, viewport.width)
+        }
+        setPdfWidth(maxWidth || null)
+        setPdfError(false)
+      } catch {
+        if (!cancelled) {
+          setPdfError(true)
+          setPdfWidth(null)
+          if (el) el.replaceChildren()
+        }
+      } finally {
+        if (!cancelled) setPdfLoading(false)
       }
     })()
     return () => {
@@ -926,8 +992,8 @@ export function AnnotationEditor({
             style={{
               cursor,
               minHeight: presentationMode ? undefined : "70vh",
-              width: isDocx ? (docxWidth ?? undefined) : undefined,
-              margin: isDocx && docxWidth ? "0 auto" : undefined,
+              width: isDocx ? (docxWidth ?? undefined) : isPdf ? (pdfWidth ?? undefined) : undefined,
+              margin: (isDocx && docxWidth) || (isPdf && pdfWidth) ? "0 auto" : undefined,
             }}
           >
             {currentIdx === -1 ? (
@@ -962,13 +1028,28 @@ export function AnnotationEditor({
                 />
               </div>
             ) : isPdf && currentFile ? (
-              <div className="w-[1000px] h-[78vh] relative mx-auto">
-                <iframe
-                  src={currentFile.url}
-                  title={currentFile.name}
-                  className="w-full h-full rounded-md"
-                />
-                <div className="absolute top-2 right-2">
+              <div className="relative w-full">
+                <div ref={pdfBoxRef} className="w-full py-3" />
+                {pdfLoading && !pdfError && (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    Đang tải tệp PDF...
+                  </p>
+                )}
+                {pdfError && (
+                  <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+                    <p className="text-sm text-muted-foreground">
+                      Không đọc được tệp PDF, mở bằng trình xem mặc định.
+                    </p>
+                    <div className="w-full h-[78vh]">
+                      <iframe
+                        src={currentFile.url}
+                        title={currentFile.name}
+                        className="w-full h-full rounded-md"
+                      />
+                    </div>
+                  </div>
+                )}
+                <div className="absolute top-2 right-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
                   <Button asChild variant="outline" size="sm" className="gap-1">
                     <a href={currentFile.url} target="_blank" rel="noreferrer" download>
                       <Download className="size-3.5" />
@@ -1057,7 +1138,7 @@ export function AnnotationEditor({
             {showAnnotations && (
               <svg
                 key={`ann-svg-${annotationKey}`}
-                className="absolute inset-0 w-full h-full pointer-events-none"
+                className="absolute inset-0 w-full h-full pointer-events-none z-[5]"
                 preserveAspectRatio="none"
               >
                 {filteredItems.map(({ it, origIdx }) => {
@@ -1123,7 +1204,7 @@ export function AnnotationEditor({
                       setSelectedTextIdx(origIdx)
                     }}
                     className={cn(
-                      "absolute whitespace-pre leading-none cursor-move transition-shadow",
+                      "absolute z-[6] whitespace-pre leading-none cursor-move transition-shadow",
                       selected
                         ? "ring-2 ring-primary ring-offset-2 ring-offset-card rounded-sm"
                         : "hover:ring-1 hover:ring-primary/40 rounded-sm",
@@ -1161,7 +1242,7 @@ export function AnnotationEditor({
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => removeStamp(origIdx)}
                     title="Click để xóa dấu"
-                    className="absolute font-heading font-bold select-none drop-shadow-sm cursor-pointer leading-none"
+                    className="absolute z-[6] font-heading font-bold select-none drop-shadow-sm cursor-pointer leading-none"
                     style={{
                       left: it.x,
                       top: it.y - it.fontSize,
