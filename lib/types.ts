@@ -49,6 +49,43 @@ export type SessionRow = {
   allow_download: boolean
   use_fixed_groups: boolean
   created_at: string
+  ai_enabled?: boolean
+  ai_rubric?: string | null
+  ai_max_score?: number
+}
+
+export type GeminiTier = "free" | "pro"
+
+export type AiGradeJobStatus = "queued" | "running" | "done" | "error"
+
+export type AiGradeResultStatus = "pending" | "ready" | "error" | "approved" | "rejected"
+
+export type AiGradeJobRow = {
+  id: string
+  session_id: string
+  teacher_id: string
+  status: AiGradeJobStatus
+  total: number
+  completed: number
+  error_message: string | null
+  created_at: string
+  finished_at: string | null
+}
+
+export type AiGradeResultRow = {
+  id: string
+  job_id: string
+  session_id: string
+  session_group_id: string | null
+  session_slot_id: string | null
+  submission_id: string | null
+  ai_score: number | null
+  ai_feedback: string | null
+  transcript: string | null
+  unreadable: boolean
+  status: AiGradeResultStatus
+  error_message: string | null
+  created_at: string
 }
 
 export type AnnotationStamp = {

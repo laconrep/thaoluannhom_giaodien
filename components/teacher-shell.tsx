@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { GraduationCap, LayoutDashboard, CreditCard, Shield } from "lucide-react"
+import { GraduationCap, LayoutDashboard, CreditCard, Shield, Bot } from "lucide-react"
 import { signOutAction } from "@/app/actions"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -35,6 +35,12 @@ export function TeacherShell({
             <Link href="/pricing" className="gap-2">
               <CreditCard className="size-4" aria-hidden="true" />
               Gói sử dụng
+            </Link>
+          </Button>
+          <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+            <Link href="/settings/ai" className="gap-2">
+              <Bot className="size-4" aria-hidden="true" />
+              API Gemini
             </Link>
           </Button>
           {isAdmin && (

@@ -37,6 +37,7 @@ import {
   PRESENTATION_START_SEEN_KEY,
   TOUR_ONBOARDING_SEEN_KEY,
 } from "@/components/tour/tour-store"
+import { AiGradePanel } from "@/components/ai-grade-panel"
 import { QRCodeSVG } from "qrcode.react"
 import {
   ArrowLeft,
@@ -741,6 +742,14 @@ export function GroupSessionBoard({
                   </>
                 )}
               </div>
+
+              <AiGradePanel
+                sessionId={displaySession.id}
+                kind="group"
+                aiEnabled={!!displaySession.ai_enabled}
+                aiRubric={displaySession.ai_rubric ?? null}
+                groups={displayGroups}
+              />
 
               <label className="flex items-center justify-between gap-2 text-xs rounded-md border px-2 py-1.5 bg-muted/30 mt-1">
                 <span className="leading-tight">Cho phép dán khi HS gõ</span>
