@@ -19,6 +19,7 @@ import { TimerPanel } from "@/components/timer-panel"
 import { Switch } from "@/components/ui/switch"
 import { AvatarInitials } from "@/components/avatar-initials"
 import { toast } from "sonner"
+import { AiGradePanel } from "@/components/ai-grade-panel"
 import { isRichTextEmpty } from "@/lib/rich-text"
 import {
   ArrowLeft,
@@ -200,6 +201,17 @@ export function IndividualBoard({
               aria-label="Cho phép dán"
             />
           </label>
+
+          <AiGradePanel
+            sessionId={session.id}
+            kind="individual"
+            aiEnabled={!!session.ai_enabled}
+            aiRubric={session.ai_rubric ?? null}
+            slots={slots.map((s) => ({
+              ...s,
+              studentName: s.student_id ? studentMap[s.student_id]?.name ?? null : null,
+            }))}
+          />
 
           <div className="rounded-md border bg-primary/5 p-2 flex items-center gap-2">
             <ClipboardList className="size-4 text-primary" aria-hidden="true" />
