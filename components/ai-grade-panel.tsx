@@ -51,18 +51,22 @@ export function AiGradePanel({
   const [pending, startTransition] = useTransition()
   const prevJobStatus = useRef<string | null>(null)
 
-  useEffect(() => {
+  async function refreshJob() {
     const supabase = createClient()
-    supabase
+    const { data, error } = await supabase
       .from("ai_grade_jobs")
       .select("*")
       .eq("session_id", sessionId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
-      .then((res: { data: AiGradeJobRow | null }) => {
-        if (res.data) setJob(res.data)
-      })
+    if (error || !data) return null
+    setJob(data as AiGradeJobRow)
+    return data as AiGradeJobRow
+  }
+
+  useEffect(() => {
+    refreshJob().catch(() => {})
   }, [sessionId])
 
   useEffect(() => {
@@ -81,6 +85,24 @@ export function AiGradePanel({
       supabase.removeChannel(ch)
     }
   }, [sessionId])
+
+  useEffect(() => {
+    if (!job || (job.status !== "queued" && job.status !== "running")) return
+    const tick = window.setInterval(() => {
+      refreshJob().catch(() => {})
+    }, 2500)
+    const kick = window.setTimeout(() => {
+      fetch("/api/ai/grade-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: job.id }),
+      }).catch(() => {})
+    }, 8000)
+    return () => {
+      window.clearInterval(tick)
+      window.clearTimeout(kick)
+    }
+  }, [job?.id, job?.status])
 
   const labelByTarget = useMemo(() => {
     const m: Record<string, string> = {}
@@ -225,10 +247,10 @@ export function AiGradePanel({
             {running ? <Loader2 className="size-3 animate-spin" /> : <Bot className="size-3" />}
             {running ? `Đang chấm ${job?.completed ?? 0}/${job?.total ?? "?"}` : "Chấm bài AI"}
           </Button>
-          {(done || readyCount > 0 || job?.status === "error") && (
+          {job && (
             <Button variant="secondary" size="sm" className="h-7 text-xs gap-1" onClick={openResults}>
               <Eye className="size-3" />
-              Xem kết quả chấm
+              {running ? "Xem tiến độ chấm" : "Xem kết quả chấm"}
             </Button>
           )}
           <Link href="/settings/ai" className="text-[10px] text-muted-foreground hover:underline">

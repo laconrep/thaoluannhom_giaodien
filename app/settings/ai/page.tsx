@@ -4,6 +4,7 @@ import { TeacherShell } from "@/components/teacher-shell"
 import { ensureActiveUser } from "@/lib/account-status"
 import { GeminiSettingsForm } from "./gemini-settings-form"
 import type { GeminiTier } from "@/lib/types"
+import { isMissingSchemaError } from "@/lib/ai/schema-error"
 
 export default async function AiSettingsPage() {
   const supabase = await createClient()
@@ -13,11 +14,19 @@ export default async function AiSettingsPage() {
   if (!user) redirect("/auth/login")
   await ensureActiveUser(user.id)
 
-  const { data: settings } = await supabase
-    .from("teacher_ai_settings")
-    .select("gemini_api_key, gemini_tier")
-    .eq("teacher_id", user.id)
-    .maybeSingle()
+  let settings: { gemini_api_key?: string | null; gemini_tier?: string | null } | null = null
+  let schemaMissing = false
+  try {
+    const { data, error } = await supabase
+      .from("teacher_ai_settings")
+      .select("gemini_api_key, gemini_tier")
+      .eq("teacher_id", user.id)
+      .maybeSingle()
+    settings = data
+    schemaMissing = isMissingSchemaError(error)
+  } catch {
+    schemaMissing = true
+  }
 
   const key = settings?.gemini_api_key ?? ""
   const masked = key ? `${key.slice(0, 6)}…${key.slice(-4)}` : ""
@@ -31,6 +40,12 @@ export default async function AiSettingsPage() {
             Lưu key riêng theo tài khoản. Dùng khi bật chấm bài AI trên phiên.
           </p>
         </header>
+        {schemaMissing && (
+          <p className="text-sm rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+            Chưa có bảng cài đặt AI trên Supabase. Chạy{" "}
+            <code className="font-mono text-xs">scripts/110_ai_grading.sql</code> trong SQL Editor rồi tải lại trang.
+          </p>
+        )}
         <GeminiSettingsForm
           hasKey={Boolean(key)}
           maskedKey={masked}
