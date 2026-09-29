@@ -1,10 +1,23 @@
 "use server"
 
+import { after } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-import { headers } from "next/headers"
 import { saveAnnotationAction } from "@/app/actions"
 import type { GeminiTier } from "@/lib/types"
+import { isMissingSchemaError, throwSchemaOrMessage } from "@/lib/ai/schema-error"
+import { runAiGradeJob } from "@/lib/ai/run-grade-job"
+
+type TeacherSession = {
+  id: string
+  class_id: string
+  title: string
+  kind: string
+  ai_enabled?: boolean
+  ai_rubric?: string | null
+  ai_max_score?: number
+  classes?: { teacher_id?: string }
+}
 
 async function requireTeacherForSession(sessionId: string) {
   const supabase = await createClient()
@@ -12,13 +25,46 @@ async function requireTeacherForSession(sessionId: string) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) throw new Error("Cần đăng nhập.")
-  const { data: session } = await supabase
-    .from("sessions")
-    .select("id, class_id, title, kind, ai_enabled, ai_rubric, ai_max_score, classes!inner(teacher_id)")
-    .eq("id", sessionId)
-    .single()
+  let session: TeacherSession | null = null
+  try {
+    const first = await supabase
+      .from("sessions")
+      .select("id, class_id, title, kind, ai_enabled, ai_rubric, ai_max_score, classes!inner(teacher_id)")
+      .eq("id", sessionId)
+      .single()
+    session = first.data as TeacherSession | null
+    if (!session && first.error && isMissingSchemaError(first.error)) {
+      const fallback = await supabase
+        .from("sessions")
+        .select("id, class_id, title, kind, classes!inner(teacher_id)")
+        .eq("id", sessionId)
+        .single()
+      if (!fallback.data) throwSchemaOrMessage(first.error, "Không tìm thấy phiên.")
+      session = {
+        ...(fallback.data as TeacherSession),
+        ai_enabled: false,
+        ai_rubric: null,
+        ai_max_score: 10,
+      }
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("Chưa cài bảng")) throw e
+    const fallback = await supabase
+      .from("sessions")
+      .select("id, class_id, title, kind, classes!inner(teacher_id)")
+      .eq("id", sessionId)
+      .single()
+    if (!fallback.data) throw new Error("Không tìm thấy phiên.")
+    session = {
+      ...(fallback.data as TeacherSession),
+      ai_enabled: false,
+      ai_rubric: null,
+      ai_max_score: 10,
+    }
+  }
   if (!session) throw new Error("Không tìm thấy phiên.")
-  const teacherId = (session as { classes?: { teacher_id?: string } }).classes?.teacher_id
+  const cls = session.classes as { teacher_id?: string } | { teacher_id?: string }[] | undefined
+  const teacherId = Array.isArray(cls) ? cls[0]?.teacher_id : cls?.teacher_id
   if (teacherId !== user.id) throw new Error("Không có quyền.")
   return { supabase, user, session }
 }
@@ -41,14 +87,14 @@ export async function saveGeminiSettingsAction(apiKey: string, tier: GeminiTier)
   }
   if (key) patch.gemini_api_key = key
   const { error } = await supabase.from("teacher_ai_settings").upsert(patch, { onConflict: "teacher_id" })
-  if (error) throw new Error(error.message)
+  if (error) throwSchemaOrMessage(error, "Không lưu được cài đặt Gemini.")
   revalidatePath("/settings/ai")
 }
 
 export async function setSessionAiEnabledAction(sessionId: string, enabled: boolean) {
   const { supabase, session } = await requireTeacherForSession(sessionId)
   const { error } = await supabase.from("sessions").update({ ai_enabled: enabled }).eq("id", sessionId)
-  if (error) throw new Error(error.message)
+  if (error) throwSchemaOrMessage(error, "Không đổi được chế độ AI.")
   revalidatePath(`/classes/${session.class_id}/sessions/${sessionId}`)
   revalidatePath(`/classes/${session.class_id}/individual/${sessionId}`)
 }
@@ -60,7 +106,7 @@ export async function saveSessionAiRubricAction(sessionId: string, rubric: strin
     .from("sessions")
     .update({ ai_rubric: rubric.trim() || null, ai_max_score: score })
     .eq("id", sessionId)
-  if (error) throw new Error(error.message)
+  if (error) throwSchemaOrMessage(error, "Không lưu được tiêu chí chấm.")
   revalidatePath(`/classes/${session.class_id}/sessions/${sessionId}`)
   revalidatePath(`/classes/${session.class_id}/individual/${sessionId}`)
 }
@@ -69,19 +115,21 @@ export async function startAiGradeJobAction(sessionId: string): Promise<{ jobId:
   const { supabase, user, session } = await requireTeacherForSession(sessionId)
   if (!session.ai_enabled) throw new Error("Chế độ chấm AI chưa bật.")
 
-  const { data: settings } = await supabase
+  const { data: settings, error: settingsErr } = await supabase
     .from("teacher_ai_settings")
     .select("gemini_api_key")
     .eq("teacher_id", user.id)
     .maybeSingle()
+  if (settingsErr && isMissingSchemaError(settingsErr)) throwSchemaOrMessage(settingsErr, "")
   if (!settings?.gemini_api_key) throw new Error("Chưa lưu API key Gemini.")
 
-  const { data: running } = await supabase
+  const { data: running, error: runningErr } = await supabase
     .from("ai_grade_jobs")
     .select("id")
     .eq("session_id", sessionId)
     .in("status", ["queued", "running"])
     .maybeSingle()
+  if (runningErr && isMissingSchemaError(runningErr)) throwSchemaOrMessage(runningErr, "")
   if (running) throw new Error("Phiên này đang được AI chấm.")
 
   const { data: submissions, error: subErr } = await supabase
@@ -103,7 +151,7 @@ export async function startAiGradeJobAction(sessionId: string): Promise<{ jobId:
     })
     .select("id")
     .single()
-  if (jobErr || !job) throw new Error(jobErr?.message ?? "Không tạo được phiên chấm AI.")
+  if (jobErr || !job) throwSchemaOrMessage(jobErr, "Không tạo được phiên chấm AI.")
 
   const rows = list.map((s) => ({
     job_id: job.id,
@@ -114,18 +162,9 @@ export async function startAiGradeJobAction(sessionId: string): Promise<{ jobId:
     status: "pending",
   }))
   const { error: rowsErr } = await supabase.from("ai_grade_results").insert(rows)
-  if (rowsErr) throw new Error(rowsErr.message)
+  if (rowsErr) throwSchemaOrMessage(rowsErr, "Không tạo được hàng chấm AI.")
 
-  const h = await headers()
-  const host = h.get("x-forwarded-host") || h.get("host")
-  const proto = h.get("x-forwarded-proto") || "https"
-  if (host) {
-    fetch(`${proto}://${host}/api/ai/grade-run`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobId: job.id }),
-    }).catch(() => {})
-  }
+  after(() => runAiGradeJob(job.id).catch(() => {}))
 
   return { jobId: job.id, total: list.length }
 }
@@ -169,7 +208,8 @@ export async function approveAiGradeResultsAction(jobId: string, resultIds?: str
     await supabase.from("ai_grade_results").update({ status: "approved" }).eq("id", row.id)
   }
 
-  const classId = (job as { sessions?: { class_id?: string } }).sessions?.class_id
+  const sess = (job as { sessions?: { class_id?: string } | { class_id?: string }[] }).sessions
+  const classId = Array.isArray(sess) ? sess[0]?.class_id : sess?.class_id
   if (classId) {
     revalidatePath(`/classes/${classId}/sessions/${job.session_id}`)
     revalidatePath(`/classes/${classId}/individual/${job.session_id}`)
