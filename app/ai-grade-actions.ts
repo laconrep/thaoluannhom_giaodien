@@ -140,6 +140,58 @@ export async function startAiGradeJobAction(sessionId: string): Promise<{ jobId:
   const list = submissions ?? []
   if (list.length === 0) throw new Error("Chưa có bài nộp để chấm.")
 
+  const { data: prevOk } = await supabase
+    .from("ai_grade_results")
+    .select("submission_id, ai_score, ai_feedback, transcript, unreadable, status, created_at")
+    .eq("session_id", sessionId)
+    .in("status", ["ready", "approved"])
+    .order("created_at", { ascending: false })
+
+  const kept = new Map<
+    string,
+    {
+      submission_id: string | null
+      ai_score: number | null
+      ai_feedback: string | null
+      transcript: string | null
+      unreadable: boolean
+      status: string
+    }
+  >()
+  for (const row of prevOk ?? []) {
+    if (row.submission_id && !kept.has(row.submission_id)) kept.set(row.submission_id, row)
+  }
+
+  const rows = list.map((s) => {
+    const prev = kept.get(s.id)
+    if (prev) {
+      return {
+        job_id: "",
+        session_id: sessionId,
+        session_group_id: s.session_group_id,
+        session_slot_id: s.session_slot_id,
+        submission_id: s.id,
+        ai_score: prev.ai_score,
+        ai_feedback: prev.ai_feedback,
+        transcript: prev.transcript,
+        unreadable: prev.unreadable,
+        status: prev.status,
+        error_message: null,
+      }
+    }
+    return {
+      job_id: "",
+      session_id: sessionId,
+      session_group_id: s.session_group_id,
+      session_slot_id: s.session_slot_id,
+      submission_id: s.id,
+      status: "pending",
+    }
+  })
+  const pendingCount = rows.filter((r) => r.status === "pending").length
+  if (pendingCount === 0) throw new Error("Tất cả bài đã chấm xong.")
+  const keptCount = list.length - pendingCount
+
   const { data: job, error: jobErr } = await supabase
     .from("ai_grade_jobs")
     .insert({
@@ -147,21 +199,15 @@ export async function startAiGradeJobAction(sessionId: string): Promise<{ jobId:
       teacher_id: user.id,
       status: "queued",
       total: list.length,
-      completed: 0,
+      completed: keptCount,
     })
     .select("id")
     .single()
   if (jobErr || !job) throwSchemaOrMessage(jobErr, "Không tạo được phiên chấm AI.")
 
-  const rows = list.map((s) => ({
-    job_id: job.id,
-    session_id: sessionId,
-    session_group_id: s.session_group_id,
-    session_slot_id: s.session_slot_id,
-    submission_id: s.id,
-    status: "pending",
-  }))
-  const { error: rowsErr } = await supabase.from("ai_grade_results").insert(rows)
+  const { error: rowsErr } = await supabase.from("ai_grade_results").insert(
+    rows.map((r) => ({ ...r, job_id: job.id })),
+  )
   if (rowsErr) throwSchemaOrMessage(rowsErr, "Không tạo được hàng chấm AI.")
 
   after(() => runAiGradeJob(job.id).catch(() => {}))

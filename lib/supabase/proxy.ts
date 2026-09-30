@@ -44,8 +44,11 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname
   const protectedPrefixes = ["/dashboard", "/classes", "/admin"]
   const needsAuth = protectedPrefixes.some((p) => path.startsWith(p))
+  const isServerAction = request.headers.has("next-action")
 
-  if (needsAuth && !user) {
+  // Server Action POST phải tới đúng trang hiện tại. Redirect sang /auth/login
+  // làm Next tìm action ID trên trang login → "Server Action was not found".
+  if (needsAuth && !user && !isServerAction) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
     url.searchParams.set("next", path)
