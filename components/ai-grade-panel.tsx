@@ -170,13 +170,17 @@ export function AiGradePanel({
         if (rubric.trim() !== (initialRubric ?? "")) {
           await saveSessionAiRubricAction(sessionId, rubric)
         }
-        const { jobId, total } = await startAiGradeJobAction(sessionId)
+        const started = await startAiGradeJobAction(sessionId)
+        if (!started.ok) {
+          toast.error(started.error)
+          return
+        }
         setJob({
-          id: jobId,
+          id: started.jobId,
           session_id: sessionId,
           teacher_id: "",
           status: "queued",
-          total,
+          total: started.total,
           completed: 0,
           error_message: null,
           created_at: new Date().toISOString(),
@@ -185,7 +189,7 @@ export function AiGradePanel({
         fetch("/api/ai/grade-run", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jobId }),
+          body: JSON.stringify({ jobId: started.jobId }),
         }).catch(() => {})
         toast.success("AI đang chấm ngầm, tự thử lại nhóm lỗi tối đa 6 lần. Có thể tiếp tục sửa bài.")
       } catch (e) {
