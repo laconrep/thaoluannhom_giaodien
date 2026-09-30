@@ -2,6 +2,18 @@ export const TOUR_ONBOARDING_SEEN_KEY = "teacher_tour_seen_v1"
 export const TOUR_DASHBOARD_SEEN_KEY = "teacher_tour_dashboard_seen_v1"
 export const TOUR_ROSTER_SEEN_KEY = "teacher_tour_roster_seen_v1"
 export const TOUR_ROSTER_SEEN_PREFIX = "roster_intro_seen_"
+export const TOUR_ROSTER_LIST_SEEN_KEY = "teacher_tour_roster_list_seen_v1"
+export const TOUR_ROSTER_LEADER_SEEN_KEY = "teacher_tour_roster_leader_seen_v1"
+export const TOUR_ROSTER_NEXT_SEEN_KEY = "teacher_tour_roster_next_seen_v1"
+
+export type RosterHint = "list" | "leader" | "next"
+
+const ROSTER_HINT_KEYS: Record<RosterHint, string> = {
+  list: TOUR_ROSTER_LIST_SEEN_KEY,
+  leader: TOUR_ROSTER_LEADER_SEEN_KEY,
+  next: TOUR_ROSTER_NEXT_SEEN_KEY,
+}
+
 export const PRESENTATION_START_SEEN_KEY = "teacher_tour_presentation_start_seen_v1"
 export const PRESENTATION_TOUR_SEEN_KEY = "teacher_tour_presentation_seen_v1"
 export const GRADEBOOK_TOUR_PENDING_KEY = "teacher_tour_gradebook_pending_v1"
@@ -37,6 +49,16 @@ export function rosterTourSeen(): boolean {
 
 export function setRosterTourSeen() {
   setSeen(TOUR_ROSTER_SEEN_KEY)
+}
+
+export function rosterHintSeen(hint: RosterHint): boolean {
+  if (rosterTourSeen()) return true
+  return getSeen(ROSTER_HINT_KEYS[hint])
+}
+
+export function setRosterHintSeen(hint: RosterHint) {
+  setSeen(ROSTER_HINT_KEYS[hint])
+  if (hint === "next") setRosterTourSeen()
 }
 
 // Tour bảng điểm chỉ hiện khi giáo viên chủ động bấm tab "Bảng điểm".
