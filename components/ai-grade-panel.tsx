@@ -187,7 +187,7 @@ export function AiGradePanel({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ jobId }),
         }).catch(() => {})
-        toast.success("AI đang chấm ngầm. Có thể tiếp tục sửa bài.")
+        toast.success("AI đang chấm ngầm, tự thử lại nhóm lỗi tối đa 6 lần. Có thể tiếp tục sửa bài.")
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Không bắt đầu được")
       }
