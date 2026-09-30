@@ -1,8 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Joyride, EVENTS, STATUS, type EventData, type Step } from "react-joyride"
-import { RESTART_EVENT, rosterTourSeen, setRosterTourSeen } from "./tour-store"
+import { Joyride, EVENTS, type EventData, type Step } from "react-joyride"
+import {
+  RESTART_EVENT,
+  rosterHintSeen,
+  setRosterHintSeen,
+  type RosterHint,
+} from "./tour-store"
 import {
   tourLocale,
   rosterListStep,
@@ -11,9 +16,9 @@ import {
 } from "./tour-config"
 import { useTourOptions } from "./use-tour-options"
 
-// Tour phân nhóm progressive: hint xuất hiện theo hành động thật của giáo viên —
-// vào trang (danh sách HS) → kéo ≥1 HS vào nhóm (hint nhóm trưởng) → gán leader
-// (hint chuyển tab). Hoàn tất bước cuối → setRosterTourSeen().
+// Tour phân nhóm progressive: từng hint chỉ tự hiện 1 lần.
+// Vào trang (danh sách HS) → kéo ≥1 HS vào nhóm (hint nhóm trưởng) → gán leader
+// (hint chuyển tab). Đóng/hoàn tất hint nào thì ghi cờ hint đó, lần sau không bật lại.
 type Stage = "idle" | "list" | "leader" | "next" | "done"
 
 type RosterTourProps = {
@@ -22,42 +27,60 @@ type RosterTourProps = {
   hasLeader: boolean
 }
 
+const INITIAL_SEEN: Record<RosterHint, boolean> = {
+  list: true,
+  leader: true,
+  next: true,
+}
+
 export function RosterTour({ ready, hasMembers, hasLeader }: RosterTourProps) {
   const [stage, setStage] = useState<Stage>("idle")
   const [run, setRun] = useState(false)
   const prevStageRef = useRef<Stage>("idle")
-  const [enabled, setEnabled] = useState(false)
+  const [seen, setSeenState] = useState<Record<RosterHint, boolean>>(INITIAL_SEEN)
+  const [hydrated, setHydrated] = useState(false)
+  const [replaying, setReplaying] = useState(false)
   const tourOptions = useTourOptions()
 
   useEffect(() => {
-    setEnabled(!rosterTourSeen())
+    setSeenState({
+      list: rosterHintSeen("list"),
+      leader: rosterHintSeen("leader"),
+      next: rosterHintSeen("next"),
+    })
+    setHydrated(true)
   }, [])
 
-  // Vào trang (đã có nhóm, chưa xem tour) → hint danh sách học sinh.
-  useEffect(() => {
-    if (!enabled || !ready) return
-    if (stage === "idle") setStage("list")
-  }, [enabled, ready, stage])
+  function markHint(hint: RosterHint) {
+    setRosterHintSeen(hint)
+    setSeenState((cur) => ({ ...cur, [hint]: true }))
+  }
 
-  // Kéo ≥1 HS vào nhóm → hint nhóm trưởng.
-  useEffect(() => {
-    if (!enabled) return
-    if (hasMembers && (stage === "idle" || stage === "list")) setStage("leader")
-  }, [hasMembers, enabled, stage])
+  const pending = !seen.list || !seen.leader || !seen.next
+  const enabled = replaying || pending
 
-  // Gán nhóm trưởng → hint chuyển tab.
+  // Vào trang: chỉ bật hint chưa xem, khớp trạng thái lớp hiện tại.
   useEffect(() => {
-    if (!enabled) return
-    if (hasLeader && (stage === "idle" || stage === "list" || stage === "leader")) {
-      setStage("next")
-    }
-  }, [hasLeader, enabled, stage])
+    if (!hydrated || replaying || !ready || stage !== "idle") return
+    if (hasLeader && !seen.next) setStage("next")
+    else if (hasMembers && !seen.leader) setStage("leader")
+    else if (!hasMembers && !seen.list) setStage("list")
+  }, [hydrated, ready, hasMembers, hasLeader, seen, stage, replaying])
 
-  // Bật hint khi chuyển stage (Joyride remount theo key). Không tự bật lại khi
-  // người dùng đã đóng hint ở cùng stage — chỉ bật khi có hành động mới.
-  // Không gate theo `enabled` để replay (nút "Hướng dẫn") vẫn chạy sau khi đã xem;
-  // khi chưa xem, stage chỉ rời "idle" qua auto-start, còn khi đã xem stage chỉ
-  // đổi qua RESTART_EVENT.
+  // Kéo ≥1 HS vào nhóm → hint nhóm trưởng (nếu chưa xem).
+  useEffect(() => {
+    if (!hydrated || replaying || !hasMembers || seen.leader) return
+    if (stage === "idle" || stage === "list") setStage("leader")
+  }, [hydrated, hasMembers, seen.leader, stage, replaying])
+
+  // Gán nhóm trưởng → hint chuyển tab (nếu chưa xem).
+  useEffect(() => {
+    if (!hydrated || replaying || !hasLeader || seen.next) return
+    if (stage === "idle" || stage === "list" || stage === "leader") setStage("next")
+  }, [hydrated, hasLeader, seen.next, stage, replaying])
+
+  // Bật hint khi chuyển stage. Không tự bật lại khi người dùng đã đóng hint
+  // ở cùng stage — chỉ bật khi có hành động mới hoặc replay.
   useEffect(() => {
     if (stage === prevStageRef.current) return
     prevStageRef.current = stage
@@ -68,7 +91,9 @@ export function RosterTour({ ready, hasMembers, hasLeader }: RosterTourProps) {
   useEffect(() => {
     if (typeof window === "undefined") return
     const onRestart = () => {
-      setStage(hasLeader ? "next" : hasMembers ? "leader" : "list")
+      const next: Stage = hasLeader ? "next" : hasMembers ? "leader" : "list"
+      setReplaying(true)
+      setStage(next)
       setRun(false)
       window.setTimeout(() => setRun(true), 80)
     }
@@ -92,15 +117,17 @@ export function RosterTour({ ready, hasMembers, hasLeader }: RosterTourProps) {
   function handleEvent(data: EventData) {
     if (data.type !== EVENTS.TOUR_END) return
     setRun(false)
-    if (data.status !== STATUS.FINISHED) return
-    if (stage === "next") {
-      setRosterTourSeen()
-      setEnabled(false)
-      setStage("done")
+    if (replaying) {
+      setReplaying(false)
+      return
     }
+    if (stage === "list" || stage === "leader" || stage === "next") {
+      markHint(stage)
+    }
+    if (stage === "next") setStage("done")
   }
 
-  if (stage === "done") return null
+  if (!hydrated || !enabled || stage === "idle" || stage === "done") return null
 
   return (
     <Joyride
