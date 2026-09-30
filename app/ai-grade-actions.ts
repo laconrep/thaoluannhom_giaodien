@@ -1,12 +1,10 @@
 "use server"
 
-import { after } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { saveAnnotationAction } from "@/app/actions"
 import type { GeminiTier } from "@/lib/types"
 import { isMissingSchemaError, throwSchemaOrMessage } from "@/lib/ai/schema-error"
-import { runAiGradeJob } from "@/lib/ai/run-grade-job"
 
 type TeacherSession = {
   id: string
@@ -111,9 +109,21 @@ export async function saveSessionAiRubricAction(sessionId: string, rubric: strin
   revalidatePath(`/classes/${session.class_id}/individual/${sessionId}`)
 }
 
-export async function startAiGradeJobAction(sessionId: string): Promise<{ jobId: string; total: number }> {
+export async function startAiGradeJobAction(
+  sessionId: string,
+): Promise<{ ok: true; jobId: string; total: number } | { ok: false; error: string }> {
+  try {
+    return await startAiGradeJobActionInner(sessionId)
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Không bắt đầu được" }
+  }
+}
+
+async function startAiGradeJobActionInner(
+  sessionId: string,
+): Promise<{ ok: true; jobId: string; total: number } | { ok: false; error: string }> {
   const { supabase, user, session } = await requireTeacherForSession(sessionId)
-  if (!session.ai_enabled) throw new Error("Chế độ chấm AI chưa bật.")
+  if (!session.ai_enabled) return { ok: false, error: "Chế độ chấm AI chưa bật." }
 
   const { data: settings, error: settingsErr } = await supabase
     .from("teacher_ai_settings")
@@ -210,9 +220,7 @@ export async function startAiGradeJobAction(sessionId: string): Promise<{ jobId:
   )
   if (rowsErr) throwSchemaOrMessage(rowsErr, "Không tạo được hàng chấm AI.")
 
-  after(() => runAiGradeJob(job.id).catch(() => {}))
-
-  return { jobId: job.id, total: list.length }
+  return { ok: true, jobId: job.id, total: list.length }
 }
 
 export async function approveAiGradeResultsAction(jobId: string, resultIds?: string[]) {
