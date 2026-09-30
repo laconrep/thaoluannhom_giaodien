@@ -184,7 +184,7 @@ async function startAiGradeJobActionInner(
         ai_score: prev.ai_score,
         ai_feedback: prev.ai_feedback,
         transcript: prev.transcript,
-        unreadable: prev.unreadable,
+        unreadable: prev.unreadable ?? false,
         status: prev.status,
         error_message: null,
       }
@@ -195,6 +195,7 @@ async function startAiGradeJobActionInner(
       session_group_id: s.session_group_id,
       session_slot_id: s.session_slot_id,
       submission_id: s.id,
+      unreadable: false,
       status: "pending",
     }
   })
