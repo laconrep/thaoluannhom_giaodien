@@ -4,6 +4,9 @@ const nextConfig = {
     unoptimized: true,
   },
   allowedDevOrigins: ['.monkeycode-ai.live'],
+  serverActions: {
+    allowedOrigins: ['*.monkeycode-ai.live'],
+  },
   serverExternalPackages: ['sharp'],
 }
 
