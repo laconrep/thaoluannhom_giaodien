@@ -414,7 +414,7 @@ export function PresentationViewer({
           style={{ width: "min(5vw, 5vh)", height: "min(5vw, 5vh)", fontSize: "min(1.4vw, 1.4vh)" }}
           title="Thời gian còn lại của phiên thảo luận"
         >
-          {formatClock(sessionLeft)}
+          {endsAt ? formatClock(sessionLeft) : "∞"}
         </div>
       )}
       {sourceUrl ? (

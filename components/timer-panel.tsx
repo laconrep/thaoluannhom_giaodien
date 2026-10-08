@@ -14,7 +14,12 @@ import {
 
 type Status = "idle" | "running" | "ended"
 
-const PRESETS = [1, 3, 5, 10, 15, 20]
+const PRESETS = [1, 3, 5, 10, 15]
+const UNLIMITED = 0
+
+function isUnlimitedDuration(seconds: number) {
+  return seconds <= 0
+}
 
 export function TimerPanel({
   sessionId,
@@ -29,17 +34,25 @@ export function TimerPanel({
   durationSeconds: number
   onChanged?: (session: any) => void
 }) {
-  const [minutes, setMinutes] = useState<number>(() => Math.floor(durationSeconds / 60))
-  const [seconds, setSeconds] = useState<number>(() => durationSeconds % 60)
+  const [unlimited, setUnlimited] = useState(() => isUnlimitedDuration(durationSeconds))
+  const [minutes, setMinutes] = useState<number>(() =>
+    isUnlimitedDuration(durationSeconds) ? 0 : Math.floor(durationSeconds / 60),
+  )
+  const [seconds, setSeconds] = useState<number>(() =>
+    isUnlimitedDuration(durationSeconds) ? 0 : durationSeconds % 60,
+  )
   const [, startTransition] = useTransition()
 
   const left = useCountdown(endsAt, status)
+  const runningUnlimited = status === "running" && !endsAt
 
   // Sync minutes/seconds when durationSeconds changes from props (e.g. when session reset)
   useEffect(() => {
     if (status !== "running") {
-      setMinutes(Math.floor(durationSeconds / 60))
-      setSeconds(durationSeconds % 60)
+      const nextUnlimited = isUnlimitedDuration(durationSeconds)
+      setUnlimited(nextUnlimited)
+      setMinutes(nextUnlimited ? 0 : Math.floor(durationSeconds / 60))
+      setSeconds(nextUnlimited ? 0 : durationSeconds % 60)
     }
   }, [durationSeconds, status])
 
@@ -68,22 +81,33 @@ export function TimerPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, endsAt, sessionId])
 
-  const totalConfigured = minutes * 60 + seconds
+  const totalConfigured = unlimited ? UNLIMITED : minutes * 60 + seconds
   const totalRemaining = left
   const totalInitial =
     status === "running" && endsAt
       ? Math.max(totalConfigured, totalRemaining, 1)
       : totalConfigured || 1
   const progressPct =
+    runningUnlimited || (status !== "running" && unlimited)
+      ? 100
+      : status === "running"
+        ? Math.max(0, Math.min(100, (totalRemaining / totalInitial) * 100))
+        : status === "ended"
+          ? 0
+          : 100
+
+  const clockValue =
     status === "running"
-      ? Math.max(0, Math.min(100, (totalRemaining / totalInitial) * 100))
+      ? runningUnlimited
+        ? "Không hạn"
+        : formatClock(left)
       : status === "ended"
-        ? 0
-        : 100
+        ? "00:00"
+        : unlimited
+          ? "Không hạn"
+          : formatClock(totalConfigured)
 
-  const clockValue = status === "running" ? formatClock(left) : status === "ended" ? "00:00" : formatClock(totalConfigured)
-
-  const isLow = status === "running" && left > 0 && left <= 15
+  const isLow = status === "running" && !runningUnlimited && left > 0 && left <= 15
 
   function runAction(action: Promise<any>, optimistic: any, revert: any) {
     if (onChanged) onChanged(optimistic)
@@ -99,13 +123,13 @@ export function TimerPanel({
   }
 
   function handleStart() {
-    const dur = Math.max(5, minutes * 60 + seconds)
+    const dur = unlimited ? UNLIMITED : Math.max(5, minutes * 60 + seconds)
     const now = new Date()
     const optimistic = {
       status: "running",
       duration_seconds: dur,
       started_at: now.toISOString(),
-      ends_at: new Date(now.getTime() + dur * 1000).toISOString(),
+      ends_at: unlimited ? null : new Date(now.getTime() + dur * 1000).toISOString(),
     }
     runAction(startSessionAction(sessionId, dur), optimistic, { status, ends_at: endsAt, duration_seconds: durationSeconds })
   }
@@ -114,18 +138,24 @@ export function TimerPanel({
     runAction(endSessionAction(sessionId), { status: "ended", ends_at: null }, { status, ends_at: endsAt })
   }
   function handleReopen() {
-    const duration = Math.max(5, minutes * 60 + seconds)
+    const duration = unlimited ? UNLIMITED : Math.max(5, minutes * 60 + seconds)
     const now = new Date()
     const optimistic = {
       status: "running",
       duration_seconds: duration,
       started_at: now.toISOString(),
-      ends_at: new Date(now.getTime() + duration * 1000).toISOString(),
+      ends_at: unlimited ? null : new Date(now.getTime() + duration * 1000).toISOString(),
     }
     runAction(reopenSessionAction(sessionId, duration), optimistic, { status, ends_at: endsAt, duration_seconds: durationSeconds })
   }
   function applyPreset(mins: number) {
+    setUnlimited(false)
     setMinutes(mins)
+    setSeconds(0)
+  }
+  function applyUnlimited() {
+    setUnlimited(true)
+    setMinutes(0)
     setSeconds(0)
   }
 
@@ -161,8 +191,12 @@ export function TimerPanel({
               type="number"
               min={0}
               max={180}
-              value={minutes}
-              onChange={(e) => setMinutes(Math.max(0, Math.min(180, Number(e.target.value) || 0)))}
+              value={unlimited ? "" : minutes}
+              placeholder={unlimited ? "—" : undefined}
+              onChange={(e) => {
+                setUnlimited(false)
+                setMinutes(Math.max(0, Math.min(180, Number(e.target.value) || 0)))
+              }}
               className="h-8 text-xs text-center"
               aria-label="Phút"
             />
@@ -171,8 +205,12 @@ export function TimerPanel({
               type="number"
               min={0}
               max={59}
-              value={seconds}
-              onChange={(e) => setSeconds(Math.max(0, Math.min(59, Number(e.target.value) || 0)))}
+              value={unlimited ? "" : seconds}
+              placeholder={unlimited ? "—" : undefined}
+              onChange={(e) => {
+                setUnlimited(false)
+                setSeconds(Math.max(0, Math.min(59, Number(e.target.value) || 0)))
+              }}
               className="h-8 text-xs text-center"
               aria-label="Giây"
             />
@@ -185,7 +223,7 @@ export function TimerPanel({
                 type="button"
                 onClick={() => applyPreset(m)}
                 className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                  minutes === m && seconds === 0
+                  !unlimited && minutes === m && seconds === 0
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-muted/40 hover:bg-muted"
                 }`}
@@ -193,6 +231,19 @@ export function TimerPanel({
                 {m}p
               </button>
             ))}
+            <button
+              type="button"
+              onClick={applyUnlimited}
+              className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                unlimited
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-muted/40 hover:bg-muted"
+              }`}
+              title="Không thời hạn"
+              aria-label="Không thời hạn"
+            >
+              Không hạn
+            </button>
           </div>
         </>
       )}
