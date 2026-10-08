@@ -58,6 +58,7 @@ const INDIVIDUAL_PRESETS: Preset[] = [
   { label: "15 phút", seconds: 900 },
   { label: "30 phút", seconds: 1800 },
   { label: "45 phút", seconds: 2700 },
+  { label: "Không thời hạn", seconds: 0 },
 ]
 
 export function SessionListView({
@@ -316,12 +317,14 @@ export function SessionListView({
                   <FieldLabel>Thời gian (giây)</FieldLabel>
                   <Input
                     type="number"
-                    min={30}
+                    min={0}
                     step={30}
                     value={duration}
-                    onChange={(e) => setDuration(Math.max(30, Number(e.target.value) || 30))}
+                    onChange={(e) => setDuration(Math.max(0, Number(e.target.value) || 0))}
                   />
-                  <FieldDescription>{Math.round(duration / 60)} phút</FieldDescription>
+                  <FieldDescription>
+                    {duration <= 0 ? "Không thời hạn" : `${Math.round(duration / 60)} phút`}
+                  </FieldDescription>
                 </Field>
                 {isGroup && (
                   <Field>
@@ -426,7 +429,7 @@ export function SessionListView({
                     </span>
                     <span className="inline-flex items-center gap-1">
                       <Timer className="size-3" aria-hidden="true" />
-                      {Math.round(s.duration_seconds / 60)} phút
+                      {s.duration_seconds <= 0 ? "Không hạn" : `${Math.round(s.duration_seconds / 60)} phút`}
                     </span>
                   </div>
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-primary mt-2">

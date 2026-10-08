@@ -597,7 +597,7 @@ function SessionRow({ session, token }: { session: Session; token: string }) {
           <div className="text-right">
             {session.status === "running" ? (
               <span className="text-lg font-mono tabular-nums text-primary">
-                {formatClock(left)}
+                {session.ends_at ? formatClock(left) : "Không hạn"}
               </span>
             ) : (
               <span className="text-xs text-muted-foreground">Chưa bắt đầu</span>
