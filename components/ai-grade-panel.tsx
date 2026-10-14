@@ -12,7 +12,6 @@ import {
 } from "@/app/ai-grade-actions"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -21,8 +20,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { RubricBaremDialog } from "@/components/rubric-barem-dialog"
+import { EvalReportDialog } from "@/components/eval-report-dialog"
 import type { AiGradeJobRow, AiGradeResultRow, SessionGroupRow, SessionSlotRow } from "@/lib/types"
-import { Bot, Check, Eye, Loader2, Sparkles } from "lucide-react"
+import { BarChart3, Bot, Check, Eye, Loader2, Sparkles } from "lucide-react"
 
 type Props = {
   sessionId: string
@@ -48,6 +49,8 @@ export function AiGradePanel({
   const [job, setJob] = useState<AiGradeJobRow | null>(null)
   const [results, setResults] = useState<AiGradeResultRow[]>([])
   const [open, setOpen] = useState(false)
+  const [paramOpen, setBaremOpen] = useState(false)
+  const [evalOpen, setEvalOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const prevJobStatus = useRef<string | null>(null)
 
@@ -153,17 +156,6 @@ export function AiGradePanel({
     })
   }
 
-  function saveRubric() {
-    startTransition(async () => {
-      try {
-        await saveSessionAiRubricAction(sessionId, rubric)
-        toast.success("Đã lưu tiêu chí chấm")
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Không lưu được")
-      }
-    })
-  }
-
   function startGrade() {
     startTransition(async () => {
       try {
@@ -180,6 +172,7 @@ export function AiGradePanel({
           session_id: sessionId,
           teacher_id: "",
           status: "queued",
+          provider: started.provider ?? null,
           total: started.total,
           completed: 0,
           error_message: null,
@@ -224,22 +217,14 @@ export function AiGradePanel({
         <span className="font-semibold">Chấm bài AI</span>
       </div>
       <label className="flex items-center justify-between gap-2 text-[11px]">
-        <span className="leading-tight">Bật chấm bằng Gemini</span>
+        <span className="leading-tight">Bật chấm AI</span>
         <Switch checked={enabled} onCheckedChange={toggleEnabled} aria-label="Bật chấm AI" />
       </label>
       {enabled && (
         <>
           {!compact && (
-            <Textarea
-              value={rubric}
-              onChange={(e) => setRubric(e.target.value)}
-              placeholder="Đáp án / tiêu chí chấm (tuỳ chọn)"
-              className="min-h-16 text-xs"
-            />
-          )}
-          {!compact && (
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={saveRubric} disabled={pending}>
-              Lưu tiêu chí
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setBaremOpen(true)}>
+              <Sparkles className="size-3" /> Tiêu chí chấm
             </Button>
           )}
           <Button
@@ -249,7 +234,11 @@ export function AiGradePanel({
             disabled={pending || running}
           >
             {running ? <Loader2 className="size-3 animate-spin" /> : <Bot className="size-3" />}
-            {running ? `Đang chấm ${job?.completed ?? 0}/${job?.total ?? "?"}` : "Chấm bài AI"}
+            {running
+              ? job?.provider === "muse_chat"
+                ? `Muse chat đang chấm ${job?.completed ?? 0}/${job?.total ?? "?"}`
+                : `Đang chấm ${job?.completed ?? 0}/${job?.total ?? "?"}`
+              : "Chấm bài AI"}
           </Button>
           {job && (
             <Button variant="secondary" size="sm" className="h-7 text-xs gap-1" onClick={openResults}>
@@ -257,6 +246,9 @@ export function AiGradePanel({
               {running ? "Xem tiến độ chấm" : "Xem kết quả chấm"}
             </Button>
           )}
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setEvalOpen(true)}>
+            <BarChart3 className="size-3" /> Đánh giá tổng thể
+          </Button>
           <Link href="/settings/ai" className="text-[10px] text-muted-foreground hover:underline">
             Cài API Gemini
           </Link>
@@ -318,6 +310,14 @@ export function AiGradePanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <RubricBaremDialog
+        sessionId={sessionId}
+        open={paramOpen}
+        onOpenChange={setBaremOpen}
+        initialRubric={rubric}
+        onSaved={(r) => setRubric(r)}
+      />
+      <EvalReportDialog sessionId={sessionId} open={evalOpen} onOpenChange={setEvalOpen} />
     </div>
   )
 }

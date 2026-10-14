@@ -109,9 +109,91 @@ export async function saveSessionAiRubricAction(sessionId: string, rubric: strin
   revalidatePath(`/classes/${session.class_id}/individual/${sessionId}`)
 }
 
+/** Tạo yêu cầu "AI chia barem tiêu chí chấm" — hook Muse chat sẽ xử lý. */
+export async function requestAiBaremAction(
+  sessionId: string,
+  answerText: string,
+  maxScore?: number,
+): Promise<{ ok: true; requestId: string } | { ok: false; error: string }> {
+  try {
+    const { supabase, user } = await requireTeacherForSession(sessionId)
+    const answer = answerText.trim()
+    if (!answer) return { ok: false, error: "Chưa nhập đáp án." }
+    const score =
+      maxScore != null && Number.isFinite(maxScore) ? Math.max(1, Math.min(10, Math.round(maxScore))) : 10
+    const { data: existing } = await supabase
+      .from("ai_barem_requests")
+      .select("id")
+      .eq("session_id", sessionId)
+      .in("status", ["pending", "processing"])
+      .maybeSingle()
+    if (existing) return { ok: true, requestId: existing.id }
+    const { data: req, error } = await supabase
+      .from("ai_barem_requests")
+      .insert({
+        session_id: sessionId,
+        teacher_id: user.id,
+        answer_text: answer,
+        max_score: score,
+        status: "pending",
+      })
+      .select("id")
+      .single()
+    if (error || !req) {
+      if (isMissingSchemaError(error)) throwSchemaOrMessage(error, "")
+      return { ok: false, error: "Không tạo được yêu cầu." }
+    }
+    return { ok: true, requestId: req.id }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Không bắt đầu được" }
+  }
+}
+
+/** Tạo yêu cầu "AI đánh giá tổng thể" — hook Muse chat sẽ xử lý. */
+export async function requestAiEvalAction(
+  sessionId: string,
+): Promise<{ ok: true; requestId: string } | { ok: false; error: string }> {
+  try {
+    const { supabase, user } = await requireTeacherForSession(sessionId)
+    // Cần có ít nhất 1 bài đã được AI chấm (ready/approved)
+    const { data: graded, error: gradedErr } = await supabase
+      .from("ai_grade_results")
+      .select("id")
+      .eq("session_id", sessionId)
+      .in("status", ["ready", "approved"])
+      .limit(1)
+    if (gradedErr) {
+      if (isMissingSchemaError(gradedErr)) throwSchemaOrMessage(gradedErr, "")
+      return { ok: false, error: "Không đọc được kết quả chấm." }
+    }
+    if (!graded || graded.length === 0) {
+      return { ok: false, error: "Chưa có bài nào được AI chấm. Hãy chấm bài trước." }
+    }
+    const { data: existing } = await supabase
+      .from("ai_eval_requests")
+      .select("id")
+      .eq("session_id", sessionId)
+      .in("status", ["pending", "processing"])
+      .maybeSingle()
+    if (existing) return { ok: true, requestId: existing.id }
+    const { data: req, error } = await supabase
+      .from("ai_eval_requests")
+      .insert({ session_id: sessionId, teacher_id: user.id, status: "pending" })
+      .select("id")
+      .single()
+    if (error || !req) {
+      if (isMissingSchemaError(error)) throwSchemaOrMessage(error, "")
+      return { ok: false, error: "Không tạo được yêu cầu." }
+    }
+    return { ok: true, requestId: req.id }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Không bắt đầu được" }
+  }
+}
+
 export async function startAiGradeJobAction(
   sessionId: string,
-): Promise<{ ok: true; jobId: string; total: number } | { ok: false; error: string }> {
+): Promise<{ ok: true; jobId: string; total: number; provider: string } | { ok: false; error: string }> {
   try {
     return await startAiGradeJobActionInner(sessionId)
   } catch (e) {
@@ -121,7 +203,7 @@ export async function startAiGradeJobAction(
 
 async function startAiGradeJobActionInner(
   sessionId: string,
-): Promise<{ ok: true; jobId: string; total: number } | { ok: false; error: string }> {
+): Promise<{ ok: true; jobId: string; total: number; provider: string } | { ok: false; error: string }> {
   const { supabase, user, session } = await requireTeacherForSession(sessionId)
   if (!session.ai_enabled) return { ok: false, error: "Chế độ chấm AI chưa bật." }
 
@@ -131,7 +213,12 @@ async function startAiGradeJobActionInner(
     .eq("teacher_id", user.id)
     .maybeSingle()
   if (settingsErr && isMissingSchemaError(settingsErr)) throwSchemaOrMessage(settingsErr, "")
-  if (!settings?.gemini_api_key) throw new Error("Chưa lưu API key Gemini.")
+  const geminiKey = settings?.gemini_api_key ?? ""
+  const museKey = process.env.MUSE_MODEL_API_KEY ?? ""
+  // Ba tùy chọn provider: giáo viên có key Gemini riêng → "gemini",
+  // hệ thống có key Muse → "muse", không có key nào → "muse_chat"
+  // (khung chat Muse chấm qua hook, không cần API key).
+  const provider = geminiKey ? "gemini" : museKey ? "muse" : "muse_chat"
 
   const { data: running, error: runningErr } = await supabase
     .from("ai_grade_jobs")
@@ -209,6 +296,7 @@ async function startAiGradeJobActionInner(
       session_id: sessionId,
       teacher_id: user.id,
       status: "queued",
+      provider,
       total: list.length,
       completed: keptCount,
     })
@@ -221,7 +309,7 @@ async function startAiGradeJobActionInner(
   )
   if (rowsErr) throwSchemaOrMessage(rowsErr, "Không tạo được hàng chấm AI.")
 
-  return { ok: true, jobId: job.id, total: list.length }
+  return { ok: true, jobId: job.id, total: list.length, provider }
 }
 
 export async function approveAiGradeResultsAction(jobId: string, resultIds?: string[]) {

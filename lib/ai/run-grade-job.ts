@@ -1,5 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { gradeSubmissionWithGemini } from "@/lib/ai/gemini-grade"
+import { gradeSubmissionWithMuse } from "@/lib/ai/muse-grade"
+import { formatRubricForPrompt } from "@/lib/ai/rubric-format"
 import { getFiles } from "@/lib/submission-files"
 import type { SubmissionFile, SubmissionRow } from "@/lib/types"
 
@@ -53,10 +55,18 @@ async function countErrors(supabase: AdminClient, jobId: string): Promise<number
   return count ?? 0
 }
 
+type AiProvider = "gemini" | "muse"
+
+type GradeKeys = {
+  provider: AiProvider
+  geminiApiKey: string
+  museApiKey: string
+}
+
 async function gradeOneRow(
   supabase: AdminClient,
   row: { id: string; submission_id: string | null },
-  apiKey: string,
+  keys: GradeKeys,
   session: { title: string; ai_rubric: string | null; ai_max_score: number | null },
 ): Promise<boolean> {
   if (!row.submission_id) {
@@ -78,14 +88,25 @@ async function gradeOneRow(
 
   try {
     const files = await refreshFileUrls(supabase, getFiles(sub as SubmissionRow))
-    const out = await gradeSubmissionWithGemini({
-      apiKey,
-      title: session.title,
-      rubric: session.ai_rubric,
-      maxScore: Number(session.ai_max_score ?? 10),
-      textContent: sub.text_content,
-      files,
-    })
+    const maxScore = Number(session.ai_max_score ?? 10)
+    const out =
+      keys.provider === "muse"
+        ? await gradeSubmissionWithMuse({
+            apiKey: keys.museApiKey,
+            title: session.title,
+            rubric: formatRubricForPrompt(session.ai_rubric),
+            maxScore,
+            textContent: sub.text_content,
+            files,
+          })
+        : await gradeSubmissionWithGemini({
+            apiKey: keys.geminiApiKey,
+            title: session.title,
+            rubric: formatRubricForPrompt(session.ai_rubric),
+            maxScore,
+            textContent: sub.text_content,
+            files,
+          })
     await supabase
       .from("ai_grade_results")
       .update({
@@ -99,7 +120,8 @@ async function gradeOneRow(
       .eq("id", row.id)
     return true
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Lỗi Gemini"
+    const message =
+      e instanceof Error ? e.message : keys.provider === "muse" ? "Lỗi Muse AI" : "Lỗi Gemini"
     await supabase
       .from("ai_grade_results")
       .update({ status: "error", error_message: message.slice(0, 400) })
@@ -124,11 +146,15 @@ async function runAiGradeJobInner(jobId: string): Promise<{ ok: boolean; error?:
 
   const { data: job } = await supabase
     .from("ai_grade_jobs")
-    .select("id, session_id, teacher_id, status")
+    .select("id, session_id, teacher_id, status, provider")
     .eq("id", jobId)
     .maybeSingle()
   if (!job) return { ok: false, error: "Không tìm thấy job" }
   if (job.status === "done" || job.status === "error") {
+    return { ok: true, completed: 0 }
+  }
+  // Job chấm qua Muse chat do hook bên ngoài đảm nhận — app bỏ qua, giữ nguyên "queued".
+  if ((job as { provider?: string | null }).provider === "muse_chat") {
     return { ok: true, completed: 0 }
   }
 
@@ -141,12 +167,25 @@ async function runAiGradeJobInner(jobId: string): Promise<{ ok: boolean; error?:
     ])
 
     const apiKey = settings?.gemini_api_key
-    if (!apiKey || !session) {
+    // Hai tùy chọn provider: giáo viên có key Gemini riêng thì dùng Gemini,
+    // ngược lại mặc định dùng Muse AI (key hệ thống từ env).
+    const museApiKey = process.env.MUSE_MODEL_API_KEY ?? ""
+    const provider: AiProvider = apiKey ? "gemini" : "muse"
+    const keys: GradeKeys = {
+      provider,
+      geminiApiKey: apiKey ?? "",
+      museApiKey,
+    }
+    if (!session || (provider === "gemini" && !keys.geminiApiKey) || (provider === "muse" && !keys.museApiKey)) {
       await supabase
         .from("ai_grade_jobs")
         .update({
           status: "error",
-          error_message: !apiKey ? "Thiếu API key Gemini." : "Không tìm thấy phiên.",
+          error_message: !session
+            ? "Không tìm thấy phiên."
+            : provider === "muse"
+              ? "Thiếu API key Muse của hệ thống (MUSE_MODEL_API_KEY). Liên hệ quản trị viên, hoặc nhập key Gemini trong Cài đặt AI."
+              : "Thiếu API key Gemini.",
           finished_at: new Date().toISOString(),
         })
         .eq("id", jobId)
@@ -178,7 +217,7 @@ async function runAiGradeJobInner(jobId: string): Promise<{ ok: boolean; error?:
       if (rows.length === 0) break
 
       for (const row of rows) {
-        const ok = await gradeOneRow(supabase, row, apiKey, session)
+        const ok = await gradeOneRow(supabase, row, keys, session)
         if (ok) completed += 1
         await supabase.from("ai_grade_jobs").update({ completed }).eq("id", jobId)
       }

@@ -60,11 +60,98 @@ export type AiGradeJobStatus = "queued" | "running" | "done" | "error"
 
 export type AiGradeResultStatus = "pending" | "ready" | "error" | "approved" | "rejected"
 
+export type AiBaremRequestStatus = "pending" | "processing" | "done" | "error"
+
+export type AiBaremRequestRow = {
+  id: string
+  session_id: string
+  teacher_id: string
+  answer_text: string
+  max_score: number
+  status: AiBaremRequestStatus
+  barem_json: GradingBarem | null
+  error_message: string | null
+  created_at: string
+  finished_at: string | null
+}
+
+// Barem chấm mẫu A: tiêu chí có trọng số (lưu JSON trong sessions.ai_rubric)
+export type BaremCriterion = {
+  name: string
+  points: number
+  expect: string[]
+  notes: string
+}
+
+export type GradingBarem = {
+  template: "criteria_weighted"
+  version: 1
+  max_score: number
+  criteria: BaremCriterion[]
+}
+
+// Báo cáo "AI đánh giá tổng thể" (lưu JSON trong ai_eval_requests.result_json)
+export type AiEvalRequestStatus = "pending" | "processing" | "done" | "error"
+
+export type AiEvalRequestRow = {
+  id: string
+  session_id: string
+  teacher_id: string
+  status: AiEvalRequestStatus
+  result_json: EvalReport | null
+  error_message: string | null
+  created_at: string
+  finished_at: string | null
+}
+
+export type EvalReportStats = {
+  total_submissions: number
+  graded: number
+  avg: number
+  max: number
+  min: number
+  distribution: { gioi: number; kha: number; trung_binh: number; yeu: number }
+}
+
+export type EvalCriterionAvg = {
+  name: string
+  points: number
+  avg: number
+}
+
+export type EvalGroupAvg = {
+  key: string
+  name: string
+  avg: number
+  count: number
+}
+
+export type EvalAttentionItem = {
+  key: string
+  name: string
+  score: number | null
+  reason: string
+}
+
+export type EvalReport = {
+  version: 1
+  generated_at: string
+  max_score: number
+  stats: EvalReportStats
+  criteria_avg: EvalCriterionAvg[]
+  common_mistakes: string[]
+  common_strengths: string[]
+  group_avg: EvalGroupAvg[]
+  attention_list: EvalAttentionItem[]
+  overall_comment: string
+}
+
 export type AiGradeJobRow = {
   id: string
   session_id: string
   teacher_id: string
   status: AiGradeJobStatus
+  provider: string | null
   total: number
   completed: number
   error_message: string | null
