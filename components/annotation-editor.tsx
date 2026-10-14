@@ -5,6 +5,7 @@ import type { AnnotationItem, SubmissionFile } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SubmissionText } from "@/components/submission-text"
+import { PdfPages } from "@/components/pdf-pages"
 import { useFullscreen } from "@/lib/use-fullscreen"
 import { renderAsync } from "docx-preview"
 import { cn } from "@/lib/utils"
@@ -155,9 +156,10 @@ export function AnnotationEditor({
   // PPT: khi đang dùng công cụ chấm (không phải bàn tay) thì khóa iframe để
   // không tương tác được với file, chuột chỉ dùng để đặt dấu/vẽ.
   const annotateLocked = isPptx && tool !== "pan"
-  const canAnnotate = isImage || currentIdx === -1 || isDocx || isPptx
+  // PDF render từng trang bằng PDF.js ngay trong trang → chấm được như Word/ảnh.
+  const canAnnotate = isImage || currentIdx === -1 || isDocx || isPptx || isPdf
   const annotationKey = currentIdx
-  const showAnnotations = canAnnotate && !presentationMode && !isPdf
+  const showAnnotations = canAnnotate && !presentationMode
 
   // Render tệp .docx bằng docx-preview thành DOM thuần (thay iframe Office):
   // scroll trang tự nhiên theo viewport, dấu bám nội dung, chấm chính xác như ảnh.
@@ -468,17 +470,10 @@ export function AnnotationEditor({
     setItems((cur) => cur.filter((_, i) => i !== origIdx))
   }
 
-  // Chuyển công cụ. Chuyển SANG bàn tay trên file PPT = mở khóa iframe để xem
-  // file (nhưng muốn dấu khỏi che nội dung nên xóa toàn bộ annotation của file).
-  // Áp dụng cho mọi công cụ chấm (stamp/bút/tô/gạch/chữ), chỉ riêng PPT — với
-  // docx/ảnh/văn bản thì không xóa. Chuyển qua lại giữa các công cụ chấm thì
-  // không xóa.
+  // Chuyển công cụ. Dấu trên file PPT gắn theo khung xem (không theo từng slide
+  // vì slide nằm trong iframe của Microsoft, code không đọc được đang ở slide nào).
+  // KHÔNG tự xóa dấu nữa — giáo viên bấm nút thùng rác để xóa khi chuyển slide.
   function switchTool(next: Tool) {
-    if (next === "pan" && tool !== "pan" && isPptx && currentFile) {
-      pushHistory()
-      setItems((cur) => cur.filter((it) => (it.fileIndex ?? -1) !== annotationKey))
-      setSelectedTextIdx(null)
-    }
     setTool(next)
   }
 
@@ -962,13 +957,16 @@ export function AnnotationEditor({
                 />
               </div>
             ) : isPdf && currentFile ? (
-              <div className="w-[1000px] h-[78vh] relative mx-auto">
-                <iframe
-                  src={currentFile.url}
-                  title={currentFile.name}
-                  className="w-full h-full rounded-md"
+              <div className="w-full relative">
+                <PdfPages
+                  key={`pdf-${currentIdx}-${currentFile.url}`}
+                  url={currentFile.url}
+                  name={currentFile.name}
                 />
-                <div className="absolute top-2 right-2">
+                <div
+                  className="absolute top-2 right-2 z-20"
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
                   <Button asChild variant="outline" size="sm" className="gap-1">
                     <a href={currentFile.url} target="_blank" rel="noreferrer" download>
                       <Download className="size-3.5" />
@@ -1022,9 +1020,9 @@ export function AnnotationEditor({
                   )}
                 />
                 {annotateLocked && (
-                  <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-background/90 border shadow px-3 py-1 text-xs text-muted-foreground pointer-events-none">
-                    <Hand className="size-3.5" />
-                    Chọn bàn tay để xem file
+                  <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-background/90 border shadow px-3 py-1 text-xs text-muted-foreground pointer-events-none max-w-[90%] text-center">
+                    <Hand className="size-3.5 shrink-0" />
+                    Dấu gắn theo khung xem (không theo slide) — chuyển slide thì bấm thùng rác để xóa dấu cũ
                   </div>
                 )}
                 <div className="absolute top-2 right-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
