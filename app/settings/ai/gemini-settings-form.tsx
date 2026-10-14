@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
-import { saveGeminiSettingsAction } from "@/app/ai-grade-actions"
+import { deleteGeminiKeyAction, saveGeminiSettingsAction } from "@/app/ai-grade-actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,6 +21,18 @@ export function GeminiSettingsForm({
   const [apiKey, setApiKey] = useState("")
   const [tier, setTier] = useState<GeminiTier>(initialTier)
   const [pending, startTransition] = useTransition()
+
+  function onDelete() {
+    if (!window.confirm("Xóa key Gemini đã lưu? Sau đó chấm AI sẽ dùng Muse mặc định.")) return
+    startTransition(async () => {
+      try {
+        await deleteGeminiKeyAction()
+        toast.success("Đã xóa key Gemini")
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Không xóa được")
+      }
+    })
+  }
 
   function onSave() {
     startTransition(async () => {
@@ -84,9 +96,16 @@ export function GeminiSettingsForm({
             </button>
           </div>
         </div>
-        <Button onClick={onSave} disabled={pending || (!apiKey.trim() && !hasKey)}>
-          {pending ? "Đang lưu…" : "Lưu"}
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={onSave} disabled={pending || (!apiKey.trim() && !hasKey)} className="flex-1">
+            {pending ? "Đang lưu…" : "Lưu"}
+          </Button>
+          {hasKey && (
+            <Button variant="destructive" onClick={onDelete} disabled={pending}>
+              Xóa key
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   )
