@@ -180,6 +180,7 @@ export function AiGradePanel({
           session_id: sessionId,
           teacher_id: "",
           status: "queued",
+          provider: started.provider ?? null,
           total: started.total,
           completed: 0,
           error_message: null,
@@ -224,7 +225,7 @@ export function AiGradePanel({
         <span className="font-semibold">Chấm bài AI</span>
       </div>
       <label className="flex items-center justify-between gap-2 text-[11px]">
-        <span className="leading-tight">Bật chấm bằng Gemini</span>
+        <span className="leading-tight">Bật chấm AI</span>
         <Switch checked={enabled} onCheckedChange={toggleEnabled} aria-label="Bật chấm AI" />
       </label>
       {enabled && (
@@ -249,7 +250,11 @@ export function AiGradePanel({
             disabled={pending || running}
           >
             {running ? <Loader2 className="size-3 animate-spin" /> : <Bot className="size-3" />}
-            {running ? `Đang chấm ${job?.completed ?? 0}/${job?.total ?? "?"}` : "Chấm bài AI"}
+            {running
+              ? job?.provider === "muse_chat"
+                ? `Muse chat đang chấm ${job?.completed ?? 0}/${job?.total ?? "?"}`
+                : `Đang chấm ${job?.completed ?? 0}/${job?.total ?? "?"}`
+              : "Chấm bài AI"}
           </Button>
           {job && (
             <Button variant="secondary" size="sm" className="h-7 text-xs gap-1" onClick={openResults}>

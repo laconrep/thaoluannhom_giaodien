@@ -111,7 +111,7 @@ export async function saveSessionAiRubricAction(sessionId: string, rubric: strin
 
 export async function startAiGradeJobAction(
   sessionId: string,
-): Promise<{ ok: true; jobId: string; total: number } | { ok: false; error: string }> {
+): Promise<{ ok: true; jobId: string; total: number; provider: string } | { ok: false; error: string }> {
   try {
     return await startAiGradeJobActionInner(sessionId)
   } catch (e) {
@@ -121,7 +121,7 @@ export async function startAiGradeJobAction(
 
 async function startAiGradeJobActionInner(
   sessionId: string,
-): Promise<{ ok: true; jobId: string; total: number } | { ok: false; error: string }> {
+): Promise<{ ok: true; jobId: string; total: number; provider: string } | { ok: false; error: string }> {
   const { supabase, user, session } = await requireTeacherForSession(sessionId)
   if (!session.ai_enabled) return { ok: false, error: "Chế độ chấm AI chưa bật." }
 
@@ -133,11 +133,10 @@ async function startAiGradeJobActionInner(
   if (settingsErr && isMissingSchemaError(settingsErr)) throwSchemaOrMessage(settingsErr, "")
   const geminiKey = settings?.gemini_api_key ?? ""
   const museKey = process.env.MUSE_MODEL_API_KEY ?? ""
-  if (!geminiKey && !museKey) {
-    throw new Error(
-      "Chưa cấu hình AI chấm bài. Nhập key Gemini trong Cài đặt AI, hoặc liên hệ quản trị viên cấu hình Muse AI (MUSE_MODEL_API_KEY).",
-    )
-  }
+  // Ba tùy chọn provider: giáo viên có key Gemini riêng → "gemini",
+  // hệ thống có key Muse → "muse", không có key nào → "muse_chat"
+  // (khung chat Muse chấm qua hook, không cần API key).
+  const provider = geminiKey ? "gemini" : museKey ? "muse" : "muse_chat"
 
   const { data: running, error: runningErr } = await supabase
     .from("ai_grade_jobs")
@@ -215,6 +214,7 @@ async function startAiGradeJobActionInner(
       session_id: sessionId,
       teacher_id: user.id,
       status: "queued",
+      provider,
       total: list.length,
       completed: keptCount,
     })
@@ -227,7 +227,7 @@ async function startAiGradeJobActionInner(
   )
   if (rowsErr) throwSchemaOrMessage(rowsErr, "Không tạo được hàng chấm AI.")
 
-  return { ok: true, jobId: job.id, total: list.length }
+  return { ok: true, jobId: job.id, total: list.length, provider }
 }
 
 export async function approveAiGradeResultsAction(jobId: string, resultIds?: string[]) {

@@ -145,11 +145,15 @@ async function runAiGradeJobInner(jobId: string): Promise<{ ok: boolean; error?:
 
   const { data: job } = await supabase
     .from("ai_grade_jobs")
-    .select("id, session_id, teacher_id, status")
+    .select("id, session_id, teacher_id, status, provider")
     .eq("id", jobId)
     .maybeSingle()
   if (!job) return { ok: false, error: "Không tìm thấy job" }
   if (job.status === "done" || job.status === "error") {
+    return { ok: true, completed: 0 }
+  }
+  // Job chấm qua Muse chat do hook bên ngoài đảm nhận — app bỏ qua, giữ nguyên "queued".
+  if ((job as { provider?: string | null }).provider === "muse_chat") {
     return { ok: true, completed: 0 }
   }
 

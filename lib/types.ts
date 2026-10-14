@@ -65,6 +65,7 @@ export type AiGradeJobRow = {
   session_id: string
   teacher_id: string
   status: AiGradeJobStatus
+  provider: string | null
   total: number
   completed: number
   error_message: string | null
