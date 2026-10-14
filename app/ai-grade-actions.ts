@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { saveAnnotationAction } from "@/app/actions"
-import type { GeminiTier } from "@/lib/types"
+import type { AiProviderChoice, GeminiTier } from "@/lib/types"
 import { isMissingSchemaError, throwSchemaOrMessage } from "@/lib/ai/schema-error"
 
 type TeacherSession = {
@@ -89,8 +89,22 @@ export async function saveGeminiSettingsAction(apiKey: string, tier: GeminiTier)
   revalidatePath("/settings/ai")
 }
 
-export async function setSessionAiEnabledAction(sessionId: string, enabled: boolean) {
-  const { supabase, session } = await requireTeacherForSession(sessionId)
+/** Xóa key Gemini đã lưu của giáo viên — sau đó chấm AI dùng Muse (mặc định). */
+export async function deleteGeminiKeyAction() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Cần đăng nhập.")
+  const { error } = await supabase
+    .from("teacher_ai_settings")
+    .update({ gemini_api_key: null, updated_at: new Date().toISOString() })
+    .eq("teacher_id", user.id)
+  if (error) throwSchemaOrMessage(error, "Không xóa được key.")
+  revalidatePath("/settings/ai")
+}
+
+export async function setSessionAiEnabledAction(sessionId: string, enabled: boolean) {  const { supabase, session } = await requireTeacherForSession(sessionId)
   const { error } = await supabase.from("sessions").update({ ai_enabled: enabled }).eq("id", sessionId)
   if (error) throwSchemaOrMessage(error, "Không đổi được chế độ AI.")
   revalidatePath(`/classes/${session.class_id}/sessions/${sessionId}`)
@@ -193,9 +207,10 @@ export async function requestAiEvalAction(
 
 export async function startAiGradeJobAction(
   sessionId: string,
+  providerChoice: AiProviderChoice = "auto",
 ): Promise<{ ok: true; jobId: string; total: number; provider: string } | { ok: false; error: string }> {
   try {
-    return await startAiGradeJobActionInner(sessionId)
+    return await startAiGradeJobActionInner(sessionId, providerChoice)
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Không bắt đầu được" }
   }
@@ -203,6 +218,7 @@ export async function startAiGradeJobAction(
 
 async function startAiGradeJobActionInner(
   sessionId: string,
+  providerChoice: AiProviderChoice = "auto",
 ): Promise<{ ok: true; jobId: string; total: number; provider: string } | { ok: false; error: string }> {
   const { supabase, user, session } = await requireTeacherForSession(sessionId)
   if (!session.ai_enabled) return { ok: false, error: "Chế độ chấm AI chưa bật." }
@@ -215,10 +231,19 @@ async function startAiGradeJobActionInner(
   if (settingsErr && isMissingSchemaError(settingsErr)) throwSchemaOrMessage(settingsErr, "")
   const geminiKey = settings?.gemini_api_key ?? ""
   const museKey = process.env.MUSE_MODEL_API_KEY ?? ""
-  // Ba tùy chọn provider: giáo viên có key Gemini riêng → "gemini",
-  // hệ thống có key Muse → "muse", không có key nào → "muse_chat"
-  // (khung chat Muse chấm qua hook, không cần API key).
-  const provider = geminiKey ? "gemini" : museKey ? "muse" : "muse_chat"
+  // Giáo viên được chọn provider lúc bấm chấm:
+  // - "gemini": bắt buộc có key Gemini riêng.
+  // - "muse": Muse AI — dùng key hệ thống nếu có, không thì chấm qua khung chat (muse_chat), không cần key.
+  // - "auto" (mặc định): có key Gemini → "gemini", có key Muse hệ thống → "muse", còn lại → "muse_chat".
+  let provider: string
+  if (providerChoice === "gemini") {
+    if (!geminiKey) return { ok: false, error: "Chưa lưu key Gemini. Vào Cài đặt AI để thêm key." }
+    provider = "gemini"
+  } else if (providerChoice === "muse") {
+    provider = museKey ? "muse" : "muse_chat"
+  } else {
+    provider = geminiKey ? "gemini" : museKey ? "muse" : "muse_chat"
+  }
 
   const { data: running, error: runningErr } = await supabase
     .from("ai_grade_jobs")

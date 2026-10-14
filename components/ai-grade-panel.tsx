@@ -22,8 +22,15 @@ import {
 } from "@/components/ui/dialog"
 import { RubricBaremDialog } from "@/components/rubric-barem-dialog"
 import { EvalReportDialog } from "@/components/eval-report-dialog"
-import type { AiGradeJobRow, AiGradeResultRow, SessionGroupRow, SessionSlotRow } from "@/lib/types"
+import type { AiGradeJobRow, AiGradeResultRow, AiProviderChoice, SessionGroupRow, SessionSlotRow } from "@/lib/types"
 import { BarChart3, Bot, Check, Eye, Loader2, Sparkles } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 type Props = {
   sessionId: string
@@ -51,6 +58,7 @@ export function AiGradePanel({
   const [open, setOpen] = useState(false)
   const [paramOpen, setBaremOpen] = useState(false)
   const [evalOpen, setEvalOpen] = useState(false)
+  const [providerChoice, setProviderChoice] = useState<AiProviderChoice>("auto")
   const [pending, startTransition] = useTransition()
   const prevJobStatus = useRef<string | null>(null)
 
@@ -162,7 +170,7 @@ export function AiGradePanel({
         if (rubric.trim() !== (initialRubric ?? "")) {
           await saveSessionAiRubricAction(sessionId, rubric)
         }
-        const started = await startAiGradeJobAction(sessionId)
+        const started = await startAiGradeJobAction(sessionId, providerChoice)
         if (!started.ok) {
           toast.error(started.error)
           return
@@ -227,6 +235,23 @@ export function AiGradePanel({
               <Sparkles className="size-3" /> Tiêu chí chấm
             </Button>
           )}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-muted-foreground shrink-0">Chấm bằng</span>
+            <Select
+              value={providerChoice}
+              onValueChange={(v) => setProviderChoice(v as AiProviderChoice)}
+              disabled={running}
+            >
+              <SelectTrigger className="h-7 text-xs flex-1" aria-label="Chọn AI chấm bài">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Tự động</SelectItem>
+                <SelectItem value="gemini">Gemini (cần key)</SelectItem>
+                <SelectItem value="muse">Muse AI</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             size="sm"
             className="h-7 text-xs gap-1"
