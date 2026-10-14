@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { RubricParamDialog } from "@/components/rubric-param-dialog"
+import { RubricBaremDialog } from "@/components/rubric-barem-dialog"
 import type { AiGradeJobRow, AiGradeResultRow, SessionGroupRow, SessionSlotRow } from "@/lib/types"
 import { Bot, Check, Eye, Loader2, Sparkles } from "lucide-react"
 
@@ -48,7 +48,7 @@ export function AiGradePanel({
   const [job, setJob] = useState<AiGradeJobRow | null>(null)
   const [results, setResults] = useState<AiGradeResultRow[]>([])
   const [open, setOpen] = useState(false)
-  const [paramOpen, setParamOpen] = useState(false)
+  const [paramOpen, setBaremOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const prevJobStatus = useRef<string | null>(null)
 
@@ -221,7 +221,7 @@ export function AiGradePanel({
       {enabled && (
         <>
           {!compact && (
-            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setParamOpen(true)}>
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setBaremOpen(true)}>
               <Sparkles className="size-3" /> Tiêu chí chấm
             </Button>
           )}
@@ -305,10 +305,10 @@ export function AiGradePanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <RubricParamDialog
+      <RubricBaremDialog
         sessionId={sessionId}
         open={paramOpen}
-        onOpenChange={setParamOpen}
+        onOpenChange={setBaremOpen}
         initialRubric={rubric}
         onSaved={(r) => setRubric(r)}
       />

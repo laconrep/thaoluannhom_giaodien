@@ -1,8 +1,8 @@
-import type { GradingParam } from "@/lib/types"
+import type { GradingBarem } from "@/lib/types"
 
 /**
  * Biến rubric lưu trong sessions.ai_rubric thành text đưa vào prompt chấm.
- * - Nếu là JSON param mẫu A (criteria_weighted): render thành danh sách tiêu chí.
+ * - Nếu là JSON barem mẫu A (criteria_weighted): render thành danh sách tiêu chí.
  * - Ngược lại: giữ nguyên text cũ (tương thích ngược).
  */
 export function formatRubricForPrompt(rubric: string | null | undefined): string {
@@ -10,7 +10,7 @@ export function formatRubricForPrompt(rubric: string | null | undefined): string
   const raw = rubric.trim()
   if (raw.startsWith("{")) {
     try {
-      const p = JSON.parse(raw) as GradingParam
+      const p = JSON.parse(raw) as GradingBarem
       if (p && p.template === "criteria_weighted" && Array.isArray(p.criteria)) {
         const lines: string[] = [
           `Tiêu chí chấm (thang ${p.max_score} điểm):`,
@@ -33,10 +33,10 @@ export function formatRubricForPrompt(rubric: string | null | undefined): string
 }
 
 /** Parse rubric JSON mẫu A, trả null nếu không phải. */
-export function parseGradingParam(rubric: string | null | undefined): GradingParam | null {
+export function parseGradingBarem(rubric: string | null | undefined): GradingBarem | null {
   if (!rubric || !rubric.trim().startsWith("{")) return null
   try {
-    const p = JSON.parse(rubric) as GradingParam
+    const p = JSON.parse(rubric) as GradingBarem
     if (p && p.template === "criteria_weighted" && Array.isArray(p.criteria)) return p
   } catch {
     // bỏ qua

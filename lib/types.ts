@@ -60,34 +60,34 @@ export type AiGradeJobStatus = "queued" | "running" | "done" | "error"
 
 export type AiGradeResultStatus = "pending" | "ready" | "error" | "approved" | "rejected"
 
-export type AiParamRequestStatus = "pending" | "processing" | "done" | "error"
+export type AiBaremRequestStatus = "pending" | "processing" | "done" | "error"
 
-export type AiParamRequestRow = {
+export type AiBaremRequestRow = {
   id: string
   session_id: string
   teacher_id: string
   answer_text: string
   max_score: number
-  status: AiParamRequestStatus
-  param_json: GradingParam | null
+  status: AiBaremRequestStatus
+  barem_json: GradingBarem | null
   error_message: string | null
   created_at: string
   finished_at: string | null
 }
 
-// Param chấm mẫu A: tiêu chí có trọng số (lưu JSON trong sessions.ai_rubric)
-export type ParamCriterion = {
+// Barem chấm mẫu A: tiêu chí có trọng số (lưu JSON trong sessions.ai_rubric)
+export type BaremCriterion = {
   name: string
   points: number
   expect: string[]
   notes: string
 }
 
-export type GradingParam = {
+export type GradingBarem = {
   template: "criteria_weighted"
   version: 1
   max_score: number
-  criteria: ParamCriterion[]
+  criteria: BaremCriterion[]
 }
 
 export type AiGradeJobRow = {
