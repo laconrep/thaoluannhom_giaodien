@@ -139,7 +139,7 @@ export function EvalReportDialog({ sessionId, open, onOpenChange }: Props) {
           <div className="flex flex-col items-center gap-2 py-10 text-sm text-muted-foreground">
             <Loader2 className="size-6 animate-spin text-primary" />
             <p>AI đang đọc toàn bộ bài chấm và tổng hợp đánh giá…</p>
-            <p className="text-xs">Thường mất khoảng 1–2 phút với cả lớp.</p>
+            <p className="text-xs">Thường mất vài phút tùy số lượng bài.</p>
           </div>
         )}
 
