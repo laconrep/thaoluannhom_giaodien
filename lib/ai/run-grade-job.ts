@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { gradeSubmissionWithGemini } from "@/lib/ai/gemini-grade"
 import { gradeSubmissionWithMuse } from "@/lib/ai/muse-grade"
+import { formatRubricForPrompt } from "@/lib/ai/rubric-format"
 import { getFiles } from "@/lib/submission-files"
 import type { SubmissionFile, SubmissionRow } from "@/lib/types"
 
@@ -93,7 +94,7 @@ async function gradeOneRow(
         ? await gradeSubmissionWithMuse({
             apiKey: keys.museApiKey,
             title: session.title,
-            rubric: session.ai_rubric,
+            rubric: formatRubricForPrompt(session.ai_rubric),
             maxScore,
             textContent: sub.text_content,
             files,
@@ -101,7 +102,7 @@ async function gradeOneRow(
         : await gradeSubmissionWithGemini({
             apiKey: keys.geminiApiKey,
             title: session.title,
-            rubric: session.ai_rubric,
+            rubric: formatRubricForPrompt(session.ai_rubric),
             maxScore,
             textContent: sub.text_content,
             files,

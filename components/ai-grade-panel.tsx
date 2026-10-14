@@ -12,7 +12,6 @@ import {
 } from "@/app/ai-grade-actions"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -21,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { RubricParamDialog } from "@/components/rubric-param-dialog"
 import type { AiGradeJobRow, AiGradeResultRow, SessionGroupRow, SessionSlotRow } from "@/lib/types"
 import { Bot, Check, Eye, Loader2, Sparkles } from "lucide-react"
 
@@ -48,6 +48,7 @@ export function AiGradePanel({
   const [job, setJob] = useState<AiGradeJobRow | null>(null)
   const [results, setResults] = useState<AiGradeResultRow[]>([])
   const [open, setOpen] = useState(false)
+  const [paramOpen, setParamOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const prevJobStatus = useRef<string | null>(null)
 
@@ -153,17 +154,6 @@ export function AiGradePanel({
     })
   }
 
-  function saveRubric() {
-    startTransition(async () => {
-      try {
-        await saveSessionAiRubricAction(sessionId, rubric)
-        toast.success("Đã lưu tiêu chí chấm")
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Không lưu được")
-      }
-    })
-  }
-
   function startGrade() {
     startTransition(async () => {
       try {
@@ -231,16 +221,8 @@ export function AiGradePanel({
       {enabled && (
         <>
           {!compact && (
-            <Textarea
-              value={rubric}
-              onChange={(e) => setRubric(e.target.value)}
-              placeholder="Đáp án / tiêu chí chấm (tuỳ chọn)"
-              className="min-h-16 text-xs"
-            />
-          )}
-          {!compact && (
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={saveRubric} disabled={pending}>
-              Lưu tiêu chí
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setParamOpen(true)}>
+              <Sparkles className="size-3" /> Tiêu chí chấm
             </Button>
           )}
           <Button
@@ -323,6 +305,13 @@ export function AiGradePanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <RubricParamDialog
+        sessionId={sessionId}
+        open={paramOpen}
+        onOpenChange={setParamOpen}
+        initialRubric={rubric}
+        onSaved={(r) => setRubric(r)}
+      />
     </div>
   )
 }

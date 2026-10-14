@@ -109,6 +109,46 @@ export async function saveSessionAiRubricAction(sessionId: string, rubric: strin
   revalidatePath(`/classes/${session.class_id}/individual/${sessionId}`)
 }
 
+/** Tạo yêu cầu "AI chia param tiêu chí chấm" — hook Muse chat sẽ xử lý. */
+export async function requestAiParamAction(
+  sessionId: string,
+  answerText: string,
+  maxScore?: number,
+): Promise<{ ok: true; requestId: string } | { ok: false; error: string }> {
+  try {
+    const { supabase, user } = await requireTeacherForSession(sessionId)
+    const answer = answerText.trim()
+    if (!answer) return { ok: false, error: "Chưa nhập đáp án." }
+    const score =
+      maxScore != null && Number.isFinite(maxScore) ? Math.max(1, Math.min(10, Math.round(maxScore))) : 10
+    const { data: existing } = await supabase
+      .from("ai_param_requests")
+      .select("id")
+      .eq("session_id", sessionId)
+      .in("status", ["pending", "processing"])
+      .maybeSingle()
+    if (existing) return { ok: true, requestId: existing.id }
+    const { data: req, error } = await supabase
+      .from("ai_param_requests")
+      .insert({
+        session_id: sessionId,
+        teacher_id: user.id,
+        answer_text: answer,
+        max_score: score,
+        status: "pending",
+      })
+      .select("id")
+      .single()
+    if (error || !req) {
+      if (isMissingSchemaError(error)) throwSchemaOrMessage(error, "")
+      return { ok: false, error: "Không tạo được yêu cầu." }
+    }
+    return { ok: true, requestId: req.id }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Không bắt đầu được" }
+  }
+}
+
 export async function startAiGradeJobAction(
   sessionId: string,
 ): Promise<{ ok: true; jobId: string; total: number; provider: string } | { ok: false; error: string }> {
