@@ -35,9 +35,11 @@ export default async function AiSettingsPage() {
     <TeacherShell email={user.email}>
       <section className="mx-auto max-w-xl px-4 py-8 flex flex-col gap-4">
         <header>
-          <h1 className="font-heading text-2xl font-bold">API Gemini</h1>
+          <h1 className="font-heading text-2xl font-bold">AI chấm bài</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Lưu key riêng theo tài khoản. Dùng khi bật chấm bài AI trên phiên.
+            Lưu key Gemini riêng theo tài khoản để chấm bằng Gemini. Nếu không lưu key,
+            hệ thống tự dùng <span className="font-medium text-foreground">Muse AI</span> mặc
+            định (không cần key riêng).
           </p>
         </header>
         {schemaMissing && (

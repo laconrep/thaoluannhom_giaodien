@@ -131,7 +131,13 @@ async function startAiGradeJobActionInner(
     .eq("teacher_id", user.id)
     .maybeSingle()
   if (settingsErr && isMissingSchemaError(settingsErr)) throwSchemaOrMessage(settingsErr, "")
-  if (!settings?.gemini_api_key) throw new Error("Chưa lưu API key Gemini.")
+  const geminiKey = settings?.gemini_api_key ?? ""
+  const museKey = process.env.MUSE_MODEL_API_KEY ?? ""
+  if (!geminiKey && !museKey) {
+    throw new Error(
+      "Chưa cấu hình AI chấm bài. Nhập key Gemini trong Cài đặt AI, hoặc liên hệ quản trị viên cấu hình Muse AI (MUSE_MODEL_API_KEY).",
+    )
+  }
 
   const { data: running, error: runningErr } = await supabase
     .from("ai_grade_jobs")
