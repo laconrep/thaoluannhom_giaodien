@@ -21,8 +21,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { RubricBaremDialog } from "@/components/rubric-barem-dialog"
+import { EvalReportDialog } from "@/components/eval-report-dialog"
 import type { AiGradeJobRow, AiGradeResultRow, SessionGroupRow, SessionSlotRow } from "@/lib/types"
-import { Bot, Check, Eye, Loader2, Sparkles } from "lucide-react"
+import { BarChart3, Bot, Check, Eye, Loader2, Sparkles } from "lucide-react"
 
 type Props = {
   sessionId: string
@@ -49,6 +50,7 @@ export function AiGradePanel({
   const [results, setResults] = useState<AiGradeResultRow[]>([])
   const [open, setOpen] = useState(false)
   const [paramOpen, setBaremOpen] = useState(false)
+  const [evalOpen, setEvalOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const prevJobStatus = useRef<string | null>(null)
 
@@ -244,6 +246,9 @@ export function AiGradePanel({
               {running ? "Xem tiến độ chấm" : "Xem kết quả chấm"}
             </Button>
           )}
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setEvalOpen(true)}>
+            <BarChart3 className="size-3" /> Đánh giá tổng thể
+          </Button>
           <Link href="/settings/ai" className="text-[10px] text-muted-foreground hover:underline">
             Cài API Gemini
           </Link>
@@ -312,6 +317,7 @@ export function AiGradePanel({
         initialRubric={rubric}
         onSaved={(r) => setRubric(r)}
       />
+      <EvalReportDialog sessionId={sessionId} open={evalOpen} onOpenChange={setEvalOpen} />
     </div>
   )
 }

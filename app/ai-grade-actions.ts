@@ -149,6 +149,48 @@ export async function requestAiBaremAction(
   }
 }
 
+/** Tạo yêu cầu "AI đánh giá tổng thể" — hook Muse chat sẽ xử lý. */
+export async function requestAiEvalAction(
+  sessionId: string,
+): Promise<{ ok: true; requestId: string } | { ok: false; error: string }> {
+  try {
+    const { supabase, user } = await requireTeacherForSession(sessionId)
+    // Cần có ít nhất 1 bài đã được AI chấm (ready/approved)
+    const { data: graded, error: gradedErr } = await supabase
+      .from("ai_grade_results")
+      .select("id")
+      .eq("session_id", sessionId)
+      .in("status", ["ready", "approved"])
+      .limit(1)
+    if (gradedErr) {
+      if (isMissingSchemaError(gradedErr)) throwSchemaOrMessage(gradedErr, "")
+      return { ok: false, error: "Không đọc được kết quả chấm." }
+    }
+    if (!graded || graded.length === 0) {
+      return { ok: false, error: "Chưa có bài nào được AI chấm. Hãy chấm bài trước." }
+    }
+    const { data: existing } = await supabase
+      .from("ai_eval_requests")
+      .select("id")
+      .eq("session_id", sessionId)
+      .in("status", ["pending", "processing"])
+      .maybeSingle()
+    if (existing) return { ok: true, requestId: existing.id }
+    const { data: req, error } = await supabase
+      .from("ai_eval_requests")
+      .insert({ session_id: sessionId, teacher_id: user.id, status: "pending" })
+      .select("id")
+      .single()
+    if (error || !req) {
+      if (isMissingSchemaError(error)) throwSchemaOrMessage(error, "")
+      return { ok: false, error: "Không tạo được yêu cầu." }
+    }
+    return { ok: true, requestId: req.id }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Không bắt đầu được" }
+  }
+}
+
 export async function startAiGradeJobAction(
   sessionId: string,
 ): Promise<{ ok: true; jobId: string; total: number; provider: string } | { ok: false; error: string }> {
