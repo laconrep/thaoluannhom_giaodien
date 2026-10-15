@@ -1,66 +1,39 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import Image from "next/image"
 import type { AnnotationItem, SubmissionFile } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SubmissionText } from "@/components/submission-text"
-import { PdfPages } from "@/components/pdf-pages"
 import { GroupMembersDialog } from "@/components/group-members-dialog"
+import {
+  AnnotationToolbar,
+  TOOLBAR_COLORS as COLORS,
+  TOOLBAR_STAMPS as STAMPS,
+  type AnnotationTool,
+} from "@/components/annotation/annotation-toolbar"
+import { FileViewer } from "@/components/annotation/file-viewer"
 import { useFullscreen } from "@/lib/use-fullscreen"
 import { renderAsync } from "docx-preview"
 import { cn } from "@/lib/utils"
 import { isRichTextEmpty } from "@/lib/rich-text"
 import {
-  Pen,
-  Highlighter,
-  Underline,
   Type,
-  Undo2,
   Trash2,
-  Save,
   X,
   Check,
   MoveDiagonal,
   ChevronLeft,
   ChevronRight,
-  RotateCw,
-  RotateCcw,
   FileText,
-  Presentation,
   File as FileIcon,
-  Download,
-  ZoomIn,
-  ZoomOut,
-  Stamp,
-  Hand,
-  Eye,
-  Users,
 } from "lucide-react"
 
-const COLORS = [
-  { name: "Đỏ", value: "#dc2626" },
-  { name: "Xanh", value: "#2563eb" },
-  { name: "Vàng", value: "#eab308" },
-  { name: "Đen", value: "#111827" },
-]
-
-const STAMPS: { mark: string; label: string; color: string }[] = [
-  { mark: "✓", label: "Tốt", color: "#16a34a" },
-  { mark: "★", label: "Xuất sắc", color: "#ca8a04" },
-  { mark: "⚠", label: "Xem lại", color: "#ea580c" },
-  { mark: "✗", label: "Sai", color: "#dc2626" },
-]
-
-type Tool = "pen" | "highlight" | "underline" | "text" | "stamp" | "pan"
+type Tool = AnnotationTool
 type TextItem = Extract<AnnotationItem, { kind: "text" }>
 
-function officeEmbed(url: string) {
-  return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
-}
-
 function fileIcon(kind: string) {
-  if (kind === "pptx") return Presentation
   if (kind === "docx") return FileText
   return FileIcon
 }
@@ -641,180 +614,37 @@ export function AnnotationEditor({
             showToolbar ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 pointer-events-none",
           )}
         >
-          <div className="bg-card/95 backdrop-blur border rounded-lg shadow-md px-1.5 py-1 flex items-center gap-1 flex-nowrap max-w-[95vw] overflow-x-auto no-scrollbar">
-            <span className="truncate max-w-[30ch] text-xs text-muted-foreground shrink-0">{title}</span>
-            {currentIdx === -1 && hasText && (
-              <span className="inline-flex items-center gap-1 pl-1.5 border-l border-border shrink-0">
-                <Eye className="size-3 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Cỡ chữ</span>
-                <button onClick={() => setTextFontSize((s) => Math.max(12, s - 2))} className="px-1.5 hover:bg-muted rounded">A−</button>
-                <span className="tabular-nums text-xs text-foreground">{textFontSize}</span>
-                <button onClick={() => setTextFontSize((s) => Math.min(200, s + 2))} className="px-1.5 hover:bg-muted rounded">A+</button>
-              </span>
-            )}
-            <div className="h-6 w-px bg-border shrink-0" />
-
-            {/* Tools */}
-            <div className="flex items-center gap-0.5">
-              <ToolBtn active={tool === "pen"} onClick={() => switchTool("pen")} label="Bút (P)" disabled={!canAnnotate}>
-                <Pen className="size-4" />
-              </ToolBtn>
-              <ToolBtn active={tool === "highlight"} onClick={() => switchTool("highlight")} label="Tô màu" disabled={!canAnnotate}>
-                <Highlighter className="size-4" />
-              </ToolBtn>
-              <ToolBtn active={tool === "underline"} onClick={() => switchTool("underline")} label="Gạch chân" disabled={!canAnnotate}>
-                <Underline className="size-4" />
-              </ToolBtn>
-              <ToolBtn active={tool === "text"} onClick={() => switchTool("text")} label="Chèn chữ" disabled={!canAnnotate}>
-                <Type className="size-4" />
-              </ToolBtn>
-              <ToolBtn active={tool === "stamp"} onClick={() => switchTool("stamp")} label="Chấm bài" disabled={!canAnnotate}>
-                <Stamp className="size-4" />
-              </ToolBtn>
-              <ToolBtn active={tool === "pan"} onClick={() => switchTool("pan")} label="Kéo">
-                <Hand className="size-4" />
-              </ToolBtn>
-            </div>
-
-            <div className="h-6 w-px bg-border" />
-
-            {/* Stamps picker (chỉ khi tool = stamp) */}
-            {tool === "stamp" && (
-              <>
-                <div className="flex items-center gap-0.5">
-                  {STAMPS.map((s, i) => (
-                    <button
-                      key={s.label}
-                      type="button"
-                      onClick={() => setStampIdx(i)}
-                      className={cn(
-                        "px-2 h-8 rounded-md text-xs font-semibold whitespace-nowrap transition",
-                        stampIdx === i ? "ring-2 ring-offset-1 ring-primary" : "hover:bg-muted",
-                      )}
-                      style={{ color: s.color }}
-                      title={`Chấm bài ${s.label}`}
-                    >
-                      {s.mark} {s.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="h-6 w-px bg-border" />
-              </>
-            )}
-
-            {/* Colors (chỉ khi không phải stamp) */}
-            {tool !== "stamp" && tool !== "pan" && (
-              <>
-                <div className="flex items-center gap-1">
-                  {COLORS.map((c) => {
-                    const active = color === c.value
-                    return (
-                      <button
-                        key={c.value}
-                        type="button"
-                        onClick={() => setColor(c.value)}
-                        aria-label={c.name}
-                        title={c.name}
-                        className={cn(
-                          "size-6 rounded-full transition shadow-sm grid place-items-center",
-                          active ? "ring-2 ring-offset-1 ring-foreground scale-110" : "hover:scale-110",
-                        )}
-                        style={{ backgroundColor: c.value }}
-                      >
-                        {active ? (
-                          <Check
-                            className="size-3"
-                            style={{ color: c.value === "#eab308" ? "#111827" : "#ffffff" }}
-                          />
-                        ) : null}
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="h-6 w-px bg-border" />
-              </>
-            )}
-
-            {/* Undo / clear / rotate */}
-            <Button variant="ghost" size="icon" onClick={undo} disabled={history.length === 0} className="size-8 rounded-full text-foreground" aria-label="Hoàn tác">
-              <Undo2 className="size-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={clearAll} className="size-8 rounded-full text-foreground" aria-label="Xóa hết">
-              <Trash2 className="size-4" />
-            </Button>
-            {isImage && (
-              <>
-                <Button variant="ghost" size="icon" onClick={() => rotateCurrent(-90)} className="size-8 rounded-full text-foreground" aria-label="Xoay trái">
-                  <RotateCcw className="size-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={() => rotateCurrent(90)} className="size-8 rounded-full text-foreground" aria-label="Xoay phải">
-                  <RotateCw className="size-4" />
-                </Button>
-              </>
-            )}
-
-            <div className="h-6 w-px bg-border" />
-
-            {/* Zoom */}
-            <Button variant="ghost" size="icon" onClick={() => nudgeZoom(-0.25)} className="size-8 rounded-full text-foreground" aria-label="Thu nhỏ">
-              <ZoomOut className="size-4" />
-            </Button>
-            <div
-              className="flex items-center"
-              title="Nhập % zoom rồi Enter (phím 0 = 100%)"
-            >
-              <Input
-                className="w-[54px] h-7 text-xs text-center tabular-nums px-1"
-                value={zoomText ?? String(Math.round(zoomLevel * 100))}
-                onChange={(e) => setZoomText(e.target.value)}
-                onBlur={commitZoom}
-                onFocus={(e) => e.target.select()}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") (e.target as HTMLInputElement).blur()
-                  if (e.key === "Escape") setZoomText(null)
-                }}
-                aria-label="Mức zoom phần trăm"
-              />
-              <span className="text-xs text-muted-foreground pl-0.5 pr-1">%</span>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => nudgeZoom(0.25)} className="size-8 rounded-full text-foreground" aria-label="Phóng to">
-              <ZoomIn className="size-4" />
-            </Button>
-
-            <div className="h-6 w-px bg-border" />
-
-            {/* Score + Save */}
-            <div className="flex items-center gap-1">
-              <Input
-                className="w-14 h-8 text-sm text-foreground"
-                type="number"
-                min={0}
-                max={maxScore}
-                step={0.25}
-                value={score}
-                onChange={(e) => setScore(e.target.value)}
-                placeholder="—"
-                aria-label="Điểm"
-              />
-              <span className="text-xs text-muted-foreground">/{maxScore}</span>
-            </div>
-            <Button onClick={handleSave} disabled={saving} size="sm" className="rounded-full gap-1.5 h-8 px-3">
-              <Save className="size-3.5" />
-              {saving ? "Lưu..." : "Lưu"}
-            </Button>
-            {sessionGroupId && (
-              <Button
-                onClick={() => setMembersOpen(true)}
-                size="sm"
-                variant="outline"
-                className="rounded-full gap-1.5 h-8 px-3"
-                title="Xem thành viên nhóm, random gọi báo cáo, sửa điểm từng em"
-              >
-                <Users className="size-3.5" />
-                Thành Viên
-              </Button>
-            )}
-          </div>
+          <AnnotationToolbar
+            title={title}
+            hasText={hasText}
+            currentIdx={currentIdx}
+            textFontSize={textFontSize}
+            setTextFontSize={setTextFontSize}
+            tool={tool}
+            onSwitchTool={switchTool}
+            canAnnotate={canAnnotate}
+            stampIdx={stampIdx}
+            setStampIdx={setStampIdx}
+            color={color}
+            setColor={setColor}
+            onUndo={undo}
+            canUndo={history.length > 0}
+            onClear={clearAll}
+            isImage={isImage}
+            onRotate={rotateCurrent}
+            zoomText={zoomText}
+            setZoomText={setZoomText}
+            zoomLevel={zoomLevel}
+            onCommitZoom={commitZoom}
+            onNudgeZoom={nudgeZoom}
+            score={score}
+            setScore={setScore}
+            maxScore={maxScore}
+            saving={saving}
+            onSave={handleSave}
+            showMembers={!!sessionGroupId}
+            onOpenMembers={() => setMembersOpen(true)}
+          />
         </div>
       )}
 
@@ -884,12 +714,16 @@ export function AnnotationEditor({
                 title={f.name}
               >
                 {f.kind === "image" ? (
-                  <img
-                    src={f.url || "/placeholder.svg"}
-                    alt={f.name}
-                    className="w-full h-full object-cover"
-                    style={{ transform: `rotate(${rotations[i] ?? 0}deg)` }}
-                  />
+                  <span className="block relative w-full h-full">
+                    <Image
+                      src={f.url || "/placeholder.svg"}
+                      alt={f.name}
+                      fill
+                      sizes="40px"
+                      className="object-cover"
+                      style={{ transform: `rotate(${rotations[i] ?? 0}deg)` }}
+                    />
+                  </span>
                 ) : (
                   <div className="w-full h-full bg-muted/60 grid place-items-center text-muted-foreground">
                     <Icon className="size-4" />
@@ -1001,105 +835,20 @@ export function AnnotationEditor({
                   }
                 />
               </div>
-            ) : isImage && currentFile ? (
-              <div className="relative p-2">
-                <img
-                  src={currentFile.url || "/placeholder.svg"}
-                  alt={currentFile.name}
-                  className="block max-w-[1200px] w-auto rounded-md pointer-events-none mx-auto"
-                  crossOrigin="anonymous"
-                  style={{ transform: `rotate(${currentRotation}deg)`, maxHeight: "80vh" }}
-                />
-              </div>
-            ) : isPdf && currentFile ? (
-              <div className="w-full relative">
-                <PdfPages
-                  key={`pdf-${currentIdx}-${currentFile.url}`}
-                  url={currentFile.url}
-                  name={currentFile.name}
-                />
-                <div
-                  className="absolute top-2 right-2 z-20"
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  <Button asChild variant="outline" size="sm" className="gap-1">
-                    <a href={currentFile.url} target="_blank" rel="noreferrer" download>
-                      <Download className="size-3.5" />
-                      Tải PDF
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            ) : isDocx && currentFile ? (
-              <div id="docx-root" className="w-full">
-                <div ref={docxBoxRef} />
-                {docxLoading && !docxError && (
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    Đang tải tệp Word...
-                  </p>
-                )}
-                {docxError && (
-                  <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-                    <p className="text-sm text-muted-foreground">
-                      Không đọc được tệp .docx, mở qua trình xem của Office.
-                    </p>
-                    <div className="w-full h-[78vh]">
-                      <iframe
-                        src={officeEmbed(currentFile.url)}
-                        title={currentFile.name}
-                        className="w-full h-full rounded-md"
-                        allow="fullscreen"
-                      />
-                    </div>
-                  </div>
-                )}
-                <div className="absolute top-2 right-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
-                  <Button asChild variant="outline" size="sm" className="gap-1">
-                    <a href={currentFile.url} target="_blank" rel="noreferrer" download>
-                      <Download className="size-3.5" />
-                      Tải tệp
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            ) : isPptx && currentFile ? (
-              <div className="w-[1000px] h-[78vh] relative mx-auto">
-                <iframe
-                  src={officeEmbed(currentFile.url)}
-                  title={currentFile.name}
-                  allow="fullscreen"
-                  className={cn(
-                    "w-full h-full rounded-md",
-                    // Khóa iframe khi đang chấm: chuột không xuyên qua, chỉ đặt dấu
-                    annotateLocked && "pointer-events-none",
-                  )}
-                />
-                {annotateLocked && (
-                  <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-background/90 border shadow px-3 py-1 text-xs text-muted-foreground pointer-events-none max-w-[90%] text-center">
-                    <Hand className="size-3.5 shrink-0" />
-                    Dấu gắn theo khung xem (không theo slide) — chuyển slide thì bấm thùng rác để xóa dấu cũ
-                  </div>
-                )}
-                <div className="absolute top-2 right-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
-                  <Button asChild variant="outline" size="sm" className="gap-1">
-                    <a href={currentFile.url} target="_blank" rel="noreferrer" download>
-                      <Download className="size-3.5" />
-                      Tải tệp
-                    </a>
-                  </Button>
-                </div>
-              </div>
             ) : currentFile ? (
-              <div className="p-6 flex flex-col items-center justify-center min-h-[70vh] gap-3 min-w-[600px]">
-                <FileIcon className="size-16 text-muted-foreground" />
-                <p className="font-medium">{currentFile.name}</p>
-                <Button asChild variant="outline" className="gap-1">
-                  <a href={currentFile.url} target="_blank" rel="noreferrer" download>
-                    <Download className="size-4" />
-                    Tải tệp về để xem
-                  </a>
-                </Button>
-              </div>
+              <FileViewer
+                file={currentFile}
+                isImage={isImage}
+                isPdf={isPdf}
+                isDocx={isDocx}
+                isPptx={isPptx}
+                currentRotation={currentRotation}
+                fileIndex={currentIdx}
+                docxBoxRef={docxBoxRef}
+                docxLoading={docxLoading}
+                docxError={docxError}
+                annotateLocked={annotateLocked}
+              />
             ) : (
               <div className="p-6 min-h-[70vh] min-w-[600px] grid place-items-center text-muted-foreground">
                 Chưa có nội dung
@@ -1272,39 +1021,5 @@ export function AnnotationEditor({
         />
       )}
     </div>
-  )
-}
-
-function ToolBtn({
-  active,
-  onClick,
-  children,
-  label,
-  disabled,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-  label: string
-  disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      className={cn(
-        "size-8 rounded-full grid place-items-center transition",
-        active
-          ? "bg-primary text-primary-foreground shadow"
-          : disabled
-            ? "text-muted-foreground/40 cursor-not-allowed"
-            : "hover:bg-muted text-foreground/80",
-      )}
-    >
-      {children}
-    </button>
   )
 }

@@ -337,6 +337,88 @@ async function startAiGradeJobActionInner(
   return { ok: true, jobId: job.id, total: list.length, provider }
 }
 
+/** Chấm lại 1 bài: xóa kết quả cũ của submission, tạo job mới total=1 giữ nguyên
+ * provider của job gốc (muse_chat → hook ngoài xử lý, gemini/muse → grade-run). */
+export async function regradeOneSubmissionAction(
+  jobId: string,
+  submissionId: string,
+): Promise<{ ok: true; jobId: string; provider: string } | { ok: false; error: string }> {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { ok: false, error: "Cần đăng nhập." }
+
+    const { data: job } = await supabase
+      .from("ai_grade_jobs")
+      .select("id, session_id, teacher_id, provider, completed")
+      .eq("id", jobId)
+      .single()
+    if (!job || job.teacher_id !== user.id) return { ok: false, error: "Không có quyền." }
+
+    const { data: sub } = await supabase
+      .from("submissions")
+      .select("id, session_id, session_group_id, session_slot_id")
+      .eq("id", submissionId)
+      .single()
+    if (!sub || sub.session_id !== job.session_id) {
+      return { ok: false, error: "Bài nộp không thuộc phiên này." }
+    }
+
+    const { data: oldRows } = await supabase
+      .from("ai_grade_results")
+      .select("id, status")
+      .eq("job_id", jobId)
+      .eq("submission_id", submissionId)
+    const counted = (oldRows ?? []).filter((r) => r.status === "ready" || r.status === "approved").length
+
+    const { error: delErr } = await supabase
+      .from("ai_grade_results")
+      .delete()
+      .eq("job_id", jobId)
+      .eq("submission_id", submissionId)
+    if (delErr) return { ok: false, error: "Không xóa được kết quả cũ." }
+    if (counted > 0) {
+      await supabase
+        .from("ai_grade_jobs")
+        .update({ completed: Math.max(0, (job.completed ?? 0) - counted) })
+        .eq("id", jobId)
+    }
+
+    const { data: newJob, error: jobErr } = await supabase
+      .from("ai_grade_jobs")
+      .insert({
+        session_id: job.session_id,
+        teacher_id: user.id,
+        status: "queued",
+        provider: job.provider,
+        total: 1,
+        completed: 0,
+      })
+      .select("id")
+      .single()
+    if (jobErr || !newJob) return { ok: false, error: "Không tạo được job chấm lại." }
+
+    const { error: rowErr } = await supabase.from("ai_grade_results").insert({
+      job_id: newJob.id,
+      session_id: job.session_id,
+      session_group_id: sub.session_group_id,
+      session_slot_id: sub.session_slot_id,
+      submission_id: sub.id,
+      unreadable: false,
+      status: "pending",
+    })
+    if (rowErr) {
+      await supabase.from("ai_grade_jobs").delete().eq("id", newJob.id)
+      return { ok: false, error: "Không tạo được hàng chấm." }
+    }
+    return { ok: true, jobId: newJob.id, provider: job.provider ?? "muse_chat" }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Không chấm lại được" }
+  }
+}
+
 export async function approveAiGradeResultsAction(jobId: string, resultIds?: string[]) {
   const supabase = await createClient()
   const {

@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Image from "next/image"
 import type {
   SessionRow,
   SessionGroupRow,
@@ -178,15 +179,17 @@ export function ResultsViewer({
                              setActiveFileIdx(i)
                              setViewRotation(0)
                            }}
-                          className={`shrink-0 size-14 rounded border-2 overflow-hidden flex items-center justify-center ${
+                          className={`shrink-0 size-14 relative rounded border-2 overflow-hidden flex items-center justify-center ${
                             i === activeFileIdx ? "border-primary" : "border-transparent"
                           }`}
                         >
                           {f.kind === "image" ? (
-                            <img
+                            <Image
                               src={f.url || "/placeholder.svg"}
                               alt=""
-                              className="size-full object-cover"
+                              fill
+                              sizes="56px"
+                              className="object-cover"
                               style={{ transform: `rotate(${f.rotation ?? 0}deg)` }}
                             />
                           ) : f.kind === "pptx" ? (

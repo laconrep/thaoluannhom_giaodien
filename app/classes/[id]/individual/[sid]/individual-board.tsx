@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { saveAnnotationAction, togglePasteAction, unlockSlotAction } from "@/app/actions"
@@ -283,10 +284,12 @@ export function IndividualBoard({
 
                   <div className="relative z-0 flex-1 rounded bg-muted/30 overflow-hidden pointer-events-none">
                     {firstImage ? (
-                      <img
+                      <Image
                         src={firstImage.url || "/placeholder.svg"}
                         alt=""
-                        className="absolute inset-0 w-full h-full object-cover"
+                        fill
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                        className="object-cover"
                         style={{ transform: `rotate(${firstImage.rotation ?? 0}deg)` }}
                       />
                     ) : firstFile ? (

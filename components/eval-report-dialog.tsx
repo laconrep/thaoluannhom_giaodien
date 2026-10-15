@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import type { RealtimeChannel } from "@supabase/supabase-js"
 import { requestAiEvalAction } from "@/app/ai-grade-actions"
 import { Button } from "@/components/ui/button"
 import {
@@ -54,15 +55,35 @@ export function EvalReportDialog({ sessionId, open, onOpenChange }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const pollRef = useRef<number | null>(null)
+  const channelRef = useRef<RealtimeChannel | null>(null)
+  // Realtime là kênh chính; polling chỉ chạy khi realtime lỗi hoặc >10s không có event.
+  const lastRtAt = useRef(0)
+  const rtFailed = useRef(false)
 
-  function stopPoll() {
+  function stopWatch() {
     if (pollRef.current) {
       window.clearInterval(pollRef.current)
       pollRef.current = null
     }
+    if (channelRef.current) {
+      createClient().removeChannel(channelRef.current)
+      channelRef.current = null
+    }
   }
 
-  useEffect(() => stopPoll, [])
+  useEffect(() => stopWatch, [])
+
+  function applyRow(row: { status: string; result_json: unknown; error_message: string | null }) {
+    if (row.status === "done") {
+      stopWatch()
+      setReport(row.result_json as EvalReport)
+      setPhase("done")
+    } else if (row.status === "error") {
+      stopWatch()
+      setError(row.error_message || "AI đánh giá gặp lỗi.")
+      setPhase("error")
+    }
+  }
 
   async function pollOnce(id: string) {
     const supabase = createClient()
@@ -72,21 +93,33 @@ export function EvalReportDialog({ sessionId, open, onOpenChange }: Props) {
       .eq("id", id)
       .maybeSingle()
     if (error || !data) return
-    if (data.status === "done") {
-      stopPoll()
-      setReport(data.result_json as EvalReport)
-      setPhase("done")
-    } else if (data.status === "error") {
-      stopPoll()
-      setError(data.error_message || "AI đánh giá gặp lỗi.")
-      setPhase("error")
-    }
+    applyRow(data as { status: string; result_json: unknown; error_message: string | null })
   }
 
-  function startPoll(id: string) {
-    stopPoll()
+  function startWatch(id: string) {
+    stopWatch()
+    lastRtAt.current = 0
+    rtFailed.current = false
+    const supabase = createClient()
+    const ch = supabase
+      .channel(`ai-eval-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "ai_eval_requests", filter: `id=eq.${id}` },
+        (p: { new?: { status: string; result_json: unknown; error_message: string | null } }) => {
+          lastRtAt.current = Date.now()
+          if (p.new) applyRow(p.new)
+        },
+      )
+      .subscribe((status: string) => {
+        rtFailed.current = status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED"
+      })
+    channelRef.current = ch
     pollRef.current = window.setInterval(() => {
-      pollOnce(id).catch(() => {})
+      // Fallback: chỉ poll khi realtime lỗi hoặc quá 10s không có event.
+      if (rtFailed.current || Date.now() - lastRtAt.current > 10000) {
+        pollOnce(id).catch(() => {})
+      }
     }, 2500)
     pollOnce(id).catch(() => {})
   }
@@ -105,14 +138,14 @@ export function EvalReportDialog({ sessionId, open, onOpenChange }: Props) {
       setRequestId(res.requestId)
       setPhase("waiting")
       toast.success("AI đang tổng hợp đánh giá toàn phiên.")
-      startPoll(res.requestId)
+      startWatch(res.requestId)
     })
   }
 
   useEffect(() => {
     if (open && phase === "idle") request()
     if (!open) {
-      stopPoll()
+      stopWatch()
       setPhase("idle")
       setRequestId(null)
       setReport(null)

@@ -4,8 +4,10 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import type { RealtimeChannel } from "@supabase/supabase-js"
 import {
   approveAiGradeResultsAction,
+  regradeOneSubmissionAction,
   saveSessionAiRubricAction,
   setSessionAiEnabledAction,
   startAiGradeJobAction,
@@ -23,7 +25,7 @@ import {
 import { RubricBaremDialog } from "@/components/rubric-barem-dialog"
 import { EvalReportDialog } from "@/components/eval-report-dialog"
 import type { AiGradeJobRow, AiGradeResultRow, AiProviderChoice, SessionGroupRow, SessionSlotRow } from "@/lib/types"
-import { BarChart3, Bot, Check, Eye, Loader2, Sparkles } from "lucide-react"
+import { BarChart3, Bot, Check, Eye, Loader2, RotateCcw, Sparkles } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -61,6 +63,12 @@ export function AiGradePanel({
   const [providerChoice, setProviderChoice] = useState<AiProviderChoice>("auto")
   const [pending, startTransition] = useTransition()
   const prevJobStatus = useRef<string | null>(null)
+  // Realtime là kênh chính; polling 2.5s chỉ chạy khi realtime lỗi hoặc >10s không có event.
+  const lastJobRtAt = useRef(0)
+  const lastResultsRtAt = useRef(0)
+  const jobRtFailed = useRef(false)
+  const resultsRtFailed = useRef(false)
+  const resultsChannelRef = useRef<RealtimeChannel | null>(null)
 
   async function refreshJob() {
     const supabase = createClient()
@@ -82,25 +90,77 @@ export function AiGradePanel({
 
   useEffect(() => {
     const supabase = createClient()
+    lastJobRtAt.current = 0
+    jobRtFailed.current = false
     const ch = supabase
       .channel(`ai-job-${sessionId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "ai_grade_jobs", filter: `session_id=eq.${sessionId}` },
         (p: { new?: AiGradeJobRow }) => {
+          lastJobRtAt.current = Date.now()
           if (p.new) setJob(p.new)
         },
       )
-      .subscribe()
+      .subscribe((status: string) => {
+        jobRtFailed.current = status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED"
+      })
     return () => {
       supabase.removeChannel(ch)
     }
   }, [sessionId])
 
+  // Realtime kết quả theo job đang theo dõi — upsert từng dòng khi có thay đổi.
+  useEffect(() => {
+    if (!open || !job) {
+      if (resultsChannelRef.current) {
+        createClient().removeChannel(resultsChannelRef.current)
+        resultsChannelRef.current = null
+      }
+      return
+    }
+    const supabase = createClient()
+    lastResultsRtAt.current = 0
+    resultsRtFailed.current = false
+    const ch = supabase
+      .channel(`ai-results-${job.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ai_grade_results", filter: `job_id=eq.${job.id}` },
+        (p: { new?: AiGradeResultRow }) => {
+          lastResultsRtAt.current = Date.now()
+          const row = p.new
+          if (!row) return
+          setResults((cur) => {
+            const i = cur.findIndex((r) => r.id === row.id)
+            if (i === -1) return [...cur, row].sort((a, b) => a.created_at.localeCompare(b.created_at))
+            const next = [...cur]
+            next[i] = row
+            return next
+          })
+        },
+      )
+      .subscribe((status: string) => {
+        resultsRtFailed.current =
+          status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED"
+      })
+    resultsChannelRef.current = ch
+    return () => {
+      supabase.removeChannel(ch)
+      resultsChannelRef.current = null
+    }
+  }, [open, job?.id])
+
   useEffect(() => {
     if (!job || (job.status !== "queued" && job.status !== "running")) return
     const tick = window.setInterval(() => {
-      refreshJob().catch(() => {})
+      // Fallback: chỉ poll khi realtime lỗi hoặc quá 10s không có event.
+      if (jobRtFailed.current || Date.now() - lastJobRtAt.current > 10000) {
+        refreshJob().catch(() => {})
+      }
+      if (open && (resultsRtFailed.current || Date.now() - lastResultsRtAt.current > 10000)) {
+        loadResults().catch(() => {})
+      }
     }, 2500)
     const kick = window.setTimeout(() => {
       fetch("/api/ai/grade-run", {
@@ -113,7 +173,7 @@ export function AiGradePanel({
       window.clearInterval(tick)
       window.clearTimeout(kick)
     }
-  }, [job?.id, job?.status])
+  }, [job?.id, job?.status, open])
 
   const labelByTarget = useMemo(() => {
     const m: Record<string, string> = {}
@@ -127,6 +187,28 @@ export function AiGradePanel({
   const running = job?.status === "queued" || job?.status === "running"
   const readyCount = results.filter((r) => r.status === "ready").length
   const done = job?.status === "done"
+
+  // Cảnh báo điểm bất thường: (a) tất cả cùng 1 điểm, (b) có bài lệch >2.5đ so với trung bình.
+  const scoreAnomaly = useMemo(() => {
+    const scored = results
+      .filter((r) => (r.status === "ready" || r.status === "approved") && r.ai_score != null)
+      .map((r) => ({
+        name:
+          (r.session_group_id && labelByTarget[`g:${r.session_group_id}`]) ||
+          (r.session_slot_id && labelByTarget[`s:${r.session_slot_id}`]) ||
+          "Bài nộp",
+        score: r.ai_score as number,
+      }))
+    if (scored.length < 2) return null
+    const scores = scored.map((s) => s.score)
+    if (scores.every((s) => s === scores[0])) {
+      return { kind: "same" as const, names: scored.map((s) => s.name), value: scores[0] }
+    }
+    const mean = scores.reduce((a, b) => a + b, 0) / scores.length
+    const outliers = scored.filter((s) => Math.abs(s.score - mean) > 2.5)
+    if (outliers.length === 0) return null
+    return { kind: "outlier" as const, names: outliers.map((s) => s.name), mean }
+  }, [results, labelByTarget])
 
   useEffect(() => {
     if (!job) return
@@ -202,6 +284,44 @@ export function AiGradePanel({
   async function openResults() {
     await loadResults()
     setOpen(true)
+  }
+
+  function regradeOne(r: AiGradeResultRow) {
+    if (!job || !r.submission_id || running) return
+    startTransition(async () => {
+      try {
+        const res = await regradeOneSubmissionAction(job.id, r.submission_id as string)
+        if (!res.ok) {
+          toast.error(res.error)
+          return
+        }
+        lastJobRtAt.current = 0
+        lastResultsRtAt.current = 0
+        jobRtFailed.current = false
+        resultsRtFailed.current = false
+        setJob({
+          id: res.jobId,
+          session_id: sessionId,
+          teacher_id: "",
+          status: "queued",
+          provider: res.provider,
+          total: 1,
+          completed: 0,
+          error_message: null,
+          created_at: new Date().toISOString(),
+          finished_at: null,
+        })
+        setResults([])
+        fetch("/api/ai/grade-run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobId: res.jobId }),
+        }).catch(() => {})
+        toast.success("Đang chấm lại bài này.")
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Không chấm lại được")
+      }
+    })
   }
 
   function approveAll() {
@@ -297,6 +417,25 @@ export function AiGradePanel({
                   : `Xong ${job.completed}/${job.total}${job.error_message ? ` · ${job.error_message}` : ""}`}
             </p>
           )}
+          {scoreAnomaly?.kind === "same" && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+              <p className="font-semibold text-amber-700 dark:text-amber-400">Cảnh báo điểm bất thường</p>
+              <p className="text-muted-foreground mt-0.5">
+                Tất cả {scoreAnomaly.names.length} bài đều cùng điểm {scoreAnomaly.value} — kiểm tra
+                lại xem AI có chấm ẩu không trước khi duyệt.
+              </p>
+            </div>
+          )}
+          {scoreAnomaly?.kind === "outlier" && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+              <p className="font-semibold text-amber-700 dark:text-amber-400">Cảnh báo điểm bất thường</p>
+              <p className="text-muted-foreground mt-0.5">
+                {scoreAnomaly.names.length} bài lệch hơn 2.5đ so với trung bình (
+                {scoreAnomaly.mean.toFixed(1)}đ): {scoreAnomaly.names.join(", ")} — kiểm tra lại
+                trước khi duyệt.
+              </p>
+            </div>
+          )}
           <ul className="flex flex-col gap-2">
             {results.map((r) => {
               const name =
@@ -307,15 +446,28 @@ export function AiGradePanel({
                 <li key={r.id} className="rounded-md border p-2 text-xs flex flex-col gap-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{name}</span>
-                    {r.status === "ready" && r.ai_score != null && (
-                      <span className="ml-auto font-bold text-primary tabular-nums">{r.ai_score} đ</span>
-                    )}
-                    {r.status === "approved" && (
-                      <span className="ml-auto text-primary inline-flex items-center gap-0.5">
-                        <Check className="size-3" /> Đã duyệt
-                      </span>
-                    )}
-                    {r.status === "error" && <span className="ml-auto text-destructive">Lỗi</span>}
+                    <span className="ml-auto inline-flex items-center gap-2">
+                      {r.status === "ready" && r.ai_score != null && (
+                        <span className="font-bold text-primary tabular-nums">{r.ai_score} đ</span>
+                      )}
+                      {r.status === "approved" && (
+                        <span className="text-primary inline-flex items-center gap-0.5">
+                          <Check className="size-3" /> Đã duyệt
+                        </span>
+                      )}
+                      {r.status === "error" && <span className="text-destructive">Lỗi</span>}
+                      {r.submission_id && !running && (
+                        <button
+                          type="button"
+                          onClick={() => regradeOne(r)}
+                          disabled={pending}
+                          className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground hover:text-primary disabled:opacity-40 shrink-0"
+                          title="Xóa kết quả cũ và chấm lại bài này bằng AI"
+                        >
+                          <RotateCcw className="size-3" /> Chấm lại
+                        </button>
+                      )}
+                    </span>
                     {r.unreadable && <span className="text-muted-foreground">Khó đọc</span>}
                   </div>
                   {r.ai_feedback && <p className="text-muted-foreground whitespace-pre-wrap">{r.ai_feedback}</p>}

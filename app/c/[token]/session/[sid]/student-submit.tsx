@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
@@ -704,10 +705,14 @@ export function StudentSubmit({
                           className="relative rounded-md border bg-card overflow-hidden aspect-square"
                         >
                           {s.previewUrl ? (
-                            <img
+                            <Image
                               src={s.previewUrl || "/placeholder.svg"}
                               alt={s.file.name}
-                              className="w-full h-full object-cover"
+                              fill
+                              sizes="(max-width: 640px) 33vw, 25vw"
+                              className="object-cover"
+                              // blob: URL là preview cục bộ tạm thời, không qua optimize
+                              unoptimized
                             />
                           ) : (
                             <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center gap-1 bg-muted/40">

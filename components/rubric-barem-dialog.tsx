@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import type { RealtimeChannel } from "@supabase/supabase-js"
 import { requestAiBaremAction, saveSessionAiRubricAction } from "@/app/ai-grade-actions"
 import { parseGradingBarem } from "@/lib/ai/rubric-format"
 import { Button } from "@/components/ui/button"
@@ -50,6 +51,22 @@ export function RubricBaremDialog({ sessionId, open, onOpenChange, initialRubric
   const [barem, setBarem] = useState<GradingBarem | null>(null)
   const [pending, startTransition] = useTransition()
   const pollRef = useRef<number | null>(null)
+  const channelRef = useRef<RealtimeChannel | null>(null)
+  // Realtime là kênh chính; polling chỉ chạy khi realtime lỗi hoặc >10s không có event.
+  const lastRtAt = useRef(0)
+  const rtFailed = useRef(false)
+  const triesRef = useRef(0)
+
+  function stopWatch() {
+    if (pollRef.current) {
+      window.clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+    if (channelRef.current) {
+      createClient().removeChannel(channelRef.current)
+      channelRef.current = null
+    }
+  }
 
   useEffect(() => {
     if (open) {
@@ -61,52 +78,83 @@ export function RubricBaremDialog({ sessionId, open, onOpenChange, initialRubric
       setAnswer("")
     }
     return () => {
-      if (pollRef.current) window.clearInterval(pollRef.current)
-      pollRef.current = null
+      stopWatch()
     }
   }, [open, initialRubric])
 
+  function applyBaremRow(
+    row: { status: string; barem_json: unknown; error_message: string | null } | null,
+    fallbackMax: number,
+  ) {
+    if (!row) return
+    if (row.status === "done" && row.barem_json) {
+      stopWatch()
+      const p = normalizeBarem(row.barem_json, fallbackMax)
+      setGenerating(false)
+      if (p) {
+        setBarem(p)
+        setMaxScore(p.max_score)
+        toast.success("AI đã soạn xong tiêu chí — bác kiểm tra và chỉnh sửa nhé")
+      } else {
+        setGenError("AI trả về dữ liệu không đúng định dạng. Thử lại.")
+      }
+    } else if (row.status === "error") {
+      stopWatch()
+      setGenerating(false)
+      setGenError(row.error_message || "AI tạo tiêu chí thất bại.")
+    }
+  }
+
+  async function pollBaremOnce(requestId: string, fallbackMax: number) {
+    triesRef.current += 1
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("ai_barem_requests")
+        .select("status,barem_json,error_message")
+        .eq("id", requestId)
+        .maybeSingle()
+      const row = data as { status: string; barem_json: unknown; error_message: string | null } | null
+      applyBaremRow(row, fallbackMax)
+      if (row && row.status !== "done" && row.status !== "error" && triesRef.current > 72) {
+        stopWatch()
+        setGenerating(false)
+        setGenError("Quá thời gian chờ AI (3 phút). Thử lại sau.")
+      }
+    } catch {
+      // thử lại ở tick sau
+    }
+  }
+
   function pollBaremRequest(requestId: string) {
+    stopWatch()
+    lastRtAt.current = 0
+    rtFailed.current = false
+    triesRef.current = 0
+    const fallbackMax = maxScore
     const supabase = createClient()
-    let tries = 0
-    const tick = window.setInterval(async () => {
-      tries++
-      try {
-        const { data } = await supabase
-          .from("ai_barem_requests")
-          .select("status,barem_json,error_message")
-          .eq("id", requestId)
-          .maybeSingle()
-        const row = data as { status: string; barem_json: unknown; error_message: string | null } | null
-        if (!row) return
-        if (row.status === "done" && row.barem_json) {
-          window.clearInterval(tick)
-          pollRef.current = null
-          const p = normalizeBarem(row.barem_json, maxScore)
-          setGenerating(false)
-          if (p) {
-            setBarem(p)
-            setMaxScore(p.max_score)
-            toast.success("AI đã soạn xong tiêu chí — bác kiểm tra và chỉnh sửa nhé")
-          } else {
-            setGenError("AI trả về dữ liệu không đúng định dạng. Thử lại.")
-          }
-        } else if (row.status === "error") {
-          window.clearInterval(tick)
-          pollRef.current = null
-          setGenerating(false)
-          setGenError(row.error_message || "AI tạo tiêu chí thất bại.")
-        } else if (tries > 72) {
-          window.clearInterval(tick)
-          pollRef.current = null
-          setGenerating(false)
-          setGenError("Quá thời gian chờ AI (3 phút). Thử lại sau.")
-        }
-      } catch {
-        // thử lại ở tick sau
+    const ch = supabase
+      .channel(`ai-barem-${requestId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "ai_barem_requests", filter: `id=eq.${requestId}` },
+        (p: { new?: { status: string; barem_json: unknown; error_message: string | null } }) => {
+          lastRtAt.current = Date.now()
+          if (p.new) applyBaremRow(p.new, fallbackMax)
+        },
+      )
+      .subscribe((status: string) => {
+        rtFailed.current = status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED"
+      })
+    channelRef.current = ch
+    const tick = window.setInterval(() => {
+      // Fallback: chỉ poll khi realtime lỗi hoặc quá 10s không có event.
+      if (rtFailed.current || Date.now() - lastRtAt.current > 10000) {
+        pollBaremOnce(requestId, fallbackMax).catch(() => {})
       }
     }, 2500)
     pollRef.current = tick
+    pollBaremOnce(requestId, fallbackMax).catch(() => {})
   }
 
   function requestBarem() {

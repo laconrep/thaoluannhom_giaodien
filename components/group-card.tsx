@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import type { AnnotationRow, SessionGroupRow, SubmissionFile, SubmissionRow } from "@/lib/types"
 import { Card } from "@/components/ui/card"
 import { SubmissionText } from "@/components/submission-text"
@@ -18,10 +19,12 @@ import { isRichTextEmpty } from "@/lib/rich-text"
 function FileThumb({ f }: { f: SubmissionFile }) {
   if (f.kind === "image") {
     return (
-      <img
+      <Image
         src={f.url || "/placeholder.svg"}
         alt={f.name}
-        className="w-full h-full object-cover"
+        fill
+        sizes="(max-width: 640px) 50vw, 25vw"
+        className="object-cover"
         style={{ transform: `rotate(${f.rotation ?? 0}deg)` }}
       />
     )
