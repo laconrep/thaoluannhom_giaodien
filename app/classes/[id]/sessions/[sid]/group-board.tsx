@@ -902,6 +902,9 @@ export function GroupSessionBoard({
           initialData={(openAnn?.data ?? []) as AnnotationItem[]}
           initialScore={openAnn?.score ?? null}
           autoFullscreen
+          sessionId={session.id}
+          sessionGroupId={openGroup.id}
+          groupLabel={openGroup.label}
           onSave={async (data, score) => {
             await saveAnnotationAction({
               sessionId: session.id,

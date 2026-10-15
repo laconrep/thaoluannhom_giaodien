@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SubmissionText } from "@/components/submission-text"
 import { PdfPages } from "@/components/pdf-pages"
+import { GroupMembersDialog } from "@/components/group-members-dialog"
 import { useFullscreen } from "@/lib/use-fullscreen"
 import { renderAsync } from "docx-preview"
 import { cn } from "@/lib/utils"
@@ -34,6 +35,7 @@ import {
   Stamp,
   Hand,
   Eye,
+  Users,
 } from "lucide-react"
 
 const COLORS = [
@@ -71,6 +73,9 @@ export function AnnotationEditor({
   initialScore,
   maxScore = 10,
   autoFullscreen = false,
+  sessionId,
+  sessionGroupId,
+  groupLabel,
   onSave,
   onClose,
 }: {
@@ -81,6 +86,10 @@ export function AnnotationEditor({
   initialScore: number | null
   maxScore?: number
   autoFullscreen?: boolean
+  /** Có 2 prop này => luồng chấm theo nhóm => hiện nút "Thành Viên" */
+  sessionId?: string
+  sessionGroupId?: string | null
+  groupLabel?: string
   onSave: (data: AnnotationItem[], score: number | null) => Promise<void> | void
   onClose: () => void
 }) {
@@ -108,6 +117,8 @@ export function AnnotationEditor({
   const [presentationMode, setPresentationMode] = useState(false)
   const [textFontSize, setTextFontSize] = useState(18) // dành cho presentation chữ to
   const [zoomLevel, setZoomLevel] = useState(1) // 0.5 → 10
+  const [zoomText, setZoomText] = useState<string | null>(null) // text đang nhập ở ô zoom
+  const [membersOpen, setMembersOpen] = useState(false)
   const [showToolbar, setShowToolbar] = useState(true)
   const toolbarHideTimer = useRef<any>(null)
 
@@ -508,6 +519,20 @@ export function AnnotationEditor({
     setSaving(false)
   }
 
+  // Zoom nhập tay: Enter/blur để áp dụng, Esc để hủy.
+  function commitZoom() {
+    const raw = (zoomText ?? "").trim().replace("%", "")
+    const n = Number(raw)
+    if (raw !== "" && Number.isFinite(n) && n > 0) {
+      setZoomLevel(Math.max(0.5, Math.min(10, Math.round(n) / 100)))
+    }
+    setZoomText(null)
+  }
+  function nudgeZoom(delta: number) {
+    setZoomText(null)
+    setZoomLevel((z) => Math.max(0.5, Math.min(10, Math.round((z + delta) * 100) / 100)))
+  }
+
   // Zoom bằng Ctrl + wheel
   useEffect(() => {
     const vp = viewportRef.current
@@ -515,6 +540,7 @@ export function AnnotationEditor({
     function onWheel(e: WheelEvent) {
       if (!e.ctrlKey && !e.metaKey) return
       e.preventDefault()
+      setZoomText(null)
       setZoomLevel((z) => {
         const next = Math.max(0.5, Math.min(10, z - e.deltaY / 500))
         return Math.round(next * 100) / 100
@@ -529,6 +555,10 @@ export function AnnotationEditor({
     function onKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (e.key === "Escape") {
+        if (membersOpen) {
+          setMembersOpen(false)
+          return
+        }
         if (pendingText) setPendingText(null)
         else if (selectedTextIdx !== null) setSelectedTextIdx(null)
         else if (presentationMode) setPresentationMode(false)
@@ -545,14 +575,17 @@ export function AnnotationEditor({
       if (e.key === "ArrowLeft" && files.length > 1) setCurrentIdx((i) => Math.max(0, i - 1))
       if (e.key === "ArrowRight" && files.length > 1)
         setCurrentIdx((i) => Math.min(files.length - 1, i + 1))
-      if (e.key === "0") setZoomLevel(1)
-      if (e.key === "+" || e.key === "=") setZoomLevel((z) => Math.min(10, z + 0.25))
-      if (e.key === "-") setZoomLevel((z) => Math.max(0.5, z - 0.25))
+      if (e.key === "0") {
+        setZoomText(null)
+        setZoomLevel(1)
+      }
+      if (e.key === "+" || e.key === "=") nudgeZoom(0.25)
+      if (e.key === "-") nudgeZoom(-0.25)
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingText, selectedTextIdx, files.length, presentationMode, isFullscreen])
+  }, [pendingText, selectedTextIdx, files.length, presentationMode, isFullscreen, membersOpen])
 
   // Tự ẩn toolbar sau vài giây không dùng
   function kickToolbar() {
@@ -723,18 +756,28 @@ export function AnnotationEditor({
             <div className="h-6 w-px bg-border" />
 
             {/* Zoom */}
-            <Button variant="ghost" size="icon" onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.25))} className="size-8 rounded-full text-foreground" aria-label="Thu nhỏ">
+            <Button variant="ghost" size="icon" onClick={() => nudgeZoom(-0.25)} className="size-8 rounded-full text-foreground" aria-label="Thu nhỏ">
               <ZoomOut className="size-4" />
             </Button>
-            <button
-              type="button"
-              onClick={() => setZoomLevel(1)}
-              className="text-xs tabular-nums min-w-[52px] px-1.5 py-1 rounded hover:bg-muted"
-              title="Vừa màn hình (phím 0)"
+            <div
+              className="flex items-center"
+              title="Nhập % zoom rồi Enter (phím 0 = 100%)"
             >
-              {Math.round(zoomLevel * 100)}%
-            </button>
-            <Button variant="ghost" size="icon" onClick={() => setZoomLevel((z) => Math.min(10, z + 0.25))} className="size-8 rounded-full text-foreground" aria-label="Phóng to">
+              <Input
+                className="w-[54px] h-7 text-xs text-center tabular-nums px-1"
+                value={zoomText ?? String(Math.round(zoomLevel * 100))}
+                onChange={(e) => setZoomText(e.target.value)}
+                onBlur={commitZoom}
+                onFocus={(e) => e.target.select()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur()
+                  if (e.key === "Escape") setZoomText(null)
+                }}
+                aria-label="Mức zoom phần trăm"
+              />
+              <span className="text-xs text-muted-foreground pl-0.5 pr-1">%</span>
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => nudgeZoom(0.25)} className="size-8 rounded-full text-foreground" aria-label="Phóng to">
               <ZoomIn className="size-4" />
             </Button>
 
@@ -759,6 +802,18 @@ export function AnnotationEditor({
               <Save className="size-3.5" />
               {saving ? "Lưu..." : "Lưu"}
             </Button>
+            {sessionGroupId && (
+              <Button
+                onClick={() => setMembersOpen(true)}
+                size="sm"
+                variant="outline"
+                className="rounded-full gap-1.5 h-8 px-3"
+                title="Xem thành viên nhóm, random gọi báo cáo, sửa điểm từng em"
+              >
+                <Users className="size-3.5" />
+                Thành Viên
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -1203,6 +1258,18 @@ export function AnnotationEditor({
         <div className="absolute bottom-3 right-3 z-20 bg-card/80 backdrop-blur text-xs text-muted-foreground px-2.5 py-1 rounded border">
           <kbd className="font-mono">+/-</kbd> zoom · <kbd className="font-mono">Esc</kbd> thoát
         </div>
+      )}
+
+      {/* Popup thành viên nhóm */}
+      {sessionGroupId && sessionId && (
+        <GroupMembersDialog
+          open={membersOpen}
+          onClose={() => setMembersOpen(false)}
+          sessionId={sessionId}
+          sessionGroupId={sessionGroupId}
+          groupLabel={groupLabel ?? title}
+          maxScore={maxScore}
+        />
       )}
     </div>
   )

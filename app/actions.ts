@@ -1020,6 +1020,54 @@ export async function overrideStudentScoreAction(
   await logScoreHistory(supabase, sessionId, studentId, existed?.score ?? null, score, "override")
 }
 
+/**
+ * Lấy thành viên của nhóm chấm + điểm từng em (phục vụ popup "Thành Viên").
+ * Điểm lấy từ student_scores — khi nhóm đã chấm, mỗi em đã có điểm = điểm nhóm.
+ */
+export async function getGroupMembersWithScoresAction(
+  sessionGroupId: string,
+): Promise<{ studentId: string; name: string; score: number | null }[]> {
+  const supabase = await createClient()
+  const { data: sg } = await supabase
+    .from("session_groups")
+    .select("class_group_id, session_id")
+    .eq("id", sessionGroupId)
+    .single()
+  if (!sg) return []
+  // Ưu tiên class_group_members (nhóm cố định), fallback session_group_members
+  let studentIds: string[] = []
+  if (sg.class_group_id) {
+    const { data: members } = await supabase
+      .from("class_group_members")
+      .select("student_id")
+      .eq("class_group_id", sg.class_group_id)
+    studentIds = (members ?? []).map((m) => m.student_id as string)
+  }
+  if (studentIds.length === 0) {
+    const { data: members } = await supabase
+      .from("session_group_members")
+      .select("student_id")
+      .eq("session_group_id", sessionGroupId)
+    studentIds = (members ?? []).map((m) => m.student_id as string)
+  }
+  if (studentIds.length === 0) return []
+  const [{ data: students }, { data: scores }] = await Promise.all([
+    supabase.from("students").select("id, name").in("id", studentIds),
+    supabase
+      .from("student_scores")
+      .select("student_id, score")
+      .eq("session_id", sg.session_id)
+      .in("student_id", studentIds),
+  ])
+  const nameMap = new Map((students ?? []).map((s) => [s.id as string, s.name as string | null]))
+  const scoreMap = new Map((scores ?? []).map((s) => [s.student_id as string, s.score as number | null]))
+  return studentIds.map((id) => ({
+    studentId: id,
+    name: nameMap.get(id) ?? "Học sinh",
+    score: scoreMap.get(id) ?? null,
+  }))
+}
+
 /* ============ STUDENT SIDE ============ */
 
 export async function studentSetNameAction(studentId: string, name: string, deviceToken: string) {
