@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { saveAnnotationAction } from "@/app/actions"
-import type { AiProviderChoice, GeminiTier } from "@/lib/types"
+import type { AiProviderChoice, GeminiTier, GradedSample } from "@/lib/types"
 import { isMissingSchemaError, throwSchemaOrMessage } from "@/lib/ai/schema-error"
 
 type TeacherSession = {
@@ -158,6 +158,151 @@ export async function requestAiBaremAction(
       return { ok: false, error: "Không tạo được yêu cầu." }
     }
     return { ok: true, requestId: req.id }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Không bắt đầu được" }
+  }
+}
+
+/** Liệt kê các bài đã được giáo viên chấm tay trong phiên — để chọn làm "bài chấm mẫu". */
+export async function listGradedSamplesAction(
+  sessionId: string,
+): Promise<{ ok: true; samples: GradedSample[] } | { ok: false; error: string }> {
+  try {
+    const { supabase } = await requireTeacherForSession(sessionId)
+
+    const { data: annotations, error: annErr } = await supabase
+      .from("annotations")
+      .select("session_group_id, session_slot_id, score, data")
+      .eq("session_id", sessionId)
+      .not("score", "is", null)
+    if (annErr) {
+      if (isMissingSchemaError(annErr)) throwSchemaOrMessage(annErr, "")
+      throw new Error(annErr.message)
+    }
+
+    const samples: GradedSample[] = []
+    for (const ann of (annotations ?? []) as {
+      session_group_id: string | null
+      session_slot_id: string | null
+      score: number | string | null
+      data: unknown
+    }[]) {
+      // Tên nhóm / ô nộp bài
+      let groupLabel = ""
+      if (ann.session_group_id) {
+        const { data: g } = await supabase
+          .from("session_groups")
+          .select("label")
+          .eq("id", ann.session_group_id)
+          .maybeSingle()
+        groupLabel = (g as { label?: string } | null)?.label ?? ""
+      } else if (ann.session_slot_id) {
+        const { data: s } = await supabase
+          .from("session_slots")
+          .select("slot_number")
+          .eq("id", ann.session_slot_id)
+          .maybeSingle()
+        const n = (s as { slot_number?: number } | null)?.slot_number
+        groupLabel = n != null ? `Ô ${n}` : ""
+      }
+      if (!groupLabel) groupLabel = "Bài nộp"
+
+      // 1 submission mới nhất cùng nhóm/ô (để subagent xem file)
+      if (!ann.session_group_id && !ann.session_slot_id) continue
+      let q = supabase
+        .from("submissions")
+        .select("id")
+        .eq("session_id", sessionId)
+        .order("submitted_at", { ascending: false })
+        .limit(1)
+      if (ann.session_group_id) q = q.eq("session_group_id", ann.session_group_id)
+      else q = q.eq("session_slot_id", ann.session_slot_id as string)
+      const { data: sub } = await q.maybeSingle()
+      if (!sub) continue
+
+      const items = Array.isArray(ann.data) ? (ann.data as { kind?: string }[]) : []
+      const textCount = items.filter((i) => i.kind === "text").length
+      const stampCount = items.filter((i) => i.kind === "stamp").length
+      const hasDrawings = items.some(
+        (i) => i.kind === "path" || i.kind === "highlight" || i.kind === "underline",
+      )
+
+      samples.push({
+        submissionId: (sub as { id: string }).id,
+        groupLabel,
+        score: Number(ann.score),
+        textCount,
+        stampCount,
+        hasDrawings,
+      })
+    }
+
+    samples.sort((a, b) => a.groupLabel.localeCompare(b.groupLabel, "vi"))
+    return { ok: true, samples }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Không tải được danh sách bài mẫu" }
+  }
+}
+
+/** Tạo yêu cầu "AI suy barem từ bài chấm mẫu" — hook chỉ báo tin, subagent có mắt xử lý. */
+export async function requestAiBaremFromSampleAction(
+  sessionId: string,
+  submissionId: string,
+  maxScore?: number,
+): Promise<{ ok: true; requestId: string } | { ok: false; error: string }> {
+  try {
+    const { supabase, user } = await requireTeacherForSession(sessionId)
+    const score =
+      maxScore != null && Number.isFinite(maxScore) ? Math.max(1, Math.min(10, Math.round(maxScore))) : 10
+
+    const { data: sub } = await supabase
+      .from("submissions")
+      .select("id, session_group_id, session_slot_id")
+      .eq("id", submissionId)
+      .eq("session_id", sessionId)
+      .maybeSingle()
+    if (!sub) return { ok: false, error: "Không tìm thấy bài nộp trong phiên này." }
+    const sg = (sub as { session_group_id: string | null }).session_group_id
+    const ss = (sub as { session_slot_id: string | null }).session_slot_id
+    if (!sg && !ss) return { ok: false, error: "Bài này chưa được chấm tay." }
+
+    let annQ = supabase
+      .from("annotations")
+      .select("id")
+      .eq("session_id", sessionId)
+      .not("score", "is", null)
+    if (sg) annQ = annQ.eq("session_group_id", sg)
+    else annQ = annQ.eq("session_slot_id", ss as string)
+    const { data: ann } = await annQ.maybeSingle()
+    if (!ann) return { ok: false, error: "Bài này chưa được chấm tay." }
+
+    const { data: existing } = await supabase
+      .from("ai_barem_requests")
+      .select("id")
+      .eq("session_id", sessionId)
+      .eq("sample_submission_id", submissionId)
+      .in("status", ["pending", "processing"])
+      .maybeSingle()
+    if (existing) return { ok: true, requestId: (existing as { id: string }).id }
+
+    const { data: req, error } = await supabase
+      .from("ai_barem_requests")
+      .insert({
+        session_id: sessionId,
+        teacher_id: user.id,
+        answer_text: "[Bài chấm mẫu]",
+        max_score: score,
+        status: "pending",
+        source: "sample",
+        sample_submission_id: submissionId,
+      })
+      .select("id")
+      .single()
+    if (error || !req) {
+      if (isMissingSchemaError(error)) throwSchemaOrMessage(error, "")
+      return { ok: false, error: "Không tạo được yêu cầu." }
+    }
+    return { ok: true, requestId: (req as { id: string }).id }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Không bắt đầu được" }
   }

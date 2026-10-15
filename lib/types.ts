@@ -93,6 +93,24 @@ export type GradingBarem = {
   criteria: BaremCriterion[]
 }
 
+// Bài đã chấm tay — ứng viên làm "bài chấm mẫu" để AI suy barem
+export type GradedSample = {
+  submissionId: string
+  groupLabel: string
+  score: number
+  textCount: number // số nhận xét chữ
+  stampCount: number // số dấu stamp ✓ ★ ⚠ ✗
+  hasDrawings: boolean // có nét vẽ/tô/gạch không chữ
+}
+
+// Kết quả vòng tự kiểm: AI chấm lại bài mẫu bằng barem vừa suy, so với điểm tay
+export type BaremSelfCheck = {
+  teacher_score: number
+  ai_rescore: number | null
+  diff: number | null
+  match: boolean // true khi diff != null và diff <= 1
+}
+
 // Báo cáo "AI đánh giá tổng thể" (lưu JSON trong ai_eval_requests.result_json)
 export type AiEvalRequestStatus = "pending" | "processing" | "done" | "error"
 
@@ -286,3 +304,4 @@ export type StudentScoreRow = {
   group_name: string | null
   updated_at: string
 }
+
