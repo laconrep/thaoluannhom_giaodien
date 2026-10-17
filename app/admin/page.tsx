@@ -4,6 +4,7 @@ import { PLAN_DEFAULT, type Plan } from "@/lib/plans"
 import { EmptyState } from "@/components/empty-state"
 import { Users } from "lucide-react"
 import { AccountsTable, type AdminAccountRow } from "@/app/admin/accounts-table"
+import { StationsSection } from "@/app/admin/stations-section"
 
 type AccountStatus = "active" | "disabled"
 type AccountRole = "user" | "admin"
@@ -106,6 +107,11 @@ export default async function AdminPage() {
 
         <AccountsTable accounts={accounts} />
       </section>
+
+      <StationsSection
+        admin={admin}
+        accounts={accounts.map((a) => ({ id: a.id, email: a.email }))}
+      />
     </AdminShell>
   )
 }

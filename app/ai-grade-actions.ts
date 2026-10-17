@@ -404,6 +404,44 @@ async function resolveAiProvider(
   return { ok: true, provider: museFallback }
 }
 
+/**
+ * Trạm chấm được gán cho giáo viên (farm). Thiếu dòng = null = về trạm chính.
+ * Tolerant khi chưa chạy migration 006: coi như chưa gán trạm nào.
+ */
+async function resolveAssignedBackend(
+  supabase: SupabaseServerClient,
+  teacherId: string,
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from("teacher_backend_map")
+      .select("station_id")
+      .eq("teacher_id", teacherId)
+      .maybeSingle()
+    if (error) return null
+    return (data?.station_id as string | undefined) ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Insert job chấm. Tolerant khi chưa chạy migration 006 (chưa có cột assigned_backend):
+ * thử kèm cột trước, lỗi thiếu cột thì insert lại không kèm cột.
+ */
+async function insertGradeJob(
+  supabase: SupabaseServerClient,
+  row: Record<string, unknown>,
+): Promise<{ data: { id: string } | null; error: { code?: string; message?: string } | null }> {
+  const first = await supabase.from("ai_grade_jobs").insert(row).select("id").single()
+  if (first.error && isMissingSchemaError(first.error) && "assigned_backend" in row) {
+    const { assigned_backend: _dropped, ...legacy } = row
+    const second = await supabase.from("ai_grade_jobs").insert(legacy).select("id").single()
+    return { data: second.data as { id: string } | null, error: second.error }
+  }
+  return { data: first.data as { id: string } | null, error: first.error }
+}
+
 export async function startAiGradeJobAction(
   sessionId: string,
   providerChoice: AiProviderChoice = "auto",
@@ -496,18 +534,16 @@ async function startAiGradeJobActionInner(
   if (pendingCount === 0) throw new Error("Tất cả bài đã chấm xong.")
   const keptCount = list.length - pendingCount
 
-  const { data: job, error: jobErr } = await supabase
-    .from("ai_grade_jobs")
-    .insert({
-      session_id: sessionId,
-      teacher_id: user.id,
-      status: "queued",
-      provider,
-      total: list.length,
-      completed: keptCount,
-    })
-    .select("id")
-    .single()
+  const assignedBackend = await resolveAssignedBackend(supabase, user.id)
+  const { data: job, error: jobErr } = await insertGradeJob(supabase, {
+    session_id: sessionId,
+    teacher_id: user.id,
+    status: "queued",
+    provider,
+    assigned_backend: assignedBackend,
+    total: list.length,
+    completed: keptCount,
+  })
   if (jobErr || !job) throwSchemaOrMessage(jobErr, "Không tạo được phiên chấm AI.")
 
   const { error: rowsErr } = await supabase.from("ai_grade_results").insert(
@@ -572,18 +608,16 @@ export async function regradeOneSubmissionAction(
     const resolved = await resolveAiProvider(supabase, user.id, providerChoice)
     if (!resolved.ok) return resolved
 
-    const { data: newJob, error: jobErr } = await supabase
-      .from("ai_grade_jobs")
-      .insert({
-        session_id: job.session_id,
-        teacher_id: user.id,
-        status: "queued",
-        provider: resolved.provider,
-        total: 1,
-        completed: 0,
-      })
-      .select("id")
-      .single()
+    const regradeBackend = await resolveAssignedBackend(supabase, user.id)
+    const { data: newJob, error: jobErr } = await insertGradeJob(supabase, {
+      session_id: job.session_id,
+      teacher_id: user.id,
+      status: "queued",
+      provider: resolved.provider,
+      assigned_backend: regradeBackend,
+      total: 1,
+      completed: 0,
+    })
     if (jobErr || !newJob) return { ok: false, error: "Không tạo được job chấm lại." }
 
     const { error: rowErr } = await supabase.from("ai_grade_results").insert({

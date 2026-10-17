@@ -63,6 +63,23 @@ export type AiGradeResultStatus = "pending" | "ready" | "error" | "approved" | "
 /** Lựa chọn AI lúc bấm chấm: tự động, ép Gemini, ép Muse */
 export type AiProviderChoice = "auto" | "gemini"
 
+/** Trạm chấm trong farm (mỗi trạm = một tài khoản Muse riêng) */
+export type BackendStationStatus = "active" | "paused"
+
+export type BackendStationRow = {
+  id: string
+  label: string
+  status: BackendStationStatus
+  notes: string | null
+  created_at: string
+}
+
+export type TeacherBackendMapRow = {
+  teacher_id: string
+  station_id: string
+  updated_at: string
+}
+
 export type AiBaremRequestStatus = "pending" | "processing" | "done" | "error"
 
 export type AiBaremRequestRow = {
