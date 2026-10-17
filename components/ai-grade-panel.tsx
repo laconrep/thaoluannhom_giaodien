@@ -290,7 +290,7 @@ export function AiGradePanel({
     if (!job || !r.submission_id || running) return
     startTransition(async () => {
       try {
-        const res = await regradeOneSubmissionAction(job.id, r.submission_id as string)
+        const res = await regradeOneSubmissionAction(job.id, r.submission_id as string, providerChoice)
         if (!res.ok) {
           toast.error(res.error)
           return
@@ -368,7 +368,6 @@ export function AiGradePanel({
               <SelectContent>
                 <SelectItem value="auto">Tự động</SelectItem>
                 <SelectItem value="gemini">Gemini (cần key)</SelectItem>
-                <SelectItem value="muse">Muse AI</SelectItem>
               </SelectContent>
             </Select>
           </div>

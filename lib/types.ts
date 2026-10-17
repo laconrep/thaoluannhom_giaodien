@@ -61,7 +61,7 @@ export type AiGradeJobStatus = "queued" | "running" | "done" | "error"
 export type AiGradeResultStatus = "pending" | "ready" | "error" | "approved" | "rejected"
 
 /** Lựa chọn AI lúc bấm chấm: tự động, ép Gemini, ép Muse */
-export type AiProviderChoice = "auto" | "gemini" | "muse"
+export type AiProviderChoice = "auto" | "gemini"
 
 export type AiBaremRequestStatus = "pending" | "processing" | "done" | "error"
 

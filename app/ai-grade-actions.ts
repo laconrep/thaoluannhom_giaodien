@@ -350,6 +350,60 @@ export async function requestAiEvalAction(
   }
 }
 
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
+
+type ResolvedAiProvider = "gemini" | "muse" | "muse_chat"
+
+/**
+ * Kiểm tra nhanh key Gemini còn sống không bằng 1 call models.list (rẻ, ~300ms).
+ * Trả về false khi Google từ chối key (400/401/403), true khi key dùng được,
+ * null khi không kiểm tra được (lỗi mạng) — trường hợp này giữ nguyên luồng cũ,
+ * để bước chấm thật báo lỗi thay vì đoán sai.
+ */
+async function isGeminiKeyAlive(apiKey: string): Promise<boolean | null> {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+      { cache: "no-store" },
+    )
+    if (res.status === 400 || res.status === 401 || res.status === 403) return false
+    return res.ok ? true : null
+  } catch {
+    return null
+  }
+}
+
+const DEAD_GEMINI_KEY_ERROR =
+  "Key Gemini đã lưu không còn hợp lệ (Google từ chối). Vào Cài đặt AI → \"Xóa key\" rồi chấm lại — hệ thống sẽ tự dùng Muse AI, hoặc lưu key mới."
+
+/**
+ * Chọn provider chấm theo lựa chọn của giáo viên + key thực tế:
+ * - "gemini": bắt buộc có key và key còn sống (chết → báo lỗi rõ ràng ngay, không tạo job lỗi).
+ * - "auto" (mặc định): luôn dùng Muse AI — key hệ thống nếu có, không thì chấm qua khung chat (muse_chat), không cần key.
+ */
+async function resolveAiProvider(
+  supabase: SupabaseServerClient,
+  teacherId: string,
+  providerChoice: AiProviderChoice,
+): Promise<{ ok: true; provider: ResolvedAiProvider } | { ok: false; error: string }> {
+  const { data: settings, error: settingsErr } = await supabase
+    .from("teacher_ai_settings")
+    .select("gemini_api_key")
+    .eq("teacher_id", teacherId)
+    .maybeSingle()
+  if (settingsErr && isMissingSchemaError(settingsErr)) throwSchemaOrMessage(settingsErr, "")
+  const geminiKey = settings?.gemini_api_key ?? ""
+  const museKey = process.env.MUSE_MODEL_API_KEY ?? ""
+  const museFallback: ResolvedAiProvider = museKey ? "muse" : "muse_chat"
+
+  if (providerChoice === "gemini") {
+    if (!geminiKey) return { ok: false, error: "Chưa lưu key Gemini. Vào Cài đặt AI để thêm key." }
+    if ((await isGeminiKeyAlive(geminiKey)) === false) return { ok: false, error: DEAD_GEMINI_KEY_ERROR }
+    return { ok: true, provider: "gemini" }
+  }
+  return { ok: true, provider: museFallback }
+}
+
 export async function startAiGradeJobAction(
   sessionId: string,
   providerChoice: AiProviderChoice = "auto",
@@ -368,27 +422,9 @@ async function startAiGradeJobActionInner(
   const { supabase, user, session } = await requireTeacherForSession(sessionId)
   if (!session.ai_enabled) return { ok: false, error: "Chế độ chấm AI chưa bật." }
 
-  const { data: settings, error: settingsErr } = await supabase
-    .from("teacher_ai_settings")
-    .select("gemini_api_key")
-    .eq("teacher_id", user.id)
-    .maybeSingle()
-  if (settingsErr && isMissingSchemaError(settingsErr)) throwSchemaOrMessage(settingsErr, "")
-  const geminiKey = settings?.gemini_api_key ?? ""
-  const museKey = process.env.MUSE_MODEL_API_KEY ?? ""
-  // Giáo viên được chọn provider lúc bấm chấm:
-  // - "gemini": bắt buộc có key Gemini riêng.
-  // - "muse": Muse AI — dùng key hệ thống nếu có, không thì chấm qua khung chat (muse_chat), không cần key.
-  // - "auto" (mặc định): có key Gemini → "gemini", có key Muse hệ thống → "muse", còn lại → "muse_chat".
-  let provider: string
-  if (providerChoice === "gemini") {
-    if (!geminiKey) return { ok: false, error: "Chưa lưu key Gemini. Vào Cài đặt AI để thêm key." }
-    provider = "gemini"
-  } else if (providerChoice === "muse") {
-    provider = museKey ? "muse" : "muse_chat"
-  } else {
-    provider = geminiKey ? "gemini" : museKey ? "muse" : "muse_chat"
-  }
+  const resolved = await resolveAiProvider(supabase, user.id, providerChoice)
+  if (!resolved.ok) return resolved
+  const provider: string = resolved.provider
 
   const { data: running, error: runningErr } = await supabase
     .from("ai_grade_jobs")
@@ -482,11 +518,13 @@ async function startAiGradeJobActionInner(
   return { ok: true, jobId: job.id, total: list.length, provider }
 }
 
-/** Chấm lại 1 bài: xóa kết quả cũ của submission, tạo job mới total=1 giữ nguyên
- * provider của job gốc (muse_chat → hook ngoài xử lý, gemini/muse → grade-run). */
+/** Chấm lại 1 bài: xóa kết quả cũ của submission, tạo job mới total=1.
+ * Provider được chọn lại theo dropdown "Chấm bằng" của giáo viên (mặc định "auto"),
+ * KHÔNG giữ nguyên provider của job gốc — tránh bẫy job cũ dùng Gemini nhưng key đã chết. */
 export async function regradeOneSubmissionAction(
   jobId: string,
   submissionId: string,
+  providerChoice: AiProviderChoice = "auto",
 ): Promise<{ ok: true; jobId: string; provider: string } | { ok: false; error: string }> {
   try {
     const supabase = await createClient()
@@ -497,7 +535,7 @@ export async function regradeOneSubmissionAction(
 
     const { data: job } = await supabase
       .from("ai_grade_jobs")
-      .select("id, session_id, teacher_id, provider, completed")
+      .select("id, session_id, teacher_id, completed")
       .eq("id", jobId)
       .single()
     if (!job || job.teacher_id !== user.id) return { ok: false, error: "Không có quyền." }
@@ -531,13 +569,16 @@ export async function regradeOneSubmissionAction(
         .eq("id", jobId)
     }
 
+    const resolved = await resolveAiProvider(supabase, user.id, providerChoice)
+    if (!resolved.ok) return resolved
+
     const { data: newJob, error: jobErr } = await supabase
       .from("ai_grade_jobs")
       .insert({
         session_id: job.session_id,
         teacher_id: user.id,
         status: "queued",
-        provider: job.provider,
+        provider: resolved.provider,
         total: 1,
         completed: 0,
       })
@@ -558,7 +599,7 @@ export async function regradeOneSubmissionAction(
       await supabase.from("ai_grade_jobs").delete().eq("id", newJob.id)
       return { ok: false, error: "Không tạo được hàng chấm." }
     }
-    return { ok: true, jobId: newJob.id, provider: job.provider ?? "muse_chat" }
+    return { ok: true, jobId: newJob.id, provider: resolved.provider }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Không chấm lại được" }
   }
