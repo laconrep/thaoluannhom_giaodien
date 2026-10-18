@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getVerifiedAuthFromHeaders } from "@/lib/auth-headers"
 import { TeacherShell } from "@/components/teacher-shell"
 import { ClassTabs } from "./class-tabs"
 import { Users } from "lucide-react"
@@ -13,23 +14,22 @@ export default async function ClassLayout({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
-  await ensureActiveUser(user.id)
+  // T2: lấy định danh từ header nội bộ do middleware xác thực — không gọi getUser() nữa.
+  const auth = await getVerifiedAuthFromHeaders()
+  if (!auth) redirect("/auth/login")
+  await ensureActiveUser(auth.id)
 
+  const supabase = await createClient()
   const { data: cls } = await supabase
     .from("classes")
     .select("id, name, capacity, teacher_id, share_token")
     .eq("id", id)
     .single()
 
-  if (!cls || cls.teacher_id !== user.id) notFound()
+  if (!cls || cls.teacher_id !== auth.id) notFound()
 
   return (
-    <TeacherShell email={user.email}>
+    <TeacherShell email={auth.email}>
       <div className="border-b bg-card">
         <div className="mx-auto max-w-7xl px-4 pt-3 pb-0">
           <div className="flex items-end justify-between gap-3 flex-wrap">

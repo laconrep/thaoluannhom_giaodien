@@ -55,5 +55,22 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  return supabaseResponse
+  // T2: đính kèm định danh đã xác thực vào request header để layout khỏi gọi
+  // getUser() thêm lần nữa (middleware và layout chạy 2 tiến trình riêng nên
+  // React.cache không dedupe được).
+  // Chống giả mạo: xóa mọi header x-auth-* do client gửi lên trước khi đặt của mình.
+  const reqHeaders = new Headers(request.headers)
+  for (const key of Array.from(reqHeaders.keys())) {
+    if (key.toLowerCase().startsWith("x-auth-")) reqHeaders.delete(key)
+  }
+  if (user) {
+    reqHeaders.set("x-auth-user-id", user.id)
+    if (user.email) reqHeaders.set("x-auth-user-email", user.email)
+  }
+  const finalResponse = NextResponse.next({ request: { headers: reqHeaders } })
+  // Giữ lại cookie session đã refresh (nếu có) — copy kèm nguyên options.
+  for (const c of supabaseResponse.cookies.getAll()) {
+    finalResponse.cookies.set(c)
+  }
+  return finalResponse
 }
