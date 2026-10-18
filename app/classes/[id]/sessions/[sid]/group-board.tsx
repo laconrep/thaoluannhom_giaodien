@@ -145,7 +145,7 @@ export function GroupSessionBoard({
           .eq("session_id", session.id)
           .order("created_at", { ascending: false })
           .limit(1)
-          .single()
+          .maybeSingle() // phiên chưa có slide → null thay vì 406
         
         if (error || !data) {
           return

@@ -32,20 +32,20 @@ export function TeacherShell({
             </Link>
           </Button>
           <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-            <Link href="/pricing" className="gap-2">
+            <Link href="/pricing" prefetch={false} className="gap-2">
               <CreditCard className="size-4" aria-hidden="true" />
               Gói sử dụng
             </Link>
           </Button>
           <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-            <Link href="/settings/ai" className="gap-2">
+            <Link href="/settings/ai" prefetch={false} className="gap-2">
               <Bot className="size-4" aria-hidden="true" />
               API Gemini
             </Link>
           </Button>
           {isAdmin && (
             <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-              <Link href="/admin" className="gap-2">
+              <Link href="/admin" prefetch={false} className="gap-2">
                 <Shield className="size-4" aria-hidden="true" />
                 Quản trị
               </Link>
