@@ -21,6 +21,12 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { GradingBarem, BaremCriterion, GradedSample, BaremSelfCheck } from "@/lib/types"
+import {
+  rebalanceOnAdd,
+  rebalanceOnEdit,
+  rebalanceOnMaxScore,
+  rebalanceOnRemove,
+} from "@/lib/barem-points"
 import { Bot, Loader2, Plus, Trash2, Upload, X } from "lucide-react"
 
 type Props = {
@@ -330,14 +336,67 @@ export function RubricBaremDialog({ sessionId, open, onOpenChange, initialRubric
     )
   }
 
+  // Sửa điểm 1 khung: giữ đúng số bác nhập, các khung còn lại tự cân theo tỉ lệ.
+  function updateCriterionPoints(i: number, raw: number) {
+    setBarem((p) => {
+      if (!p) return p
+      const pts = rebalanceOnEdit(
+        p.criteria.map((c) => c.points),
+        i,
+        raw,
+        p.max_score,
+      )
+      return { ...p, criteria: p.criteria.map((c, j) => ({ ...c, points: pts[j] })) }
+    })
+  }
+
   function addCriterion() {
-    setBarem((p) =>
-      p ? { ...p, criteria: [...p.criteria, { name: "", points: 1, expect: [], notes: "" }] } : p,
-    )
+    setBarem((p) => {
+      if (!p) return p
+      const pts = rebalanceOnAdd(
+        p.criteria.map((c) => c.points),
+        p.max_score,
+        1,
+      )
+      const kept = p.criteria.map((c, j) => ({ ...c, points: pts[j] }))
+      return {
+        ...p,
+        criteria: [...kept, { name: "", points: pts[pts.length - 1], expect: [], notes: "" }],
+      }
+    })
   }
 
   function removeCriterion(i: number) {
-    setBarem((p) => (p ? { ...p, criteria: p.criteria.filter((_, j) => j !== i) } : p))
+    setBarem((p) => {
+      if (!p) return p
+      const pts = rebalanceOnRemove(
+        p.criteria.map((c) => c.points),
+        i,
+        p.max_score,
+      )
+      return {
+        ...p,
+        criteria: p.criteria.filter((_, j) => j !== i).map((c, j) => ({ ...c, points: pts[j] })),
+      }
+    })
+  }
+
+  // Đổi thang điểm: toàn bộ tiêu chí co/giãn theo tỉ lệ, tổng luôn khớp.
+  function changeMaxScore(v: number) {
+    const next = Math.max(1, Math.min(10, Number(v) || 10))
+    setMaxScore(next)
+    setBarem((p) => {
+      if (!p || p.criteria.length === 0) return p
+      const pts = rebalanceOnMaxScore(
+        p.criteria.map((c) => c.points),
+        next,
+      )
+      return {
+        ...p,
+        max_score: next,
+        criteria: p.criteria.map((c, j) => ({ ...c, points: pts[j] })),
+      }
+    })
   }
 
   const totalPoints = barem?.criteria.reduce((s, c) => s + (Number(c.points) || 0), 0) ?? 0
@@ -433,7 +492,7 @@ export function RubricBaremDialog({ sessionId, open, onOpenChange, initialRubric
                   min={1}
                   max={10}
                   value={maxScore}
-                  onChange={(e) => setMaxScore(Math.max(1, Math.min(10, Number(e.target.value) || 10)))}
+                  onChange={(e) => changeMaxScore(Number(e.target.value))}
                   className="w-20 h-8 text-xs"
                 />
               </div>
@@ -551,7 +610,7 @@ export function RubricBaremDialog({ sessionId, open, onOpenChange, initialRubric
                   min={1}
                   max={10}
                   value={maxScore}
-                  onChange={(e) => setMaxScore(Math.max(1, Math.min(10, Number(e.target.value) || 10)))}
+                  onChange={(e) => changeMaxScore(Number(e.target.value))}
                   className="w-20 h-8 text-xs"
                 />
               </div>
@@ -611,10 +670,13 @@ export function RubricBaremDialog({ sessionId, open, onOpenChange, initialRubric
           <div className="border-t pt-3 mt-1">
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-semibold">Tiêu chí chấm (mẫu A)</div>
-              <div
-                className={`text-xs font-bold tabular-nums ${totalPoints === barem.max_score ? "text-primary" : "text-destructive"}`}
-              >
-                Tổng: {totalPoints}/{barem.max_score}
+              <div className="text-right">
+                <div
+                  className={`text-xs font-bold tabular-nums ${totalPoints === barem.max_score ? "text-primary" : "text-destructive"}`}
+                >
+                  Tổng: {totalPoints}/{barem.max_score}
+                </div>
+                <div className="text-[10px] text-muted-foreground">Điểm tự cân khi bác sửa từng khung</div>
               </div>
             </div>
             <div className="flex flex-col gap-2">
@@ -631,7 +693,7 @@ export function RubricBaremDialog({ sessionId, open, onOpenChange, initialRubric
                       type="number"
                       min={0}
                       value={c.points}
-                      onChange={(e) => updateCriterion(i, { points: Math.max(0, Number(e.target.value) || 0) })}
+                      onChange={(e) => updateCriterionPoints(i, Number(e.target.value))}
                       className="h-8 text-xs w-16"
                       aria-label="Điểm"
                     />
