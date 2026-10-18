@@ -1,8 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
+import { useSmartPoll } from "@/hooks/use-smart-poll"
 import { fetchClassGroups } from "@/lib/class-groups"
 import {
   leaderSwapSlotsAction,
@@ -127,6 +128,9 @@ export function ClassLobby({
     }
   }, [classId, students])
 
+  // Realtime khỏe hay không → quyết định nhịp poll dự phòng (xem useSmartPoll).
+  const realtimeOk = useRef(false)
+
   // Realtime: sessions appearing/disappearing + students name updates
   useEffect(() => {
     const supabase = createClient()
@@ -181,23 +185,25 @@ export function ClassLobby({
           refreshMembers()
         },
       )
-      .subscribe()
+      .subscribe((status: string) => {
+        realtimeOk.current = status === "SUBSCRIBED"
+      })
 
     return () => {
       supabase.removeChannel(ch)
     }
   }, [classId, refreshGroups, refreshMembers])
 
-  // Fallback đồng bộ định kỳ: nếu Realtime không gửi sự kiện, vẫn tự làm mới
-  // nhóm/trạng thái leader/member để không phải F5.
-  useEffect(() => {
-    const id = setInterval(() => {
+  // Poll dự phòng thông minh (thay setInterval 5s): Realtime khỏe → 60s/lần,
+  // Realtime lỗi → 10s/lần, tab ẩn → nghỉ.
+  useSmartPoll(
+    () => {
       refreshStudents()
       refreshGroups()
       refreshMembers()
-    }, 5000)
-    return () => clearInterval(id)
-  }, [classId, refreshStudents, refreshGroups, refreshMembers])
+    },
+    realtimeOk,
+  )
 
   function claimSlot(studentId: string) {
     if (saving) return

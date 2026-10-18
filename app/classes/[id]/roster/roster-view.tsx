@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import {
   addClassGroupAction,
   bulkSetNamesAction,
@@ -45,13 +45,13 @@ import {
   Crown,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useSmartPoll } from "@/hooks/use-smart-poll"
 import { fetchClassGroups } from "@/lib/class-groups"
 import { groupCardStyle, groupPillStyle } from "@/lib/group-colors"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import * as XLSX from "xlsx"
 import { Spinner } from "@/components/ui/spinner"
-import { useRef } from "react"
 import { RosterTour } from "@/components/tour/roster-tour"
 
 type Student = { id: string; slot_number: number; name: string | null; device_token: string | null }
@@ -161,6 +161,9 @@ export function RosterView({
   )
   const hasLeader = useMemo(() => groups.some((g) => g.leader_student_id), [groups])
 
+  // Realtime khỏe hay không → quyết định nhịp poll dự phòng (xem useSmartPoll).
+  const realtimeOk = useRef(false)
+
   // Realtime HS + nhóm
   useEffect(() => {
     const supabase = createClient()
@@ -202,23 +205,25 @@ export function RosterView({
           refreshMembers()
         },
       )
-      .subscribe()
+      .subscribe((status: string) => {
+        realtimeOk.current = status === "SUBSCRIBED"
+      })
 
     return () => {
       supabase.removeChannel(ch)
     }
   }, [classId, refreshGroups, refreshMembers])
 
-  // Fallback đồng bộ định kỳ: nếu Realtime không gửi sự kiện, vẫn tự làm mới
-  // danh sách HS/nhóm/member để không phải F5.
-  useEffect(() => {
-    const id = setInterval(() => {
+  // Poll dự phòng thông minh (thay setInterval 5s): Realtime khỏe → 60s/lần,
+  // Realtime lỗi → 10s/lần, tab ẩn → nghỉ.
+  useSmartPoll(
+    () => {
       refreshStudents()
       refreshGroups()
       refreshMembers()
-    }, 5000)
-    return () => clearInterval(id)
-  }, [classId, refreshStudents, refreshGroups, refreshMembers])
+    },
+    realtimeOk,
+  )
 
   function onRenameStudent(id: string, name: string) {
     setStudents((cur) => cur.map((s) => (s.id === id ? { ...s, name } : s)))
