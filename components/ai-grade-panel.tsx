@@ -188,15 +188,54 @@ export function AiGradePanel({
   const readyCount = results.filter((r) => r.status === "ready").length
   const done = job?.status === "done"
 
+  // Tên hiển thị của 1 dòng kết quả (nhóm / ô cá nhân / bài nộp).
+  function displayNameOf(r: AiGradeResultRow): string {
+    return (
+      (r.session_group_id && labelByTarget[`g:${r.session_group_id}`]) ||
+      (r.session_slot_id && labelByTarget[`s:${r.session_slot_id}`]) ||
+      "Bài nộp"
+    )
+  }
+
+  // Danh sách hiển thị: lọc trùng theo bài nộp (phòng khi DB có dòng trùng do agent
+  // ghi 2 lần), sắp xếp theo số nhóm tăng dần. Ưu tiên dòng đã chấm xong.
+  const displayResults = useMemo(() => {
+    const rank: Record<string, number> = { approved: 0, ready: 1, error: 2, pending: 3 }
+    const bySubmission = new Map<string, AiGradeResultRow>()
+    for (const r of results) {
+      const key = r.submission_id ?? r.id
+      const cur = bySubmission.get(key)
+      if (!cur) {
+        bySubmission.set(key, r)
+        continue
+      }
+      const better =
+        (rank[r.status] ?? 9) < (rank[cur.status] ?? 9) ||
+        ((rank[r.status] ?? 9) === (rank[cur.status] ?? 9) &&
+          r.created_at.localeCompare(cur.created_at) > 0)
+      if (better) bySubmission.set(key, r)
+    }
+    const numOf = (r: AiGradeResultRow): number => {
+      const m = displayNameOf(r).match(/(\d+)\s*$/)
+      return m ? parseInt(m[1], 10) : 9999
+    }
+    return [...bySubmission.values()].sort((a, b) => {
+      const ga = a.session_group_id ? 0 : 1
+      const gb = b.session_group_id ? 0 : 1
+      if (ga !== gb) return ga - gb
+      const n = numOf(a) - numOf(b)
+      if (n !== 0) return n
+      return a.created_at.localeCompare(b.created_at)
+    })
+  }, [results, labelByTarget])
+
   // Cảnh báo điểm bất thường: (a) tất cả cùng 1 điểm, (b) có bài lệch >2.5đ so với trung bình.
+  // Dùng displayResults (đã lọc trùng) để dòng trùng không làm lệch thống kê.
   const scoreAnomaly = useMemo(() => {
-    const scored = results
+    const scored = displayResults
       .filter((r) => (r.status === "ready" || r.status === "approved") && r.ai_score != null)
       .map((r) => ({
-        name:
-          (r.session_group_id && labelByTarget[`g:${r.session_group_id}`]) ||
-          (r.session_slot_id && labelByTarget[`s:${r.session_slot_id}`]) ||
-          "Bài nộp",
+        name: displayNameOf(r),
         score: r.ai_score as number,
       }))
     if (scored.length < 2) return null
@@ -436,16 +475,18 @@ export function AiGradePanel({
             </div>
           )}
           <ul className="flex flex-col gap-2">
-            {results.map((r) => {
-              const name =
-                (r.session_group_id && labelByTarget[`g:${r.session_group_id}`]) ||
-                (r.session_slot_id && labelByTarget[`s:${r.session_slot_id}`]) ||
-                "Bài nộp"
+            {displayResults.map((r) => {
+              const name = displayNameOf(r)
               return (
-                <li key={r.id} className="rounded-md border p-2 text-xs flex flex-col gap-1">
+                <li key={r.submission_id ?? r.id} className="rounded-md border p-2 text-xs flex flex-col gap-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{name}</span>
                     <span className="ml-auto inline-flex items-center gap-2">
+                      {r.status === "pending" && (
+                        <span className="text-muted-foreground inline-flex items-center gap-1">
+                          <Loader2 className="size-3 animate-spin" /> Đang chấm…
+                        </span>
+                      )}
                       {r.status === "ready" && r.ai_score != null && (
                         <span className="font-bold text-primary tabular-nums">{r.ai_score} đ</span>
                       )}
@@ -474,13 +515,13 @@ export function AiGradePanel({
                 </li>
               )
             })}
-            {results.length === 0 && <p className="text-sm text-muted-foreground">Chưa có kết quả.</p>}
+            {displayResults.length === 0 && <p className="text-sm text-muted-foreground">Chưa có kết quả.</p>}
           </ul>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>
               Đóng
             </Button>
-            <Button onClick={approveAll} disabled={pending || results.every((r) => r.status !== "ready")}>
+            <Button onClick={approveAll} disabled={pending || displayResults.every((r) => r.status !== "ready")}>
               Duyệt lên điểm
             </Button>
           </DialogFooter>
