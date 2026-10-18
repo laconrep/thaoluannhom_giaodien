@@ -42,12 +42,21 @@ export default async function GroupSessionPage({
   const [{ data: sg }, { data: cls }, { data: subs }, { data: anns }] = await Promise.all([
     supabase
       .from("session_groups")
-      .select("*")
+      .select("id, session_id, class_group_id, group_number, label, claimed, claimed_at")
       .eq("session_id", sid)
       .order("group_number"),
     supabase.from("classes").select("share_token, name").eq("id", id).single(),
-    supabase.from("submissions").select("*").eq("session_id", sid),
-    supabase.from("annotations").select("*").eq("session_id", sid),
+    supabase
+      .from("submissions")
+      .select(
+        "id, session_id, session_group_id, session_slot_id, image_url, text_content, files, submitted_at, is_auto_submitted",
+      )
+      .eq("session_id", sid),
+    // T3: KHÔNG select cột data (nét vẽ, nặng) — tải lười khi mở editor chấm bài.
+    supabase
+      .from("annotations")
+      .select("id, session_id, session_group_id, session_slot_id, score, updated_at")
+      .eq("session_id", sid),
   ])
 
   return (

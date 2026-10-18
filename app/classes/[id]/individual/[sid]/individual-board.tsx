@@ -15,6 +15,7 @@ import type {
 } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { AnnotationEditor } from "@/components/annotation-editor"
+import { useLazyAnnotationData } from "@/hooks/use-lazy-annotation-data"
 import { SubmissionText } from "@/components/submission-text"
 import { TimerPanel } from "@/components/timer-panel"
 import { Switch } from "@/components/ui/switch"
@@ -73,6 +74,9 @@ export function IndividualBoard({
   const [slots, setSlots] = useState(initialSlots)
   const [subs, setSubs] = useState(initialSubs)
   const [anns, setAnns] = useState(initialAnns)
+  // T3: cache nét vẽ tải lười (cột data không select ở page)
+  const { ensureData: ensureAnnData, dataFor: annDataFor, isReady: isAnnReady } =
+    useLazyAnnotationData()
   const [openSlotId, setOpenSlotId] = useState<string | null>(null)
 
   const studentMap = useMemo(() => {
@@ -155,6 +159,11 @@ export function IndividualBoard({
   const openStudent = openSlot?.student_id ? studentMap[openSlot.student_id] : null
   const openSub = openSlot ? subsBySlot[openSlot.id] : null
   const openAnn = openSlot ? annsBySlot[openSlot.id] : null
+
+  // T3.2: mở editor → tải lười cột data của annotation (nếu chưa có).
+  useEffect(() => {
+    if (openSlot) ensureAnnData(annsBySlot[openSlot.id] ?? null)
+  }, [openSlotId, annsBySlot, ensureAnnData])
 
   function copyShareLink() {
     const url = `${window.location.origin}/c/${shareToken}/session/${session.id}`
@@ -331,8 +340,10 @@ export function IndividualBoard({
           title={`${openStudent?.name || `Ô ${openSlot.slot_number}`} — ${session.title}`}
           files={getFilesI(openSub ?? undefined)}
           textContent={openSub?.text_content ?? null}
-          initialData={(openAnn?.data ?? []) as AnnotationItem[]}
+          initialData={annDataFor(openAnn)}
           initialScore={openAnn?.score ?? null}
+          // T3.3: chưa tải xong nét vẽ → chặn vẽ + chặn lưu, chống ghi đè mất dữ liệu.
+          dataReady={isAnnReady(openAnn)}
           autoFullscreen
           onSave={async (data, score) => {
             await saveAnnotationAction({

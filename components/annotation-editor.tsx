@@ -27,6 +27,7 @@ import {
   ChevronRight,
   FileText,
   File as FileIcon,
+  Loader2,
 } from "lucide-react"
 
 type Tool = AnnotationTool
@@ -43,6 +44,7 @@ export function AnnotationEditor({
   textContent,
   initialData,
   initialScore,
+  dataReady = true,
   maxScore = 10,
   autoFullscreen = false,
   sessionId,
@@ -56,6 +58,12 @@ export function AnnotationEditor({
   textContent: string | null
   initialData: AnnotationItem[]
   initialScore: number | null
+  /**
+   * T3.3 — chốt an toàn tải lười: false = nét vẽ chưa tải xong.
+   * Khi false: chặn vẽ (overlay) + chặn lưu, chống ghi đè mất nét vẽ cũ.
+   * Mặc định true để các luồng cũ (đã có data) không đổi hành vi.
+   */
+  dataReady?: boolean
   maxScore?: number
   autoFullscreen?: boolean
   /** Có 2 prop này => luồng chấm theo nhóm => hiện nút "Thành Viên" */
@@ -76,6 +84,13 @@ export function AnnotationEditor({
   }, [files])
 
   const [items, setItems] = useState<AnnotationItem[]>(initialData)
+  // T3.3: data tải lười về SAU khi editor đã mở → nạp vào items.
+  // Trong lúc chưa ready, overlay chặn tương tác nên không thể mất nét vẽ người dùng.
+  useEffect(() => {
+    if (dataReady) setItems(initialData)
+    // Chỉ chạy khi dataReady đổi (false→true); không reset theo initialData để giữ nét đang vẽ.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataReady])
   const [history, setHistory] = useState<AnnotationItem[][]>([])
   const [tool, setTool] = useState<Tool>("pen")
   const [color, setColor] = useState(COLORS[0].value)
@@ -643,6 +658,7 @@ export function AnnotationEditor({
             setScore={setScore}
             maxScore={maxScore}
             saving={saving}
+            saveDisabled={!dataReady}
             onSave={handleSave}
             showMembers={!!sessionGroupId}
             onOpenMembers={() => setMembersOpen(true)}
@@ -816,6 +832,13 @@ export function AnnotationEditor({
               margin: isDocx && docxWidth ? "0 auto" : undefined,
             }}
           >
+            {/* T3.3: đang tải lười nét vẽ → chặn mọi tương tác vẽ cho đến khi data sẵn sàng */}
+            {!dataReady && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center gap-2 bg-background/70 backdrop-blur-[1px] rounded-md">
+                <Loader2 className="size-5 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground">Đang tải nét vẽ…</span>
+              </div>
+            )}
             {currentIdx === -1 ? (
               <div
                 className={cn(

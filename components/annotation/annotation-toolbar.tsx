@@ -101,6 +101,8 @@ export type AnnotationToolbarProps = {
   setScore: (s: string) => void
   maxScore: number
   saving: boolean
+  /** T3.3: true = chặn nút Lưu (đang tải lười nét vẽ) */
+  saveDisabled?: boolean
   onSave: () => void
   showMembers: boolean
   onOpenMembers: () => void
@@ -138,6 +140,7 @@ export function AnnotationToolbar(props: AnnotationToolbarProps) {
     setScore,
     maxScore,
     saving,
+    saveDisabled = false,
     onSave,
     showMembers,
     onOpenMembers,
@@ -319,7 +322,7 @@ export function AnnotationToolbar(props: AnnotationToolbarProps) {
         />
         <span className="text-xs text-muted-foreground">/{maxScore}</span>
       </div>
-      <Button onClick={onSave} disabled={saving} size="sm" className="rounded-full gap-1.5 h-8 px-3 shrink-0">
+      <Button onClick={onSave} disabled={saving || saveDisabled} size="sm" className="rounded-full gap-1.5 h-8 px-3 shrink-0">
         <Save className="size-3.5" />
         {saving ? "Lưu..." : "Lưu"}
       </Button>

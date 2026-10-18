@@ -20,6 +20,7 @@ const QRCodeSVG = dynamic(() => import("qrcode.react").then((m) => m.QRCodeSVG),
   ssr: false,
 })
 import { AnnotationEditor } from "@/components/annotation-editor"
+import { useLazyAnnotationData } from "@/hooks/use-lazy-annotation-data"
 import { GroupCardsGrid } from "@/components/group-card"
 import { TimerPanel } from "@/components/timer-panel"
 import { getFiles } from "@/lib/submission-files"
@@ -87,6 +88,9 @@ export function PresentationViewer({
   const [sourceUrl, setSourceUrl] = useState<string | null>(null)
   const [rawUrl, setRawUrl] = useState<string | null>(null)
   const [openGroupId, setOpenGroupId] = useState<string | null>(null)
+  // T3: cache nét vẽ tải lười (cột data không select ở page)
+  const { ensureData: ensureAnnData, dataFor: annDataFor, isReady: isAnnReady } =
+    useLazyAnnotationData()
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -383,6 +387,11 @@ export function PresentationViewer({
   const openGroupRow = openGroupId ? groups.find((g) => g.id === openGroupId) ?? null : null
   const openSub = openGroupRow ? subsByGroup[openGroupRow.id] : null
   const openAnn = openGroupRow ? annsByGroup[openGroupRow.id] : null
+
+  // T3.2: mở editor chấm → tải lười cột data của annotation (nếu chưa có).
+  useEffect(() => {
+    if (openGroupRow) ensureAnnData(annsByGroup[openGroupRow.id] ?? null)
+  }, [openGroupId, annsByGroup, ensureAnnData])
 
   if (!presentation) return <>{children}</>
   if (!active)
@@ -689,8 +698,10 @@ export function PresentationViewer({
                 title={`${openGroupRow.label} — ${presentation.file_name ?? ""}`}
                 files={getFiles(openSub ?? undefined)}
                 textContent={openSub?.text_content ?? null}
-                initialData={(openAnn?.data ?? []) as AnnotationItem[]}
+                initialData={annDataFor(openAnn)}
                 initialScore={openAnn?.score ?? null}
+                // T3.3: chưa tải xong nét vẽ → chặn vẽ + chặn lưu.
+                dataReady={isAnnReady(openAnn)}
                 autoFullscreen
                 onSave={async (data, score) => {
                   await saveAnnotationAction({

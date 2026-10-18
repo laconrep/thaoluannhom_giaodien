@@ -308,7 +308,8 @@ export type AnnotationRow = {
   session_id: string
   session_group_id: string | null
   session_slot_id: string | null
-  data: AnnotationItem[]
+  /** Nét vẽ — trang danh sách KHÔNG select cột này (nặng); tải lười khi mở editor. */
+  data?: AnnotationItem[]
   score: number | null
   updated_at: string
 }

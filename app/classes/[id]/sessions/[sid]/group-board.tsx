@@ -21,6 +21,7 @@ import type {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { AnnotationEditor } from "@/components/annotation-editor"
+import { useLazyAnnotationData } from "@/hooks/use-lazy-annotation-data"
 import { GroupCardsGrid } from "@/components/group-card"
 import { SubmissionText } from "@/components/submission-text"
 import { getFiles } from "@/lib/submission-files"
@@ -86,6 +87,9 @@ export function GroupSessionBoard({
   const [groups, setGroups] = useState(initialGroups)
   const [subs, setSubs] = useState(initialSubs)
   const [anns, setAnns] = useState(initialAnns)
+  // T3: cache nét vẽ tải lười (cột data không select ở page)
+  const { ensureData: ensureAnnData, dataFor: annDataFor, isReady: isAnnReady } =
+    useLazyAnnotationData()
   const [openGroupId, setOpenGroupId] = useState<string | null>(null)
   const [slideshowIdx, setSlideshowIdx] = useState<number | null>(null) // chế độ trình chiếu cả lớp
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -389,11 +393,20 @@ export function GroupSessionBoard({
       supabase.from("sessions").select("*").eq("id", sid).single(),
       supabase
         .from("session_groups")
-        .select("*")
+        .select("id, session_id, class_group_id, group_number, label, claimed, claimed_at")
         .eq("session_id", sid)
         .order("group_number"),
-      supabase.from("submissions").select("*").eq("session_id", sid),
-      supabase.from("annotations").select("*").eq("session_id", sid),
+      supabase
+        .from("submissions")
+        .select(
+          "id, session_id, session_group_id, session_slot_id, image_url, text_content, files, submitted_at, is_auto_submitted",
+        )
+        .eq("session_id", sid),
+      // T3: KHÔNG select cột data (nặng) — tải lười khi mở editor.
+      supabase
+        .from("annotations")
+        .select("id, session_id, session_group_id, session_slot_id, score, updated_at")
+        .eq("session_id", sid),
     ])
     if (s) {
       setPreviewData({
@@ -409,6 +422,11 @@ export function GroupSessionBoard({
   const openGroup = openGroupId ? groups.find((g) => g.id === openGroupId) : null
   const openSub = openGroup ? subsByGroup[openGroup.id] : null
   const openAnn = openGroup ? annsByGroup[openGroup.id] : null
+
+  // T3.2: mở editor → tải lười cột data của annotation (nếu chưa có).
+  useEffect(() => {
+    if (openGroup) ensureAnnData(annsByGroup[openGroup.id] ?? null)
+  }, [openGroupId, annsByGroup, ensureAnnData])
 
   const slideshowGroup = slideshowIdx !== null ? groups[slideshowIdx] : null
   const slideshowSub = slideshowGroup ? subsByGroup[slideshowGroup.id] : null
@@ -903,8 +921,10 @@ export function GroupSessionBoard({
           title={`${openGroup.label} — ${session.title}`}
           files={getFiles(openSub ?? undefined)}
           textContent={openSub?.text_content ?? null}
-          initialData={(openAnn?.data ?? []) as AnnotationItem[]}
+          initialData={annDataFor(openAnn)}
           initialScore={openAnn?.score ?? null}
+          // T3.3: chưa tải xong nét vẽ → chặn vẽ + chặn lưu, chống ghi đè mất dữ liệu.
+          dataReady={isAnnReady(openAnn)}
           autoFullscreen
           sessionId={session.id}
           sessionGroupId={openGroup.id}
