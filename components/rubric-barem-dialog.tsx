@@ -41,12 +41,25 @@ function normalizeBarem(raw: unknown, fallbackMax: number): GradingBarem | null 
   if (!raw || typeof raw !== "object") return null
   const r = raw as Partial<GradingBarem>
   if (!Array.isArray(r.criteria) || r.criteria.length === 0) return null
-  const criteria: BaremCriterion[] = r.criteria.map((c) => ({
-    name: String(c?.name ?? "").trim() || "Tiêu chí",
-    points: Math.max(0, Number(c?.points) || 0),
-    expect: Array.isArray(c?.expect) ? c.expect.map((e) => String(e)).filter(Boolean) : [],
-    notes: String(c?.notes ?? ""),
-  }))
+  const criteria: BaremCriterion[] = r.criteria.map((c) => {
+    // Chấp nhận cả 2 cách đặt tên: subagent mẫu viết max_points, worker đáp án viết points.
+    const pts =
+      Number(c?.points) || Number((c as { max_points?: unknown })?.max_points) || 0
+    // expect có thể là mảng (worker) hoặc chuỗi (subagent mẫu) — chuẩn hóa thành mảng dòng.
+    const expRaw = (c as { expect?: unknown })?.expect
+    const expect = Array.isArray(expRaw)
+      ? expRaw.map((e) => String(e)).filter(Boolean)
+      : String(expRaw ?? "")
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean)
+    return {
+      name: String(c?.name ?? "").trim() || "Tiêu chí",
+      points: Math.max(0, pts),
+      expect,
+      notes: String(c?.notes ?? ""),
+    }
+  })
   const maxScore =
     Number(r.max_score) > 0 ? Math.round(Number(r.max_score)) : fallbackMax
   return { template: "criteria_weighted", version: 1, max_score: maxScore, criteria }
