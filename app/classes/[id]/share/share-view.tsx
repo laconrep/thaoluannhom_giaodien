@@ -4,7 +4,11 @@ import { useEffect, useState, useTransition } from "react"
 import { rotateShareTokenAction } from "@/app/actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { QRCodeSVG } from "qrcode.react"
+import dynamic from "next/dynamic"
+// QR chỉ cần khi mở popup chia sẻ (dynamic import, không SSR) để nhẹ bundle.
+const QRCodeSVG = dynamic(() => import("qrcode.react").then((m) => m.QRCodeSVG), {
+  ssr: false,
+})
 import { Copy, RotateCw, QrCode, ExternalLink } from "lucide-react"
 import { TeacherTour } from "@/components/tour/teacher-tour"
 import { shareGradesStep, shareLinkStep } from "@/components/tour/tour-config"

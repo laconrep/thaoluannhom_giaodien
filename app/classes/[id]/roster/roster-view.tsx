@@ -50,7 +50,6 @@ import { fetchClassGroups } from "@/lib/class-groups"
 import { groupCardStyle, groupPillStyle } from "@/lib/group-colors"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import * as XLSX from "xlsx"
 import { Spinner } from "@/components/ui/spinner"
 import { RosterTour } from "@/components/tour/roster-tour"
 
@@ -272,7 +271,9 @@ export function RosterView({
   }
 
   // Tải mẫu Excel: 1 cột "Họ và tên" + vài dòng ví dụ (đúng định dạng web app nhận).
-  function downloadTemplate() {
+  // xlsx chỉ tải khi bấm nút (dynamic import) để nhẹ bundle trang roster.
+  async function downloadTemplate() {
+    const XLSX = await import("xlsx")
     const ws = XLSX.utils.aoa_to_sheet([
       ["Họ và tên"],
       ["Nguyễn Văn An"],
@@ -292,6 +293,7 @@ export function RosterView({
     setImportPreview(null)
     setImportMerged(false)
     try {
+      const XLSX = await import("xlsx")
       const buf = await file.arrayBuffer()
       const wb = XLSX.read(buf, { type: "array" })
       const ws = wb.Sheets[wb.SheetNames[0]]

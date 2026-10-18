@@ -14,7 +14,11 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
-import { QRCodeSVG } from "qrcode.react"
+import dynamic from "next/dynamic"
+// QR chỉ cần khi mở popup chia sẻ (dynamic import, không SSR) để nhẹ bundle.
+const QRCodeSVG = dynamic(() => import("qrcode.react").then((m) => m.QRCodeSVG), {
+  ssr: false,
+})
 import { AnnotationEditor } from "@/components/annotation-editor"
 import { GroupCardsGrid } from "@/components/group-card"
 import { TimerPanel } from "@/components/timer-panel"

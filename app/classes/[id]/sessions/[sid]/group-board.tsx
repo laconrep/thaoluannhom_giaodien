@@ -38,7 +38,11 @@ import {
   TOUR_ONBOARDING_SEEN_KEY,
 } from "@/components/tour/tour-store"
 import { AiGradePanel } from "@/components/ai-grade-panel"
-import { QRCodeSVG } from "qrcode.react"
+import dynamic from "next/dynamic"
+// QR chỉ cần khi mở popup chia sẻ (dynamic import, không SSR) để nhẹ bundle.
+const QRCodeSVG = dynamic(() => import("qrcode.react").then((m) => m.QRCodeSVG), {
+  ssr: false,
+})
 import {
   ArrowLeft,
   Link as LinkIcon,

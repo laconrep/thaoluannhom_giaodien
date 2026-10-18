@@ -15,7 +15,6 @@ import {
 } from "@/components/annotation/annotation-toolbar"
 import { FileViewer } from "@/components/annotation/file-viewer"
 import { useFullscreen } from "@/lib/use-fullscreen"
-import { renderAsync } from "docx-preview"
 import { cn } from "@/lib/utils"
 import { isRichTextEmpty } from "@/lib/rich-text"
 import {
@@ -163,6 +162,9 @@ export function AnnotationEditor({
         const res = await fetch(currentFile.url)
         if (!res.ok) throw new Error("Không tải được tệp")
         const blob = await res.blob()
+        if (cancelled) return
+        // docx-preview chỉ tải khi thực sự mở file .docx (dynamic import).
+        const { renderAsync } = await import("docx-preview")
         if (cancelled) return
         await renderAsync(blob, el, undefined, { className: "docx" })
         if (cancelled) return
