@@ -27,6 +27,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { RichTextEditor } from "@/components/rich-text-editor"
 import { createClient } from "@/lib/supabase/client"
+import { compressImageIfNeeded } from "@/lib/compress-image"
 import { useCountdown } from "@/lib/use-countdown"
 import { formatDuration } from "@/lib/utils-format"
 import { isRichTextEmpty } from "@/lib/rich-text"
@@ -288,6 +289,12 @@ export function StudentSubmit({
 
   async function uploadAll(): Promise<SubmissionFile[]> {
     if (!staged.length) return []
+    // T5: nén ảnh phía client trước khi upload (song song) — upload nhanh, nhẹ server.
+    const toUpload = await Promise.all(
+      staged.map(async (sf) =>
+        sf.kind === "image" ? { ...sf, file: await compressImageIfNeeded(sf.file) } : sf,
+      ),
+    )
     try {
       const res = await fetch("/api/storage/ensure-bucket", { method: "POST" })
       const body = await res.json().catch(() => ({}))
@@ -296,7 +303,7 @@ export function StudentSubmit({
       console.warn("ensure submissions bucket skipped:", e)
     }
     const uploaded: SubmissionFile[] = []
-    for (const s of staged) {
+    for (const s of toUpload) {
       const ext = s.file.name.split(".").pop() ?? "bin"
       const path = `${session.id}/${selectedId}/${Date.now()}-${Math.random()
         .toString(36)
