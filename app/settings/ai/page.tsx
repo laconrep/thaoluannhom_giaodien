@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getVerifiedAuthFromHeaders } from "@/lib/auth-headers"
 import { TeacherShell } from "@/components/teacher-shell"
 import { ensureActiveUser } from "@/lib/account-status"
 import { GeminiSettingsForm } from "./gemini-settings-form"
@@ -7,12 +8,11 @@ import type { GeminiTier } from "@/lib/types"
 import { isMissingSchemaError } from "@/lib/ai/schema-error"
 
 export default async function AiSettingsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // T2: lấy định danh từ header nội bộ do middleware xác thực — không gọi getUser() nữa.
+  const user = await getVerifiedAuthFromHeaders()
   if (!user) redirect("/auth/login")
   await ensureActiveUser(user.id)
+  const supabase = await createClient()
 
   let settings: { gemini_api_key?: string | null; gemini_tier?: string | null } | null = null
   let schemaMissing = false

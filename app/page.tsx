@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/server"
+import { getVerifiedAuthFromHeaders } from "@/lib/auth-headers"
 import { Button } from "@/components/ui/button"
 import { GraduationCap, Users, Presentation, PenLine, ClipboardList } from "lucide-react"
 
@@ -8,10 +8,8 @@ export default async function HomePage() {
   // Keep the public landing page renderable while Supabase environment
   // variables are being provisioned for a deployment.
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // T2: đọc định danh từ header nội bộ do middleware xác thực.
+    const user = await getVerifiedAuthFromHeaders()
     if (user) redirect("/dashboard")
   } catch (error) {
     if (!(error instanceof Error) || !error.message.includes("Supabase server configuration is missing")) {

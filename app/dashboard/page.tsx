@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getVerifiedAuthFromHeaders } from "@/lib/auth-headers"
 import { TeacherShell } from "@/components/teacher-shell"
 import { CreateClassCard } from "./create-class-card"
 import { Users, ArrowRight, CalendarRange, Trash2, School } from "lucide-react"
@@ -22,12 +23,11 @@ type ClassWithCounts = {
 }
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // T2: lấy định danh từ header nội bộ do middleware xác thực — không gọi getUser() nữa.
+  const user = await getVerifiedAuthFromHeaders()
   if (!user) redirect("/auth/login")
   await ensureActiveUser(user.id)
+  const supabase = await createClient()
 
   const { data: classes } = await supabase
     .from("classes")

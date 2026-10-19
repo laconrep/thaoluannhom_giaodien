@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getVerifiedAuthFromHeaders } from "@/lib/auth-headers"
 import { upgradeToPlanAction } from "@/app/actions"
 import { PLANS, PLAN_DEFAULT, type Plan } from "@/lib/plans"
 import { Button } from "@/components/ui/button"
@@ -8,12 +9,11 @@ import { GraduationCap, Check, ArrowLeft } from "lucide-react"
 import { ensureActiveUser } from "@/lib/account-status"
 
 export default async function PricingPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // T2: lấy định danh từ header nội bộ do middleware xác thực — không gọi getUser() nữa.
+  const user = await getVerifiedAuthFromHeaders()
   if (!user) redirect("/auth/login")
   await ensureActiveUser(user.id)
+  const supabase = await createClient()
 
   const { data: profile } = await supabase
     .from("profiles")
