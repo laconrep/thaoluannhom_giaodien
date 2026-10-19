@@ -96,8 +96,10 @@ export function TeacherTour({
     }
     if (data.type === EVENTS.TOUR_END) {
       setRun(false)
+      // Mỗi hint chỉ hiện 1 lần: Đóng/Bỏ qua hay Hoàn tất đều ghi cờ đã xem.
+      // (Nút "Hướng dẫn" trên header vẫn mở lại được qua RESTART_EVENT.)
+      markAsSeen()
       if (data.status === STATUS.FINISHED) {
-        markAsSeen()
         onComplete?.()
       }
       onEnd?.()

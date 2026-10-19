@@ -137,9 +137,26 @@ export function PresentationTour({
   function handleEvent(data: EventData) {
     if (data.type !== EVENTS.TOUR_END) return
     setRun(false)
-    if (data.status === STATUS.SKIPPED) return
-    // Nhánh multi-step (thời gian + QR + chấm bài) kết thúc → dẫn sang "Tất cả phiên".
-    if (stage === "drawer") setStage("all-sessions")
+    // Mỗi hint chỉ xuất hiện 1 lần: Đóng/Bỏ qua hay đi hết đều ghi cờ đã xem.
+    // (Nút "Hướng dẫn" trên header vẫn mở lại được qua RESTART_EVENT.)
+    setSeen(PRESENTATION_TOUR_SEEN_KEY)
+    if (data.status === STATUS.SKIPPED) {
+      setOnboardingEnabled(false)
+      setReplaying(false)
+      setStage("done")
+      return
+    }
+    if (data.status === STATUS.FINISHED) {
+      if (stage === "drawer") {
+        // Hết nhánh drawer (thời gian + QR + chấm bài) → sang "Tất cả phiên",
+        // vẫn trong lần xem đầu này.
+        setStage("all-sessions")
+        return
+      }
+      setOnboardingEnabled(false)
+      setReplaying(false)
+      setStage("done")
+    }
   }
 
   if (!enabled || stage === "done") return null
