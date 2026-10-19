@@ -4,9 +4,6 @@ import type { BackendStationRow, TeacherBackendMapRow } from "@/lib/types"
 import type { createAdminClient } from "@/lib/supabase/admin"
 import { StationManager } from "@/app/admin/station-manager"
 import { StationAssignTable } from "@/app/admin/station-assign-table"
-import { TeacherTour } from "@/components/tour/teacher-tour"
-import { farmStationsStep } from "@/components/tour/tour-config"
-import { TOUR_FARM_SEEN_KEY } from "@/components/tour/tour-store"
 
 type AdminClient = NonNullable<ReturnType<typeof createAdminClient>>
 
@@ -47,13 +44,7 @@ export async function StationsSection({
   for (const r of mapRows) countByStation.set(r.station_id, (countByStation.get(r.station_id) ?? 0) + 1)
 
   return (
-    <section data-tour="farm-stations" className="mx-auto max-w-6xl px-4 pb-8 flex flex-col gap-6">
-      <TeacherTour
-        tourId="farm-stations"
-        steps={[farmStationsStep()]}
-        seenKey={TOUR_FARM_SEEN_KEY}
-        autoStart
-      />
+    <section className="mx-auto max-w-6xl px-4 pb-8 flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h2 className="font-heading text-xl md:text-2xl font-bold flex items-center gap-2">
           <Server className="size-5" /> Trạm chấm (farm)

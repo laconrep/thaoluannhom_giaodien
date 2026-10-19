@@ -447,8 +447,6 @@ export function PresentationViewer({
           <PresentationTour
             active={active}
             drawerOpen={drawerOpen}
-            sessionPickerOpen={sessionPickerOpen}
-            createSessionOpen={createSessionOpen}
           />
           {/* Left hover zone */}
           <div
@@ -525,7 +523,7 @@ export function PresentationViewer({
                 board(openGroup)
               ) : (
                 <>
-                  <div className="p-3 pb-0">
+                  <div className="p-3 pb-0" data-tour="presentation-timer">
                     <TimerPanel
                       sessionId={sessionId}
                       status={status}
@@ -533,7 +531,7 @@ export function PresentationViewer({
                       durationSeconds={durationSeconds}
                     />
                   </div>
-                  <div className="p-3">
+                  <div className="p-3" data-tour="presentation-groups">
                     <GroupCardsGrid
                       groups={groups}
                       subsByGroup={subsByGroup}

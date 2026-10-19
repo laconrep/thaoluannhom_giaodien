@@ -42,7 +42,7 @@ export function rosterListStep(): Step {
     placement: "right",
     title: "Danh sách học sinh",
     content:
-      "Đây là danh sách học sinh của lớp. Nhập tên vào từng ô, hoặc dùng \"Dán danh sách\" và \"Import Excel\" để nhập hàng loạt. Kéo thẻ học sinh từ bên trái thả vào một nhóm bên phải.",
+      "Nhập tên vào từng ô, hoặc dùng \"Dán danh sách\" và \"Import Excel\" để nhập hàng loạt. Thầy/cô chỉ cần gán nhóm trưởng cho mỗi nhóm — thành viên thì thầy/cô kéo thả vào, hoặc nhóm trưởng tự kéo trên tài khoản của mình.",
   }
 }
 
@@ -180,23 +180,13 @@ export function presentationQrStep(): Step {
   }
 }
 
-export function presentationAllSessionsStep(): Step {
+export function presentationGradeStep(): Step {
   return {
-    target: "[data-tour='presentation-all-sessions']",
+    target: "[data-tour='presentation-groups']",
     placement: "right",
-    title: "Chuyển phiên",
+    title: "Chấm ngay trên màn chiếu",
     content:
-      "Bấm \"Tất cả phiên\" để xem danh sách phiên thảo luận của lớp, chọn phiên khác hoặc tạo phiên mới ngay trong lúc chiếu.",
-  }
-}
-
-export function presentationCreateSessionStep(): Step {
-  return {
-    target: "[data-tour='presentation-create-session']",
-    placement: "bottom",
-    title: "Tạo phiên mới",
-    content:
-      "Bấm \"Tạo phiên mới\" để mở một phiên thảo luận mới ngay trên bảng điều khiển mà không cần thoát màn chiếu.",
+      "Điểm nổi bật: học sinh vẫn nộp bài bình thường khi PowerPoint đang chiếu fullscreen. Bấm vào thẻ nhóm để mở bài và chấm/sửa ngay trên màn hình đang chiếu, không cần thoát.",
   }
 }
 
@@ -207,17 +197,7 @@ export function aiGradePanelStep(): Step {
     placement: "bottom",
     title: "Chấm bài AI",
     content:
-      "Bật \"Bật chấm AI\" rồi bấm \"Chấm bài AI\" — AI chấm ngầm từng bài, gập máy vẫn chạy. Bấm \"Tiêu chí chấm\" để xem/sửa barem AI dùng để chấm, hoặc tạo barem từ bài chấm mẫu.",
+      "Tạo tiêu chí chấm từ bài chấm mẫu (nút \"Tiêu chí chấm\"), rồi bấm \"Chấm bài AI\" — AI chấm ngầm từng bài, gập máy vẫn chạy. Điểm tự ghi vào sổ điểm của từng cá nhân theo từng phiên thảo luận.",
   }
 }
 
-// Trang admin: hint trạm chấm (farm).
-export function farmStationsStep(): Step {
-  return {
-    target: "[data-tour='farm-stations']",
-    placement: "top",
-    title: "Trạm chấm (farm)",
-    content:
-      "Mỗi trạm là một tài khoản Muse riêng, chấm song song. Thêm trạm mới ở trên, rồi gán giáo viên vào trạm ở bảng bên dưới — job chấm của giáo viên sẽ về đúng trạm của họ.",
-  }
-}

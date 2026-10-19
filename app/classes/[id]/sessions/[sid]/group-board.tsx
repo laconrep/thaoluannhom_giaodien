@@ -657,7 +657,7 @@ export function GroupSessionBoard({
               </h3>
               <p className="text-xs text-muted-foreground">{className}</p>
 
-              <div data-tour="presentation-timer">
+              <div>
                 <TimerPanel
                   sessionId={displaySession.id}
                   status={displaySession.status}
