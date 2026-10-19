@@ -190,6 +190,26 @@ export function presentationGradeStep(): Step {
   }
 }
 
+export function presentationAllSessionsStep(): Step {
+  return {
+    target: "[data-tour='presentation-all-sessions']",
+    placement: "right",
+    title: "Chuyển phiên",
+    content:
+      "Bấm \"Tất cả phiên\" để xem danh sách phiên thảo luận của lớp, chọn phiên khác hoặc tạo phiên mới ngay trong lúc chiếu.",
+  }
+}
+
+export function presentationCreateSessionStep(): Step {
+  return {
+    target: "[data-tour='presentation-create-session']",
+    placement: "bottom",
+    title: "Tạo phiên mới",
+    content:
+      "Bấm \"Tạo phiên mới\" để mở một phiên thảo luận mới ngay trên bảng điều khiển mà không cần thoát màn chiếu.",
+  }
+}
+
 // Trang phiên (bảng nhóm): hint chấm AI — tính năng chính của app.
 export function aiGradePanelStep(): Step {
   return {

@@ -15,21 +15,30 @@ import {
   presentationTimerStep,
   presentationQrStep,
   presentationGradeStep,
+  presentationAllSessionsStep,
+  presentationCreateSessionStep,
 } from "./tour-config"
 import { useTourOptions } from "./use-tour-options"
 
 // Tour màn hình chiếu PowerPoint (fullscreen): từng hint xuất hiện theo hành
 // động thật của giáo viên — mở drawer → chỉnh thời gian/QR/chấm bài ngay trên
-// màn chiếu. (Các bước "Tất cả phiên"/"Tạo phiên mới" thuộc UI chế độ nhúng,
-// không tồn tại ở fullscreen nên đã gỡ khỏi tour này.)
-type Stage = "idle" | "edge" | "drawer" | "done"
+// màn chiếu → "Tất cả phiên" → "Tạo phiên mới". Drawer render nguyên sidebar
+// (chế độ nhúng) nên các nút chuyển/tạo phiên đều có mặt trong drawer.
+type Stage = "idle" | "edge" | "drawer" | "all-sessions" | "create-session" | "done"
 
 type PresentationTourProps = {
   active: boolean
   drawerOpen: boolean
+  sessionPickerOpen: boolean
+  createSessionOpen: boolean
 }
 
-export function PresentationTour({ active, drawerOpen }: PresentationTourProps) {
+export function PresentationTour({
+  active,
+  drawerOpen,
+  sessionPickerOpen,
+  createSessionOpen,
+}: PresentationTourProps) {
   const [stage, setStage] = useState<Stage>("idle")
   const [run, setRun] = useState(false)
   const [replaying, setReplaying] = useState(false)
@@ -48,7 +57,7 @@ export function PresentationTour({ active, drawerOpen }: PresentationTourProps) 
   const enabled = onboardingEnabled || replaying
 
   // Vào màn chiếu → bắt đầu từ hint mép trái. Không ghi đè stage khi replay
-  // giữa chừng (drawer đang mở).
+  // giữa chừng (drawer / picker đang mở).
   useEffect(() => {
     if (!enabled) return
     if (active) setStage((s) => (s === "idle" || s === "done" ? "edge" : s))
@@ -61,19 +70,41 @@ export function PresentationTour({ active, drawerOpen }: PresentationTourProps) 
     if (drawerOpen) setStage((s) => (s === "edge" || s === "idle" ? "drawer" : s))
   }, [drawerOpen, enabled])
 
+  // Giáo viên bấm "Tất cả phiên" → hint "Tạo phiên mới".
+  useEffect(() => {
+    if (!enabled) return
+    if (sessionPickerOpen) {
+      setStage((s) => (s === "drawer" || s === "all-sessions" ? "create-session" : s))
+    }
+  }, [sessionPickerOpen, enabled])
+
+  // Giáo viên bấm "Tạo phiên mới" → kết thúc tour màn chiếu.
+  useEffect(() => {
+    if (!enabled) return
+    if (createSessionOpen && stage === "create-session") {
+      setSeen(PRESENTATION_TOUR_SEEN_KEY)
+      setOnboardingEnabled(false)
+      setReplaying(false)
+      setRun(false)
+      setStage("done")
+    }
+  }, [createSessionOpen, stage, enabled])
+
   // Replay từ nút "Hướng dẫn" trên header: reset về hint mép trái khi đang chiếu.
   useEffect(() => {
     if (typeof window === "undefined") return
     const onRestart = () => {
       if (!active) return
       setReplaying(true)
-      setStage(drawerOpen ? "drawer" : "edge")
+      if (sessionPickerOpen) setStage("create-session")
+      else if (drawerOpen) setStage("drawer")
+      else setStage("edge")
       setRun(false)
       window.setTimeout(() => setRun(true), 120)
     }
     window.addEventListener(RESTART_EVENT, onRestart)
     return () => window.removeEventListener(RESTART_EVENT, onRestart)
-  }, [active, drawerOpen])
+  }, [active, drawerOpen, sessionPickerOpen])
 
   const steps = useMemo<Step[]>(() => {
     switch (stage) {
@@ -81,6 +112,10 @@ export function PresentationTour({ active, drawerOpen }: PresentationTourProps) 
         return [presentationEdgeStep()]
       case "drawer":
         return [presentationTimerStep(), presentationQrStep(), presentationGradeStep()]
+      case "all-sessions":
+        return [presentationAllSessionsStep()]
+      case "create-session":
+        return [presentationCreateSessionStep()]
       default:
         return []
     }
@@ -94,20 +129,17 @@ export function PresentationTour({ active, drawerOpen }: PresentationTourProps) 
     let shouldRun = false
     if (stage === "edge") shouldRun = active && !drawerOpen
     else if (stage === "drawer") shouldRun = drawerOpen
+    else if (stage === "all-sessions") shouldRun = drawerOpen && !sessionPickerOpen
+    else if (stage === "create-session") shouldRun = sessionPickerOpen
     setRun(shouldRun)
-  }, [stage, active, drawerOpen, enabled])
+  }, [stage, active, drawerOpen, sessionPickerOpen, enabled])
 
   function handleEvent(data: EventData) {
     if (data.type !== EVENTS.TOUR_END) return
     setRun(false)
     if (data.status === STATUS.SKIPPED) return
-    // Nhánh multi-step (thời gian + QR + chấm bài) kết thúc → hoàn tất tour.
-    if (stage === "drawer") {
-      setSeen(PRESENTATION_TOUR_SEEN_KEY)
-      setOnboardingEnabled(false)
-      setReplaying(false)
-      setStage("done")
-    }
+    // Nhánh multi-step (thời gian + QR + chấm bài) kết thúc → dẫn sang "Tất cả phiên".
+    if (stage === "drawer") setStage("all-sessions")
   }
 
   if (!enabled || stage === "done") return null

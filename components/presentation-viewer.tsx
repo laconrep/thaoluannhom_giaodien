@@ -447,6 +447,8 @@ export function PresentationViewer({
           <PresentationTour
             active={active}
             drawerOpen={drawerOpen}
+            sessionPickerOpen={sessionPickerOpen}
+            createSessionOpen={createSessionOpen}
           />
           {/* Left hover zone */}
           <div
@@ -698,6 +700,8 @@ export function PresentationViewer({
                 textContent={openSub?.text_content ?? null}
                 initialData={annDataFor(openAnn)}
                 initialScore={openAnn?.score ?? null}
+                sessionId={sessionId}
+                sessionGroupId={openGroupRow.id}
                 // T3.3: chưa tải xong nét vẽ → chặn vẽ + chặn lưu.
                 dataReady={isAnnReady(openAnn)}
                 autoFullscreen
