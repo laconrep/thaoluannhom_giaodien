@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button"
 import { PdfPages } from "@/components/pdf-pages"
 import { cn } from "@/lib/utils"
 import type { SubmissionFile } from "@/lib/types"
-import { Download, File as FileIcon, Hand } from "lucide-react"
+import { Download, File as FileIcon, Hand, Loader2 } from "lucide-react"
+import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
+import { isSignUrl } from "@/lib/file-url"
 
 export function officeEmbed(url: string) {
   return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
@@ -46,11 +48,26 @@ export function FileViewer(props: FileViewerProps) {
     annotateLocked,
   } = props
 
+  // Signed URL lưu trong DB hết hạn sau 7 ngày → đổi lấy URL mới trước khi hiện,
+  // tránh ảnh vỡ khi chấm bài cũ.
+  const freshUrl = useFreshFileUrl(file.url)
+  const refreshing = isSignUrl(file.url) && !freshUrl
+  const src = freshUrl ?? file.url
+
+  if (refreshing) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh] text-muted-foreground gap-2 text-sm">
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+        Đang tải bài nộp…
+      </div>
+    )
+  }
+
   if (isImage) {
     return (
       <div className="relative p-2">
         <img
-          src={file.url || "/placeholder.svg"}
+          src={src || "/placeholder.svg"}
           alt={file.name}
           className="block max-w-[1200px] w-auto rounded-md pointer-events-none mx-auto"
           crossOrigin="anonymous"
@@ -64,8 +81,8 @@ export function FileViewer(props: FileViewerProps) {
     return (
       <div className="w-full relative">
         <PdfPages
-          key={`pdf-${fileIndex}-${file.url}`}
-          url={file.url}
+          key={`pdf-${fileIndex}-${src}`}
+          url={src}
           name={file.name}
         />
         <div
@@ -73,7 +90,7 @@ export function FileViewer(props: FileViewerProps) {
           onPointerDown={(e) => e.stopPropagation()}
         >
           <Button asChild variant="outline" size="sm" className="gap-1">
-            <a href={file.url} target="_blank" rel="noreferrer" download>
+            <a href={src} target="_blank" rel="noreferrer" download>
               <Download className="size-3.5" />
               Tải PDF
             </a>
@@ -99,7 +116,7 @@ export function FileViewer(props: FileViewerProps) {
             </p>
             <div className="w-full h-[78vh]">
               <iframe
-                src={officeEmbed(file.url)}
+                src={officeEmbed(src)}
                 title={file.name}
                 className="w-full h-full rounded-md"
                 allow="fullscreen"
@@ -109,7 +126,7 @@ export function FileViewer(props: FileViewerProps) {
         )}
         <div className="absolute top-2 right-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
           <Button asChild variant="outline" size="sm" className="gap-1">
-            <a href={file.url} target="_blank" rel="noreferrer" download>
+            <a href={src} target="_blank" rel="noreferrer" download>
               <Download className="size-3.5" />
               Tải tệp
             </a>
@@ -123,7 +140,7 @@ export function FileViewer(props: FileViewerProps) {
     return (
       <div className="w-[1000px] h-[78vh] relative mx-auto">
         <iframe
-          src={officeEmbed(file.url)}
+          src={officeEmbed(src)}
           title={file.name}
           allow="fullscreen"
           className={cn(
@@ -140,7 +157,7 @@ export function FileViewer(props: FileViewerProps) {
         )}
         <div className="absolute top-2 right-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
           <Button asChild variant="outline" size="sm" className="gap-1">
-            <a href={file.url} target="_blank" rel="noreferrer" download>
+            <a href={src} target="_blank" rel="noreferrer" download>
               <Download className="size-3.5" />
               Tải tệp
             </a>
@@ -155,7 +172,7 @@ export function FileViewer(props: FileViewerProps) {
       <FileIcon className="size-16 text-muted-foreground" />
       <p className="font-medium">{file.name}</p>
       <Button asChild variant="outline" className="gap-1">
-        <a href={file.url} target="_blank" rel="noreferrer" download>
+        <a href={src} target="_blank" rel="noreferrer" download>
           <Download className="size-4" />
           Tải tệp về để xem
         </a>

@@ -23,6 +23,22 @@ import { AvatarInitials } from "@/components/avatar-initials"
 import { toast } from "sonner"
 import { AiGradePanel } from "@/components/ai-grade-panel"
 import { isRichTextEmpty } from "@/lib/rich-text"
+import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
+
+// Thumbnail trong vòng lặp — bọc hook refresh signed URL hết hạn.
+function SlotThumb({ file }: { file: { url?: string; rotation?: number } }) {
+  const freshUrl = useFreshFileUrl(file.url)
+  return (
+    <Image
+      src={freshUrl || file.url || "/placeholder.svg"}
+      alt=""
+      fill
+      sizes="(max-width: 768px) 100vw, 33vw"
+      className="object-cover"
+      style={{ transform: `rotate(${file.rotation ?? 0}deg)` }}
+    />
+  )
+}
 import {
   ArrowLeft,
   Link as LinkIcon,
@@ -293,14 +309,7 @@ export function IndividualBoard({
 
                   <div className="relative z-0 flex-1 rounded bg-muted/30 overflow-hidden pointer-events-none">
                     {firstImage ? (
-                      <Image
-                        src={firstImage.url || "/placeholder.svg"}
-                        alt=""
-                        fill
-                        sizes="(max-width: 768px) 100vw, 33vw"
-                        className="object-cover"
-                        style={{ transform: `rotate(${firstImage.rotation ?? 0}deg)` }}
-                      />
+                      <SlotThumb file={firstImage} />
                     ) : firstFile ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 text-muted-foreground">
                         {firstFile.kind === "pptx" ? (

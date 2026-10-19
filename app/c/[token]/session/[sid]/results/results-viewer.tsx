@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { SubmissionText } from "@/components/submission-text"
 import { Users, Download, FileText, Presentation, File as FileIcon, RotateCw } from "lucide-react"
 import { isRichTextEmpty } from "@/lib/rich-text"
+import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
 
 function getFiles(sub?: SubmissionRow): SubmissionFile[] {
   if (!sub) return []
@@ -63,6 +64,8 @@ export function ResultsViewer({
   const ann = active ? annsByGroup[active.id] : undefined
   const files = getFiles(sub)
   const file = files[activeFileIdx]
+  // Signed URL hết hạn sau 7 ngày → đổi lấy URL mới trước khi hiện.
+  const freshFileUrl = useFreshFileUrl(file?.url)
 
   return (
     <div className="min-h-screen bg-background">
@@ -211,7 +214,7 @@ export function ResultsViewer({
                           style={{ transform: `rotate(${((file.rotation ?? 0) + viewRotation) % 360}deg)` }}
                         >
                           <img
-                            src={file.url || "/placeholder.svg"}
+                            src={freshFileUrl || file.url || "/placeholder.svg"}
                             alt=""
                             className="max-w-full max-h-[75vh] object-contain"
                           />

@@ -26,6 +26,7 @@ import { GroupCardsGrid } from "@/components/group-card"
 import { SubmissionText } from "@/components/submission-text"
 import { getFiles } from "@/lib/submission-files"
 import { isRichTextEmpty } from "@/lib/rich-text"
+import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
 import { TimerPanel } from "@/components/timer-panel"
 import { Switch } from "@/components/ui/switch"
 import { sounds, isSoundEnabled, setSoundEnabled } from "@/lib/sounds"
@@ -66,6 +67,19 @@ import {
   Plus,
   X,
 } from "lucide-react"
+
+// Thumbnail bài nộp trong vòng lặp — bọc hook refresh signed URL hết hạn.
+function ThumbImg({ f }: { f: { url?: string; name?: string; rotation?: number } }) {
+  const freshUrl = useFreshFileUrl(f.url)
+  return (
+    <img
+      src={freshUrl || f.url || "/placeholder.svg"}
+      alt={f.name}
+      className="w-full h-auto"
+      style={{ transform: `rotate(${f.rotation ?? 0}deg)` }}
+    />
+  )
+}
 
 export function GroupSessionBoard({
   classId,
@@ -1118,12 +1132,7 @@ function Slideshow({
             {files.map((f, i) => (
               <div key={i} className="rounded-lg overflow-hidden border bg-white">
                 {f.kind === "image" ? (
-                  <img
-                    src={f.url || "/placeholder.svg"}
-                    alt={f.name}
-                    className="w-full h-auto"
-                    style={{ transform: `rotate(${f.rotation ?? 0}deg)` }}
-                  />
+                  <ThumbImg f={f} />
                 ) : (
                   <div className="p-10 flex flex-col items-center gap-2 text-muted-foreground">
                     <FileIcon className="size-10" />

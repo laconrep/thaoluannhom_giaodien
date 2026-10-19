@@ -15,12 +15,15 @@ import {
 } from "lucide-react"
 import { getFiles } from "@/lib/submission-files"
 import { isRichTextEmpty } from "@/lib/rich-text"
+import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
 
 function FileThumb({ f }: { f: SubmissionFile }) {
+  // Signed URL hết hạn sau 7 ngày → đổi lấy URL mới trước khi hiện.
+  const freshUrl = useFreshFileUrl(f.url)
   if (f.kind === "image") {
     return (
       <Image
-        src={f.url || "/placeholder.svg"}
+        src={freshUrl || f.url || "/placeholder.svg"}
         alt={f.name}
         fill
         sizes="(max-width: 640px) 50vw, 25vw"
