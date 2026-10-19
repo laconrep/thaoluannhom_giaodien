@@ -378,7 +378,10 @@ export function AiGradePanel({
   }
 
   return (
-    <div className="rounded-md border bg-primary/5 border-primary/20 p-2 flex flex-col gap-1.5 mt-1">
+    <div
+      data-tour="ai-grade-panel"
+      className="rounded-md border bg-primary/5 border-primary/20 p-2 flex flex-col gap-1.5 mt-1"
+    >
       <div className="flex items-center gap-2 text-xs">
         <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
         <span className="font-semibold">Chấm bài AI</span>

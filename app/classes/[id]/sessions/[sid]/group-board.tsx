@@ -32,10 +32,11 @@ import { sounds, isSoundEnabled, setSoundEnabled } from "@/lib/sounds"
 import { PresentationUpload } from "@/components/presentation-upload"
 import { PresentationViewer, startPresentationMode } from "@/components/presentation-viewer"
 import { TeacherTour } from "@/components/tour/teacher-tour"
-import { presentationStartStep } from "@/components/tour/tour-config"
+import { presentationStartStep, aiGradePanelStep } from "@/components/tour/tour-config"
 import {
   getSeen,
   PRESENTATION_START_SEEN_KEY,
+  TOUR_AIGRADE_SEEN_KEY,
   TOUR_ONBOARDING_SEEN_KEY,
 } from "@/components/tour/tour-store"
 import { AiGradePanel } from "@/components/ai-grade-panel"
@@ -913,6 +914,15 @@ export function GroupSessionBoard({
           seenKey={PRESENTATION_START_SEEN_KEY}
           autoStart
           autoStartWhen={!!presentation && !getSeen(TOUR_ONBOARDING_SEEN_KEY)}
+        />
+      )}
+      {isTeacher && (
+        <TeacherTour
+          tourId="ai-grade-panel"
+          steps={[aiGradePanelStep()]}
+          seenKey={TOUR_AIGRADE_SEEN_KEY}
+          autoStart
+          autoStartWhen={getSeen(PRESENTATION_START_SEEN_KEY) || !presentation}
         />
       )}
       {renderBoard(false)}

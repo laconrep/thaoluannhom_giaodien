@@ -199,3 +199,25 @@ export function presentationCreateSessionStep(): Step {
       "Bấm \"Tạo phiên mới\" để mở một phiên thảo luận mới ngay trên bảng điều khiển mà không cần thoát màn chiếu.",
   }
 }
+
+// Trang phiên (bảng nhóm): hint chấm AI — tính năng chính của app.
+export function aiGradePanelStep(): Step {
+  return {
+    target: "[data-tour='ai-grade-panel']",
+    placement: "bottom",
+    title: "Chấm bài AI",
+    content:
+      "Bật \"Bật chấm AI\" rồi bấm \"Chấm bài AI\" — AI chấm ngầm từng bài, gập máy vẫn chạy. Bấm \"Tiêu chí chấm\" để xem/sửa barem AI dùng để chấm, hoặc tạo barem từ bài chấm mẫu.",
+  }
+}
+
+// Trang admin: hint trạm chấm (farm).
+export function farmStationsStep(): Step {
+  return {
+    target: "[data-tour='farm-stations']",
+    placement: "top",
+    title: "Trạm chấm (farm)",
+    content:
+      "Mỗi trạm là một tài khoản Muse riêng, chấm song song. Thêm trạm mới ở trên, rồi gán giáo viên vào trạm ở bảng bên dưới — job chấm của giáo viên sẽ về đúng trạm của họ.",
+  }
+}

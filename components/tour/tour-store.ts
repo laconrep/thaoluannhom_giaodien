@@ -16,6 +16,8 @@ const ROSTER_HINT_KEYS: Record<RosterHint, string> = {
 
 export const PRESENTATION_START_SEEN_KEY = "teacher_tour_presentation_start_seen_v1"
 export const PRESENTATION_TOUR_SEEN_KEY = "teacher_tour_presentation_seen_v1"
+export const TOUR_AIGRADE_SEEN_KEY = "teacher_tour_aigrade_seen_v1"
+export const TOUR_FARM_SEEN_KEY = "teacher_tour_farm_seen_v1"
 export const GRADEBOOK_TOUR_PENDING_KEY = "teacher_tour_gradebook_pending_v1"
 export const SESSIONS_NEXT_PENDING_PREFIX = "teacher_tour_sessions_next_pending_"
 export const RESTART_EVENT = "teacher-tour:restart"
