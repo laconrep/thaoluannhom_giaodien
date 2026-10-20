@@ -15,6 +15,8 @@ import { SubmissionText } from "@/components/submission-text"
 import { Users, Download, FileText, Presentation, File as FileIcon, RotateCw } from "lucide-react"
 import { isRichTextEmpty } from "@/lib/rich-text"
 import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
+import { useCanvaEmbedUrl } from "@/hooks/use-canva-embed-url"
+import { extractCanvaUrl } from "@/lib/canva"
 
 function getFiles(sub?: SubmissionRow): SubmissionFile[] {
   if (!sub) return []
@@ -78,10 +80,29 @@ export function ResultsViewer({
   const active = groups.find((g) => g.id === activeId) ?? null
   const sub = active ? subsByGroup[active.id] : undefined
   const ann = active ? annsByGroup[active.id] : undefined
-  const files = getFiles(sub)
+  // Bài nộp link Canva: thêm "file ảo" ở cuối — cùng vị trí như khung chấm
+  // của giáo viên để dấu chấm (theo fileIndex) khớp nhau.
+  const baseFiles = getFiles(sub)
+  const canvaUrl = extractCanvaUrl(sub?.text_content)
+  const files =
+    canvaUrl && !baseFiles.some((f) => f.kind === "canva")
+      ? [
+          ...baseFiles,
+          {
+            url: canvaUrl,
+            name: "Bài Canva",
+            kind: "canva" as const,
+            mime: "",
+            rotation: 0,
+          },
+        ]
+      : baseFiles
   const file = files[activeFileIdx]
   // Signed URL hết hạn sau 7 ngày → đổi lấy URL mới trước khi hiện.
   const freshFileUrl = useFreshFileUrl(file?.url)
+  const canvaEmbedUrl = useCanvaEmbedUrl(
+    file?.kind === "canva" ? file.url : undefined,
+  )
 
   return (
     <div className="min-h-screen bg-background">
@@ -163,7 +184,7 @@ export function ResultsViewer({
                         Xoay ảnh
                       </Button>
                     )}
-                    {session.allow_download && file?.url && (
+                    {session.allow_download && file?.url && file.kind !== "canva" && (
                       <Button asChild size="sm" variant="outline">
                         <a href={freshFileUrl ?? file.url} download={file.name}>
                           <Download className="size-4 mr-2" aria-hidden="true" />
@@ -240,6 +261,15 @@ export function ResultsViewer({
                           Xoay ảnh
                         </Button>
                       </>
+                    ) : file?.kind === "canva" ? (
+                      <div className="relative w-full">
+                        {canvaEmbedUrl ? (
+                          <iframe src={canvaEmbedUrl} className="w-full h-[80vh]" title={file.name} />
+                        ) : (
+                          <p className="p-8 text-muted-foreground">Đang tải bài Canva…</p>
+                        )}
+                        {ann?.data && <AnnotationOverlay items={ann.data as AnnotationItem[]} fileIdx={activeFileIdx} />}
+                      </div>
                     ) : file?.kind === "pdf" ? (
                       <iframe src={freshFileUrl ?? file.url} className="w-full h-[80vh]" title={file.name} />
                     ) : file?.kind === "docx" || file?.kind === "pptx" ? (

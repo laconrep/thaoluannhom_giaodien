@@ -702,6 +702,7 @@ export function PresentationViewer({
                 initialScore={openAnn?.score ?? null}
                 sessionId={sessionId}
                 sessionGroupId={openGroupRow.id}
+                submissionId={openSub?.id}
                 // T3.3: chưa tải xong nét vẽ → chặn vẽ + chặn lưu.
                 dataReady={isAnnReady(openAnn)}
                 autoFullscreen

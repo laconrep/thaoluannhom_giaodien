@@ -354,6 +354,7 @@ export function IndividualBoard({
           // T3.3: chưa tải xong nét vẽ → chặn vẽ + chặn lưu, chống ghi đè mất dữ liệu.
           dataReady={isAnnReady(openAnn)}
           autoFullscreen
+          submissionId={openSub?.id}
           onSave={async (data, score) => {
             await saveAnnotationAction({
               sessionId: session.id,

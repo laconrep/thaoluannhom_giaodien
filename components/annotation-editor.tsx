@@ -16,6 +16,11 @@ import {
 import { FileViewer } from "@/components/annotation/file-viewer"
 import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
 import { isSignUrl } from "@/lib/file-url"
+import { extractCanvaUrl } from "@/lib/canva"
+import {
+  getLinkRenderStatusAction,
+  requestLinkRenderAction,
+} from "@/app/link-render-actions"
 import { useFullscreen } from "@/lib/use-fullscreen"
 import { cn } from "@/lib/utils"
 import { isRichTextEmpty } from "@/lib/rich-text"
@@ -30,6 +35,7 @@ import {
   FileText,
   File as FileIcon,
   Loader2,
+  Camera,
 } from "lucide-react"
 
 type Tool = AnnotationTool
@@ -38,6 +44,80 @@ type TextItem = Extract<AnnotationItem, { kind: "text" }>
 function fileIcon(kind: string) {
   if (kind === "docx") return FileText
   return FileIcon
+}
+
+// Điều khiển "chụp link Canva thành ảnh": tạo yêu cầu → trạm chấm của giáo
+// viên chụp từng trang bằng trình duyệt → ảnh được gắn vào bài nộp. Poll
+// trạng thái 5s/lần khi đang chờ/đang chụp.
+function LinkRenderControl({ submissionId }: { submissionId: string }) {
+  const [status, setStatus] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [note, setNote] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let stop = false
+    const load = async () => {
+      const r = await getLinkRenderStatusAction(submissionId)
+      if (stop || !r.ok) return
+      setStatus(r.status)
+      setErrorMessage(r.errorMessage ?? null)
+    }
+    load()
+    if (status !== "pending" && status !== "processing") return
+    const t = setInterval(load, 5000)
+    return () => {
+      stop = true
+      clearInterval(t)
+    }
+  }, [submissionId, status])
+
+  const start = async () => {
+    setBusy(true)
+    setNote(null)
+    const r = await requestLinkRenderAction(submissionId)
+    setBusy(false)
+    if (r.ok) {
+      setStatus(r.status)
+      setErrorMessage(null)
+    } else {
+      setNote(r.error)
+    }
+  }
+
+  if (status === "pending" || status === "processing") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-amber-900">
+        <Loader2 className="size-3.5 animate-spin" />
+        {status === "pending"
+          ? "Đã gửi yêu cầu — đang chờ trạm chụp link…"
+          : "Trạm đang chụp link thành ảnh…"}
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-2 flex-wrap">
+      <Button type="button" size="sm" variant="outline" onClick={start} disabled={busy}>
+        {busy ? (
+          <Loader2 className="size-3.5 animate-spin mr-1" />
+        ) : (
+          <Camera className="size-3.5 mr-1" />
+        )}
+        {status === "done" ? "Chụp lại link thành ảnh" : "Chụp link thành ảnh"}
+      </Button>
+      {status === "done" && (
+        <span className="text-xs text-emerald-700">
+          Đã chụp xong — đóng khung chấm rồi mở lại bài này để xem các trang ảnh.
+        </span>
+      )}
+      {status === "error" && (
+        <span className="text-xs text-red-600">
+          Chụp lỗi: {errorMessage ?? "không rõ lý do"} — bấm chụp lại để thử tiếp.
+        </span>
+      )}
+      {note && <span className="text-xs text-red-600">{note}</span>}
+    </span>
+  )
 }
 
 // Ảnh thu nhỏ ở thanh chọn file: signed URL lưu trong DB hết hạn sau 7 ngày
@@ -68,6 +148,7 @@ export function AnnotationEditor({
   sessionId,
   sessionGroupId,
   groupLabel,
+  submissionId,
   onSave,
   onClose,
 }: {
@@ -88,18 +169,41 @@ export function AnnotationEditor({
   sessionId?: string
   sessionGroupId?: string | null
   groupLabel?: string
+  /** Có prop này + bài có link Canva => hiện nút "Chụp link thành ảnh" */
+  submissionId?: string
   onSave: (data: AnnotationItem[], score: number | null) => Promise<void> | void
   onClose: () => void
 }) {
-  const hasFiles = files.length > 0
+  // Bài HS nộp link Canva (dán trong text_content, không kèm file): thêm 1
+  // "file ảo" Canva ở cuối danh sách để khung chấm hiện trình xem nhúng và
+  // chấm lên được như file thường. Vị trí cuối phải nhất quán với trang kết
+  // quả của HS (results-viewer cũng thêm ở cuối) để dấu chấm khớp fileIndex.
+  const canvaUrl = useMemo(() => extractCanvaUrl(textContent), [textContent])
+  const effFiles = useMemo<SubmissionFile[]>(
+    () =>
+      canvaUrl && !files.some((f) => f.kind === "canva")
+        ? [
+            ...files,
+            {
+              url: canvaUrl,
+              name: "Bài Canva",
+              kind: "canva",
+              mime: "",
+              rotation: 0,
+            },
+          ]
+        : files,
+    [files, canvaUrl],
+  )
+  const hasFiles = effFiles.length > 0
   const hasText = !isRichTextEmpty(textContent)
   const [currentIdx, setCurrentIdx] = useState<number>(hasFiles ? 0 : -1)
   const [rotations, setRotations] = useState<number[]>(() =>
-    files.map((f) => f.rotation ?? 0),
+    effFiles.map((f) => f.rotation ?? 0),
   )
   useEffect(() => {
-    setRotations(files.map((f) => f.rotation ?? 0))
-  }, [files])
+    setRotations(effFiles.map((f) => f.rotation ?? 0))
+  }, [effFiles])
 
   const [items, setItems] = useState<AnnotationItem[]>(initialData)
   // T3.3: data tải lười về SAU khi editor đã mở → nạp vào items.
@@ -163,7 +267,7 @@ export function AnnotationEditor({
     onClose()
   }
 
-  const currentFile = currentIdx >= 0 ? files[currentIdx] : null
+  const currentFile = currentIdx >= 0 ? effFiles[currentIdx] : null
   // Signed URL của file hiện tại hết hạn sau 7 ngày → xin cấp mới (cho đường fetch DOCX).
   const freshCurrentUrl = useFreshFileUrl(currentFile?.url)
   const currentRotation = currentIdx >= 0 ? rotations[currentIdx] ?? 0 : 0
@@ -171,11 +275,12 @@ export function AnnotationEditor({
   const isPdf = currentFile?.kind === "pdf"
   const isDocx = currentFile?.kind === "docx"
   const isPptx = currentFile?.kind === "pptx"
-  // PPT: khi đang dùng công cụ chấm (không phải bàn tay) thì khóa iframe để
-  // không tương tác được với file, chuột chỉ dùng để đặt dấu/vẽ.
-  const annotateLocked = isPptx && tool !== "pan"
+  const isCanva = currentFile?.kind === "canva"
+  // PPT/Canva (iframe nhúng): khi đang dùng công cụ chấm (không phải bàn tay)
+  // thì khóa iframe để không tương tác được với file, chuột chỉ dùng để đặt dấu/vẽ.
+  const annotateLocked = (isPptx || isCanva) && tool !== "pan"
   // PDF render từng trang bằng PDF.js ngay trong trang → chấm được như Word/ảnh.
-  const canAnnotate = isImage || currentIdx === -1 || isDocx || isPptx || isPdf
+  const canAnnotate = isImage || currentIdx === -1 || isDocx || isPptx || isPdf || isCanva
   const annotationKey = currentIdx
   const showAnnotations = canAnnotate && !presentationMode
 
@@ -588,9 +693,9 @@ export function AnnotationEditor({
       ) {
         deleteSelectedText()
       }
-      if (e.key === "ArrowLeft" && files.length > 1) setCurrentIdx((i) => Math.max(0, i - 1))
-      if (e.key === "ArrowRight" && files.length > 1)
-        setCurrentIdx((i) => Math.min(files.length - 1, i + 1))
+      if (e.key === "ArrowLeft" && effFiles.length > 1) setCurrentIdx((i) => Math.max(0, i - 1))
+      if (e.key === "ArrowRight" && effFiles.length > 1)
+        setCurrentIdx((i) => Math.min(effFiles.length - 1, i + 1))
       if (e.key === "0") {
         setZoomText(null)
         setZoomLevel(1)
@@ -601,7 +706,7 @@ export function AnnotationEditor({
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingText, selectedTextIdx, files.length, presentationMode, isFullscreen, membersOpen])
+  }, [pendingText, selectedTextIdx, effFiles.length, presentationMode, isFullscreen, membersOpen])
 
   // Tự ẩn toolbar sau vài giây không dùng
   function kickToolbar() {
@@ -728,7 +833,7 @@ export function AnnotationEditor({
       )}
 
       {/* File thumb strip */}
-      {(files.length > 0 || hasText) && !presentationMode && (
+      {(effFiles.length > 0 || hasText) && !presentationMode && (
         <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1 bg-card/95 backdrop-blur border rounded-lg p-1 shadow-sm max-w-[70vw] overflow-x-auto no-scrollbar">
           {hasText && (
             <button
@@ -743,7 +848,7 @@ export function AnnotationEditor({
               Văn bản
             </button>
           )}
-          {files.map((f, i) => {
+          {effFiles.map((f, i) => {
             const selected = currentIdx === i
             const Icon = fileIcon(f.kind)
             return (
@@ -775,8 +880,19 @@ export function AnnotationEditor({
         </div>
       )}
 
+      {/* Bài Canva: nút yêu cầu trạm chụp link thành ảnh (để AI chấm được) */}
+      {isCanva && submissionId && !presentationMode && (
+        <div className="px-3 py-2 border-b bg-amber-50 flex items-center gap-3 flex-wrap">
+          <span className="text-xs text-amber-900">
+            Bài này nộp bằng link Canva — chấm tay trực tiếp trên khung xem, hoặc
+            chụp link thành ảnh để chấm bằng AI:
+          </span>
+          <LinkRenderControl submissionId={submissionId} />
+        </div>
+      )}
+
       {/* File nav arrows */}
-      {files.length > 1 && !presentationMode && (
+      {effFiles.length > 1 && !presentationMode && (
         <>
           <button
             type="button"
@@ -789,8 +905,8 @@ export function AnnotationEditor({
           </button>
           <button
             type="button"
-            onClick={() => setCurrentIdx((i) => Math.min(files.length - 1, i + 1))}
-            disabled={currentIdx >= files.length - 1}
+            onClick={() => setCurrentIdx((i) => Math.min(effFiles.length - 1, i + 1))}
+            disabled={currentIdx >= effFiles.length - 1}
             className="absolute right-3 top-1/2 -translate-y-1/2 z-20 bg-card/90 hover:bg-card border shadow rounded-full p-2 disabled:opacity-40"
             aria-label="Sau"
           >
@@ -886,6 +1002,7 @@ export function AnnotationEditor({
                 isPdf={isPdf}
                 isDocx={isDocx}
                 isPptx={isPptx}
+                isCanva={isCanva}
                 currentRotation={currentRotation}
                 fileIndex={currentIdx}
                 docxBoxRef={docxBoxRef}

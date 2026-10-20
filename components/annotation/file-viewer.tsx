@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import type { SubmissionFile } from "@/lib/types"
 import { Download, File as FileIcon, Hand, Loader2 } from "lucide-react"
 import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
+import { useCanvaEmbedUrl } from "@/hooks/use-canva-embed-url"
 import { isSignUrl } from "@/lib/file-url"
 
 export function officeEmbed(url: string) {
@@ -19,6 +20,7 @@ export type FileViewerProps = {
   isPdf: boolean
   isDocx: boolean
   isPptx: boolean
+  isCanva: boolean
   currentRotation: number
   fileIndex: number
   docxBoxRef: RefObject<HTMLDivElement | null>
@@ -40,6 +42,7 @@ export function FileViewer(props: FileViewerProps) {
     isPdf,
     isDocx,
     isPptx,
+    isCanva,
     currentRotation,
     fileIndex,
     docxBoxRef,
@@ -53,6 +56,47 @@ export function FileViewer(props: FileViewerProps) {
   const freshUrl = useFreshFileUrl(file.url)
   const refreshing = isSignUrl(file.url) && !freshUrl
   const src = freshUrl ?? file.url
+
+  // Bài Canva: đổi link HS dán thành URL nhúng chuẩn rồi mới hiện iframe.
+  const canvaEmbedUrl = useCanvaEmbedUrl(isCanva ? file.url : undefined)
+
+  if (isCanva) {
+    if (!canvaEmbedUrl) {
+      return (
+        <div className="flex items-center justify-center min-h-[50vh] text-muted-foreground gap-2 text-sm">
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          Đang tải bài Canva…
+        </div>
+      )
+    }
+    return (
+      <div className="w-[1000px] h-[78vh] relative mx-auto">
+        <iframe
+          src={canvaEmbedUrl}
+          title={file.name}
+          allow="fullscreen"
+          className={cn(
+            "w-full h-full rounded-md border bg-white",
+            // Khóa iframe khi đang chấm (giống PPTX): chuột chỉ để đặt dấu.
+            annotateLocked && "pointer-events-none",
+          )}
+        />
+        {annotateLocked && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-background/90 border shadow px-3 py-1 text-xs text-muted-foreground pointer-events-none max-w-[90%] text-center">
+            <Hand className="size-3.5 shrink-0" />
+            Dấu gắn theo khung xem, không chạy theo trang Canva — chấm trang nào thì để yên trang đó, lật trang hãy xóa dấu cũ
+          </div>
+        )}
+        <div className="absolute top-2 right-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
+          <Button asChild variant="outline" size="sm" className="gap-1">
+            <a href={file.url} target="_blank" rel="noreferrer">
+              Mở Canva gốc
+            </a>
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   if (refreshing) {
     return (

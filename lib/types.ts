@@ -240,7 +240,7 @@ export type SessionSlotRow = {
   student_id: string | null
 }
 
-export type SubmissionFileKind = "image" | "pdf" | "docx" | "pptx" | "other"
+export type SubmissionFileKind = "image" | "pdf" | "docx" | "pptx" | "canva" | "other"
 
 export type SubmissionFile = {
   url: string
