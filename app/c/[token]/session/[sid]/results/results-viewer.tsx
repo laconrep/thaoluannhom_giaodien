@@ -30,6 +30,22 @@ function officeUrl(url: string) {
   return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
 }
 
+// Ảnh thu nhỏ trong thanh chọn file: signed URL lưu trong DB hết hạn sau 7 ngày
+// → xin cấp URL mới như ảnh chính.
+function FileThumb({ f }: { f: SubmissionFile }) {
+  const fresh = useFreshFileUrl(f.url)
+  return (
+    <Image
+      src={fresh || "/placeholder.svg"}
+      alt=""
+      fill
+      sizes="56px"
+      className="object-cover"
+      style={{ transform: `rotate(${f.rotation ?? 0}deg)` }}
+    />
+  )
+}
+
 export function ResultsViewer({
   className,
   session,
@@ -149,7 +165,7 @@ export function ResultsViewer({
                     )}
                     {session.allow_download && file?.url && (
                       <Button asChild size="sm" variant="outline">
-                        <a href={file.url} download={file.name}>
+                        <a href={freshFileUrl ?? file.url} download={file.name}>
                           <Download className="size-4 mr-2" aria-hidden="true" />
                           Tải xuống
                         </a>
@@ -187,14 +203,7 @@ export function ResultsViewer({
                           }`}
                         >
                           {f.kind === "image" ? (
-                            <Image
-                              src={f.url || "/placeholder.svg"}
-                              alt=""
-                              fill
-                              sizes="56px"
-                              className="object-cover"
-                              style={{ transform: `rotate(${f.rotation ?? 0}deg)` }}
-                            />
+                            <FileThumb f={f} />
                           ) : f.kind === "pptx" ? (
                             <Presentation className="size-5 text-muted-foreground" />
                           ) : f.kind === "docx" ? (
@@ -232,9 +241,9 @@ export function ResultsViewer({
                         </Button>
                       </>
                     ) : file?.kind === "pdf" ? (
-                      <iframe src={file.url} className="w-full h-[80vh]" title={file.name} />
+                      <iframe src={freshFileUrl ?? file.url} className="w-full h-[80vh]" title={file.name} />
                     ) : file?.kind === "docx" || file?.kind === "pptx" ? (
-                      <iframe src={officeUrl(file.url)} className="w-full h-[80vh]" title={file.name} />
+                      <iframe src={officeUrl(freshFileUrl ?? file.url)} className="w-full h-[80vh]" title={file.name} />
                     ) : (
                       <p className="p-8 text-muted-foreground">Không có file để xem</p>
                     )}

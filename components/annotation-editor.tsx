@@ -14,6 +14,8 @@ import {
   type AnnotationTool,
 } from "@/components/annotation/annotation-toolbar"
 import { FileViewer } from "@/components/annotation/file-viewer"
+import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
+import { isSignUrl } from "@/lib/file-url"
 import { useFullscreen } from "@/lib/use-fullscreen"
 import { cn } from "@/lib/utils"
 import { isRichTextEmpty } from "@/lib/rich-text"
@@ -36,6 +38,22 @@ type TextItem = Extract<AnnotationItem, { kind: "text" }>
 function fileIcon(kind: string) {
   if (kind === "docx") return FileText
   return FileIcon
+}
+
+// Ảnh thu nhỏ ở thanh chọn file: signed URL lưu trong DB hết hạn sau 7 ngày
+// → xin cấp URL mới như ảnh chính trong khung chấm.
+function FileThumbImg({ f, rotation }: { f: SubmissionFile; rotation: number }) {
+  const fresh = useFreshFileUrl(f.url)
+  return (
+    <Image
+      src={fresh || "/placeholder.svg"}
+      alt={f.name}
+      fill
+      sizes="40px"
+      className="object-cover"
+      style={{ transform: `rotate(${rotation}deg)` }}
+    />
+  )
 }
 
 export function AnnotationEditor({
@@ -146,6 +164,8 @@ export function AnnotationEditor({
   }
 
   const currentFile = currentIdx >= 0 ? files[currentIdx] : null
+  // Signed URL của file hiện tại hết hạn sau 7 ngày → xin cấp mới (cho đường fetch DOCX).
+  const freshCurrentUrl = useFreshFileUrl(currentFile?.url)
   const currentRotation = currentIdx >= 0 ? rotations[currentIdx] ?? 0 : 0
   const isImage = currentFile?.kind === "image"
   const isPdf = currentFile?.kind === "pdf"
@@ -172,9 +192,13 @@ export function AnnotationEditor({
     }
     let cancelled = false
     setDocxLoading(true)
+    // File cũ có signed URL đã hết hạn: chờ URL mới rồi mới tải, tránh fetch link chết.
+    if (isSignUrl(currentFile.url) && !freshCurrentUrl) {
+      return
+    }
     ;(async () => {
       try {
-        const res = await fetch(currentFile.url)
+        const res = await fetch(freshCurrentUrl ?? currentFile.url)
         if (!res.ok) throw new Error("Không tải được tệp")
         const blob = await res.blob()
         if (cancelled) return
@@ -203,8 +227,10 @@ export function AnnotationEditor({
       cancelled = true
       if (el) el.replaceChildren()
     }
+    // freshCurrentUrl nằm trong deps: URL mới được cấp (file cũ hết hạn) phải
+    // chạy lại effect để tải file, nếu không sẽ kẹt ở trạng thái chờ.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIdx])
+  }, [currentIdx, freshCurrentUrl])
 
   const filteredItems = useMemo(() => {
     if (!canAnnotate) return []
@@ -733,14 +759,7 @@ export function AnnotationEditor({
               >
                 {f.kind === "image" ? (
                   <span className="block relative w-full h-full">
-                    <Image
-                      src={f.url || "/placeholder.svg"}
-                      alt={f.name}
-                      fill
-                      sizes="40px"
-                      className="object-cover"
-                      style={{ transform: `rotate(${rotations[i] ?? 0}deg)` }}
-                    />
+                    <FileThumbImg f={f} rotation={rotations[i] ?? 0} />
                   </span>
                 ) : (
                   <div className="w-full h-full bg-muted/60 grid place-items-center text-muted-foreground">
