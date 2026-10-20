@@ -221,6 +221,8 @@ export type AnnotationStamp = {
   y: number
   fontSize: number
   fileIndex?: number
+  // Chi cho file nhung (PPTX/Canva): so slide/trang ma dau gan vao (mac dinh 1).
+  slide?: number
 }
 
 export type SessionGroupRow = {
@@ -268,6 +270,8 @@ export type AnnotationDrawPath = {
   width: number
   points: { x: number; y: number }[]
   fileIndex?: number
+  // Chi cho file nhung (PPTX/Canva): so slide/trang ma dau gan vao (mac dinh 1).
+  slide?: number
 }
 export type AnnotationText = {
   kind: "text"
@@ -277,6 +281,8 @@ export type AnnotationText = {
   text: string
   fontSize: number
   fileIndex?: number
+  // Chi cho file nhung (PPTX/Canva): so slide/trang ma dau gan vao (mac dinh 1).
+  slide?: number
 }
 export type AnnotationHighlight = {
   kind: "highlight"
@@ -286,6 +292,8 @@ export type AnnotationHighlight = {
   w: number
   h: number
   fileIndex?: number
+  // Chi cho file nhung (PPTX/Canva): so slide/trang ma dau gan vao (mac dinh 1).
+  slide?: number
 }
 export type AnnotationUnderline = {
   kind: "underline"
@@ -295,6 +303,8 @@ export type AnnotationUnderline = {
   x2: number
   y2: number
   fileIndex?: number
+  // Chi cho file nhung (PPTX/Canva): so slide/trang ma dau gan vao (mac dinh 1).
+  slide?: number
 }
 export type AnnotationItem =
   | AnnotationDrawPath

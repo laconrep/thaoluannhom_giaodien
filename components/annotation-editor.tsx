@@ -14,6 +14,7 @@ import {
   type AnnotationTool,
 } from "@/components/annotation/annotation-toolbar"
 import { FileViewer } from "@/components/annotation/file-viewer"
+import { EmbedSlideBar } from "@/components/embed-slide-bar"
 import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
 import { isSignUrl } from "@/lib/file-url"
 import { extractCanvaUrl } from "@/lib/canva"
@@ -283,6 +284,11 @@ export function AnnotationEditor({
   const canAnnotate = isImage || currentIdx === -1 || isDocx || isPptx || isPdf || isCanva
   const annotationKey = currentIdx
   const showAnnotations = canAnnotate && !presentationMode
+  const isEmbed = isPptx || isCanva
+  // Slide/trang hiện tại của file nhúng: app ra lệnh khung xem mở đúng slide
+  // này (PPTX: wdSlideIndex, Canva: #N) và chỉ hiện/gắn dấu của slide đó —
+  // dấu lưu riêng từng slide, qua slide không còn bị mất.
+  const [embedSlide, setEmbedSlide] = useState(1)
 
   // Render tệp .docx bằng docx-preview thành DOM thuần (thay iframe Office):
   // scroll trang tự nhiên theo viewport, dấu bám nội dung, chấm chính xác như ảnh.
@@ -341,8 +347,24 @@ export function AnnotationEditor({
     if (!canAnnotate) return []
     return items
       .map((it, origIdx) => ({ it, origIdx }))
-      .filter(({ it }) => (it.fileIndex ?? -1) === annotationKey)
-  }, [items, annotationKey, canAnnotate])
+      .filter(
+        ({ it }) =>
+          (it.fileIndex ?? -1) === annotationKey &&
+          (!isEmbed || (it.slide ?? 1) === embedSlide),
+      )
+  }, [items, annotationKey, canAnnotate, isEmbed, embedSlide])
+
+  // Số dấu trên từng slide của file nhúng hiện tại (cho thanh chọn slide).
+  const slideCounts = useMemo(() => {
+    const m = new Map<number, number>()
+    if (!isEmbed) return m
+    for (const it of items) {
+      if ((it.fileIndex ?? -1) !== annotationKey) continue
+      const s = it.slide ?? 1
+      m.set(s, (m.get(s) ?? 0) + 1)
+    }
+    return m
+  }, [items, annotationKey, isEmbed])
 
   const drawingRef = useRef<{
     active: boolean
@@ -365,6 +387,7 @@ export function AnnotationEditor({
   useEffect(() => {
     setPendingText(null)
     setSelectedTextIdx(null)
+    setEmbedSlide(1)
     drawingRef.current = { active: false, origIdx: -1, start: null }
     panRef.current.active = false
     if (!canAnnotate) setTool("pan")
@@ -383,6 +406,26 @@ export function AnnotationEditor({
     })
   }
   function clearAll() {
+    if (isEmbed) {
+      // File nhúng: thùng rác chỉ xóa bộ dấu của slide/trang đang chọn.
+      const noun = isCanva ? "trang" : "slide"
+      if (
+        !confirm(
+          `Xóa toàn bộ dấu ở ${noun} ${embedSlide} của tệp này? (Dấu ở các ${noun} khác vẫn giữ nguyên.)`,
+        )
+      )
+        return
+      pushHistory()
+      setItems((cur) =>
+        cur.filter(
+          (it) =>
+            (it.fileIndex ?? -1) !== annotationKey ||
+            (it.slide ?? 1) !== embedSlide,
+        ),
+      )
+      setSelectedTextIdx(null)
+      return
+    }
     if (!confirm("Xóa toàn bộ ghi chú trên tệp này?")) return
     pushHistory()
     setItems((cur) => cur.filter((it) => (it.fileIndex ?? -1) !== annotationKey))
@@ -433,7 +476,7 @@ export function AnnotationEditor({
           x,
           y,
           fontSize: 13,
-          fileIndex: annotationKey,
+          fileIndex: annotationKey, slide: isEmbed ? embedSlide : undefined,
         },
       ])
       return
@@ -447,7 +490,7 @@ export function AnnotationEditor({
         color,
         width: 3,
         points: [{ x, y }],
-        fileIndex: annotationKey,
+        fileIndex: annotationKey, slide: isEmbed ? embedSlide : undefined,
       }
       setItems((cur) => {
         const n = [...cur, item]
@@ -462,7 +505,7 @@ export function AnnotationEditor({
         y,
         w: 0,
         h: 0,
-        fileIndex: annotationKey,
+        fileIndex: annotationKey, slide: isEmbed ? embedSlide : undefined,
       }
       setItems((cur) => {
         const n = [...cur, item]
@@ -477,7 +520,7 @@ export function AnnotationEditor({
         y1: y,
         x2: x,
         y2: y,
-        fileIndex: annotationKey,
+        fileIndex: annotationKey, slide: isEmbed ? embedSlide : undefined,
       }
       setItems((cur) => {
         const n = [...cur, item]
@@ -540,7 +583,7 @@ export function AnnotationEditor({
             y: pendingText.y,
             text: t,
             fontSize: 20,
-            fileIndex: annotationKey,
+            fileIndex: annotationKey, slide: isEmbed ? embedSlide : undefined,
           },
         ]
         setSelectedTextIdx(next.length - 1)
@@ -891,6 +934,27 @@ export function AnnotationEditor({
         </div>
       )}
 
+      {/* File nhúng (PPTX/Canva): thanh chọn slide — app ra lệnh khung xem lật
+          slide và đổi bộ dấu cùng lúc, dấu lưu riêng từng slide. */}
+      {isEmbed && !presentationMode && (
+        <div className="px-3 py-2 border-b">
+          <EmbedSlideBar
+            slide={embedSlide}
+            onSlide={setEmbedSlide}
+            counts={slideCounts}
+            noun={isCanva ? "Trang" : "Slide"}
+            verb="đang chấm"
+          />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Hãy lật {isCanva ? "trang" : "slide"} bằng thanh này (không lật bằng
+            nút bên trong khung xem) để dấu theo đúng{" "}
+            {isCanva ? "trang" : "slide"}.
+            {isPptx &&
+              " PowerPoint nạp lại khung xem mỗi lần lật nên chờ một chút."}
+          </p>
+        </div>
+      )}
+
       {/* File nav arrows */}
       {effFiles.length > 1 && !presentationMode && (
         <>
@@ -1009,6 +1073,7 @@ export function AnnotationEditor({
                 docxLoading={docxLoading}
                 docxError={docxError}
                 annotateLocked={annotateLocked}
+                slide={embedSlide}
               />
             ) : (
               <div className="p-6 min-h-[70vh] min-w-[600px] grid place-items-center text-muted-foreground">

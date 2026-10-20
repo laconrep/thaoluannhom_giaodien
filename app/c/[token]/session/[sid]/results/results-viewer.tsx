@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import type {
   SessionRow,
@@ -17,6 +17,7 @@ import { isRichTextEmpty } from "@/lib/rich-text"
 import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
 import { useCanvaEmbedUrl } from "@/hooks/use-canva-embed-url"
 import { extractCanvaUrl } from "@/lib/canva"
+import { EmbedSlideBar } from "@/components/embed-slide-bar"
 
 function getFiles(sub?: SubmissionRow): SubmissionFile[] {
   if (!sub) return []
@@ -64,6 +65,13 @@ export function ResultsViewer({
   const [activeId, setActiveId] = useState<string | null>(groups[0]?.id ?? null)
   const [activeFileIdx, setActiveFileIdx] = useState(0)
   const [viewRotation, setViewRotation] = useState(0)
+  // Slide/trang hiện tại khi xem file nhúng (PPTX/Canva): dấu chấm được lưu
+  // riêng theo từng slide — chọn slide nào thì iframe mở slide đó + hiện
+  // đúng bộ dấu của slide đó.
+  const [embedSlide, setEmbedSlide] = useState(1)
+  useEffect(() => {
+    setEmbedSlide(1)
+  }, [activeId, activeFileIdx])
 
   const subsByGroup = useMemo(() => {
     const m: Record<string, SubmissionRow> = {}
@@ -98,6 +106,17 @@ export function ResultsViewer({
         ]
       : baseFiles
   const file = files[activeFileIdx]
+  const isEmbedFile = file?.kind === "pptx" || file?.kind === "canva"
+  const slideCounts = useMemo(() => {
+    const m = new Map<number, number>()
+    if (!isEmbedFile || !ann?.data) return m
+    for (const it of ann.data as AnnotationItem[]) {
+      if ((it.fileIndex ?? 0) !== activeFileIdx) continue
+      const s = it.slide ?? 1
+      m.set(s, (m.get(s) ?? 0) + 1)
+    }
+    return m
+  }, [ann?.data, activeFileIdx, isEmbedFile])
   // Signed URL hết hạn sau 7 ngày → đổi lấy URL mới trước khi hiện.
   const freshFileUrl = useFreshFileUrl(file?.url)
   const canvaEmbedUrl = useCanvaEmbedUrl(
@@ -236,6 +255,17 @@ export function ResultsViewer({
                       ))}
                     </div>
                   )}
+                  {isEmbedFile && (
+                    <div className="p-2 border-b">
+                      <EmbedSlideBar
+                        slide={embedSlide}
+                        onSlide={setEmbedSlide}
+                        counts={slideCounts}
+                        noun={file?.kind === "canva" ? "Trang" : "Slide"}
+                        verb="đang xem"
+                      />
+                    </div>
+                  )}
                   <div className="relative bg-muted/20 flex items-center justify-center min-h-[60vh]">
                     {file?.kind === "image" ? (
                       <>
@@ -264,16 +294,19 @@ export function ResultsViewer({
                     ) : file?.kind === "canva" ? (
                       <div className="relative w-full">
                         {canvaEmbedUrl ? (
-                          <iframe src={canvaEmbedUrl} className="w-full h-[80vh]" title={file.name} />
+                          <iframe src={`${canvaEmbedUrl}#${embedSlide}`} className="w-full h-[80vh]" title={file.name} />
                         ) : (
                           <p className="p-8 text-muted-foreground">Đang tải bài Canva…</p>
                         )}
-                        {ann?.data && <AnnotationOverlay items={ann.data as AnnotationItem[]} fileIdx={activeFileIdx} />}
+                        {ann?.data && <AnnotationOverlay items={ann.data as AnnotationItem[]} fileIdx={activeFileIdx} slide={embedSlide} />}
                       </div>
                     ) : file?.kind === "pdf" ? (
                       <iframe src={freshFileUrl ?? file.url} className="w-full h-[80vh]" title={file.name} />
                     ) : file?.kind === "docx" || file?.kind === "pptx" ? (
-                      <iframe src={officeUrl(freshFileUrl ?? file.url)} className="w-full h-[80vh]" title={file.name} />
+                      <>
+                        <iframe src={`${officeUrl(freshFileUrl ?? file.url)}${file?.kind === "pptx" ? `&wdSlideIndex=${embedSlide}` : ""}`} className="w-full h-[80vh]" title={file.name} />
+                        {file?.kind === "pptx" && ann?.data && <AnnotationOverlay items={ann.data as AnnotationItem[]} fileIdx={activeFileIdx} slide={embedSlide} />}
+                      </>
                     ) : (
                       <p className="p-8 text-muted-foreground">Không có file để xem</p>
                     )}
@@ -292,8 +325,12 @@ export function ResultsViewer({
   )
 }
 
-function AnnotationOverlay({ items, fileIdx }: { items: AnnotationItem[]; fileIdx: number }) {
-  const relevant = items.filter((it) => (it.fileIndex ?? 0) === fileIdx)
+function AnnotationOverlay({ items, fileIdx, slide }: { items: AnnotationItem[]; fileIdx: number; slide?: number }) {
+  const relevant = items.filter(
+    (it) =>
+      (it.fileIndex ?? 0) === fileIdx &&
+      (slide === undefined || (it.slide ?? 1) === slide),
+  )
   return (
     <div className="pointer-events-none absolute inset-0">
       {relevant.map((it, i) => {

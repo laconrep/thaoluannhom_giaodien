@@ -27,6 +27,9 @@ export type FileViewerProps = {
   docxLoading: boolean
   docxError: boolean
   annotateLocked: boolean
+  /** Slide/trang hiện tại cho file nhúng (PPTX/Canva) — app ra lệnh khung xem
+   * mở đúng slide này (PPTX: wdSlideIndex, Canva: #N) để dấu theo đúng slide. */
+  slide?: number
 }
 
 /**
@@ -49,6 +52,7 @@ export function FileViewer(props: FileViewerProps) {
     docxLoading,
     docxError,
     annotateLocked,
+    slide = 1,
   } = props
 
   // Signed URL lưu trong DB hết hạn sau 7 ngày → đổi lấy URL mới trước khi hiện,
@@ -72,7 +76,7 @@ export function FileViewer(props: FileViewerProps) {
     return (
       <div className="w-[1000px] h-[78vh] relative mx-auto">
         <iframe
-          src={canvaEmbedUrl}
+          src={`${canvaEmbedUrl}#${slide}`}
           title={file.name}
           allow="fullscreen"
           className={cn(
@@ -84,7 +88,7 @@ export function FileViewer(props: FileViewerProps) {
         {annotateLocked && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-background/90 border shadow px-3 py-1 text-xs text-muted-foreground pointer-events-none max-w-[90%] text-center">
             <Hand className="size-3.5 shrink-0" />
-            Dấu gắn theo khung xem, không chạy theo trang Canva — chấm trang nào thì để yên trang đó, lật trang hãy xóa dấu cũ
+            Dấu được lưu riêng theo từng trang — lật trang bằng thanh chọn trang phía trên, dấu sẽ theo đúng trang
           </div>
         )}
         <div className="absolute top-2 right-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
@@ -184,7 +188,7 @@ export function FileViewer(props: FileViewerProps) {
     return (
       <div className="w-[1000px] h-[78vh] relative mx-auto">
         <iframe
-          src={officeEmbed(src)}
+          src={`${officeEmbed(src)}&wdSlideIndex=${slide}`}
           title={file.name}
           allow="fullscreen"
           className={cn(
@@ -196,7 +200,7 @@ export function FileViewer(props: FileViewerProps) {
         {annotateLocked && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-background/90 border shadow px-3 py-1 text-xs text-muted-foreground pointer-events-none max-w-[90%] text-center">
             <Hand className="size-3.5 shrink-0" />
-            Dấu gắn theo khung xem (không theo slide) — chuyển slide thì bấm thùng rác để xóa dấu cũ
+            Dấu được lưu riêng theo từng slide — lật slide bằng thanh chọn slide phía trên, dấu sẽ theo đúng slide
           </div>
         )}
         <div className="absolute top-2 right-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
