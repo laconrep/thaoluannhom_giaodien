@@ -840,6 +840,38 @@ export function AnnotationEditor({
         </div>
       )}
 
+      {/* File nhúng (PPTX/Canva): cụm nổi NGAY DƯỚI thanh công cụ chấm —
+          thanh chọn slide (+ nút chụp link Canva) + dòng nhắc. Để nổi cùng
+          lớp với thanh chấm thì không còn bị thanh chấm đè lên như khi đặt
+          theo dòng chảy thường. */}
+      {isEmbed && !presentationMode && (
+        <div className="absolute top-[68px] left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-1.5 w-max max-w-[97vw]">
+          <EmbedSlideBar
+            slide={embedSlide}
+            onSlide={setEmbedSlide}
+            counts={slideCounts}
+            noun={isCanva ? "Trang" : "Slide"}
+            verb="đang chấm"
+          />
+          {isCanva && submissionId && (
+            <div className="flex items-center justify-center gap-3 flex-wrap rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs text-amber-900 shadow-sm">
+              <span>
+                Bài Canva — chấm tay trên khung xem, hoặc chụp link thành ảnh
+                để chấm bằng AI:
+              </span>
+              <LinkRenderControl submissionId={submissionId} />
+            </div>
+          )}
+          <p className="text-[11px] text-muted-foreground bg-background/85 rounded-full px-2.5 py-0.5 shadow-sm text-center">
+            Hãy lật {isCanva ? "trang" : "slide"} bằng thanh này (không lật
+            bằng nút bên trong khung xem) để dấu theo đúng{" "}
+            {isCanva ? "trang" : "slide"}.
+            {isPptx &&
+              " PowerPoint nạp lại khung xem mỗi lần lật nên chờ một chút."}
+          </p>
+        </div>
+      )}
+
       {/* Selected-text mini toolbar */}
       {selectedTextIdx !== null && items[selectedTextIdx]?.kind === "text" && !presentationMode && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 bg-card/95 backdrop-blur border rounded-full shadow px-2.5 py-1.5 flex items-center gap-2 text-sm">
@@ -923,38 +955,6 @@ export function AnnotationEditor({
         </div>
       )}
 
-      {/* Bài Canva: nút yêu cầu trạm chụp link thành ảnh (để AI chấm được) */}
-      {isCanva && submissionId && !presentationMode && (
-        <div className="px-3 py-2 border-b bg-amber-50 flex items-center gap-3 flex-wrap">
-          <span className="text-xs text-amber-900">
-            Bài này nộp bằng link Canva — chấm tay trực tiếp trên khung xem, hoặc
-            chụp link thành ảnh để chấm bằng AI:
-          </span>
-          <LinkRenderControl submissionId={submissionId} />
-        </div>
-      )}
-
-      {/* File nhúng (PPTX/Canva): thanh chọn slide — app ra lệnh khung xem lật
-          slide và đổi bộ dấu cùng lúc, dấu lưu riêng từng slide. */}
-      {isEmbed && !presentationMode && (
-        <div className="px-3 py-2 border-b">
-          <EmbedSlideBar
-            slide={embedSlide}
-            onSlide={setEmbedSlide}
-            counts={slideCounts}
-            noun={isCanva ? "Trang" : "Slide"}
-            verb="đang chấm"
-          />
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            Hãy lật {isCanva ? "trang" : "slide"} bằng thanh này (không lật bằng
-            nút bên trong khung xem) để dấu theo đúng{" "}
-            {isCanva ? "trang" : "slide"}.
-            {isPptx &&
-              " PowerPoint nạp lại khung xem mỗi lần lật nên chờ một chút."}
-          </p>
-        </div>
-      )}
-
       {/* File nav arrows */}
       {effFiles.length > 1 && !presentationMode && (
         <>
@@ -984,8 +984,17 @@ export function AnnotationEditor({
         ref={viewportRef}
         className={cn(
           "flex-1 overflow-auto",
-          presentationMode ? "bg-white p-8" : "bg-muted/30 p-6 pt-20 pb-20",
+          presentationMode ? "bg-white p-8" : "bg-muted/30 p-6 pb-20",
         )}
+        style={
+          presentationMode
+            ? undefined
+            : {
+                // Chừa chỗ cho thanh chấm nổi (+ cụm chọn slide khi chấm file
+                // nhúng, + thêm 1 hàng khi có nút chụp link Canva).
+                paddingTop: isEmbed ? (isCanva && submissionId ? 176 : 140) : 80,
+              }
+        }
       >
         <div
           className="mx-auto"

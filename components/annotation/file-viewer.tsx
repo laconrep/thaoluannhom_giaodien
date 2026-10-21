@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { PdfPages } from "@/components/pdf-pages"
 import { cn } from "@/lib/utils"
 import type { SubmissionFile } from "@/lib/types"
-import { Download, File as FileIcon, Hand, Loader2 } from "lucide-react"
+import { Download, File as FileIcon, Loader2 } from "lucide-react"
 import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
 import { useCanvaEmbedUrl } from "@/hooks/use-canva-embed-url"
 import { isSignUrl } from "@/lib/file-url"
@@ -85,12 +85,6 @@ export function FileViewer(props: FileViewerProps) {
             annotateLocked && "pointer-events-none",
           )}
         />
-        {annotateLocked && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-background/90 border shadow px-3 py-1 text-xs text-muted-foreground pointer-events-none max-w-[90%] text-center">
-            <Hand className="size-3.5 shrink-0" />
-            Dấu được lưu riêng theo từng trang — lật trang bằng thanh chọn trang phía trên, dấu sẽ theo đúng trang
-          </div>
-        )}
         <div className="absolute top-2 right-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
           <Button asChild variant="outline" size="sm" className="gap-1">
             <a href={file.url} target="_blank" rel="noreferrer">
@@ -197,12 +191,6 @@ export function FileViewer(props: FileViewerProps) {
             annotateLocked && "pointer-events-none",
           )}
         />
-        {annotateLocked && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-background/90 border shadow px-3 py-1 text-xs text-muted-foreground pointer-events-none max-w-[90%] text-center">
-            <Hand className="size-3.5 shrink-0" />
-            Dấu được lưu riêng theo từng slide — lật slide bằng thanh chọn slide phía trên, dấu sẽ theo đúng slide
-          </div>
-        )}
         <div className="absolute top-2 right-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
           <Button asChild variant="outline" size="sm" className="gap-1">
             <a href={src} target="_blank" rel="noreferrer" download>
