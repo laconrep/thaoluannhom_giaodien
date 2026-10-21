@@ -39,7 +39,8 @@ export function EmbedSlideBar({
   const curCount = counts.get(slide) ?? 0
 
   return (
-    <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm shadow-sm">
+    <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-sm shadow-sm">
+      {/* Tất cả trên MỘT hàng ngang cho thanh mỏng, nhường chỗ cho bài chấm. */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="font-medium text-teal-900">
           {noun} {verb}:
@@ -61,7 +62,7 @@ export function EmbedSlideBar({
             if (e.key === "Enter") (e.target as HTMLInputElement).blur()
           }}
           inputMode="numeric"
-          className="w-14 rounded-md border border-teal-300 bg-white px-2 py-1 text-center font-semibold text-teal-900"
+          className="w-14 rounded-md border border-teal-300 bg-white px-2 py-0.5 text-center font-semibold text-teal-900"
           aria-label={`Số ${noun.toLowerCase()}`}
         />
         <button
@@ -75,27 +76,28 @@ export function EmbedSlideBar({
         <span className="text-teal-800">
           • {noun} này: <strong>{curCount} dấu</strong>
         </span>
+        {marked.length > 0 && (
+          <span className="flex flex-wrap items-center gap-1 text-xs text-teal-800">
+            <span className="text-teal-300">|</span>
+            <span>Đã có dấu ở {noun.toLowerCase()}:</span>
+            {marked.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => onSlide(n)}
+                className={`rounded-full px-2 py-0.5 font-medium ${
+                  n === slide
+                    ? "bg-teal-600 text-white"
+                    : "bg-white text-teal-800 ring-1 ring-teal-300 hover:bg-teal-100"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+            <span className="text-teal-600">(bấm số để nhảy tới)</span>
+          </span>
+        )}
       </div>
-      {marked.length > 0 && (
-        <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-teal-800">
-          <span>Đã có dấu ở {noun.toLowerCase()}:</span>
-          {marked.map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => onSlide(n)}
-              className={`rounded-full px-2 py-0.5 font-medium ${
-                n === slide
-                  ? "bg-teal-600 text-white"
-                  : "bg-white text-teal-800 ring-1 ring-teal-300 hover:bg-teal-100"
-              }`}
-            >
-              {n}
-            </button>
-          ))}
-          <span className="text-teal-600">(bấm số để nhảy tới)</span>
-        </div>
-      )}
     </div>
   )
 }
