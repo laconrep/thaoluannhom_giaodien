@@ -862,13 +862,6 @@ export function AnnotationEditor({
               <LinkRenderControl submissionId={submissionId} />
             </div>
           )}
-          <p className="text-[11px] text-muted-foreground bg-background/85 rounded-full px-2.5 py-0.5 shadow-sm text-center">
-            Hãy lật {isCanva ? "trang" : "slide"} bằng thanh này (không lật
-            bằng nút bên trong khung xem) để dấu theo đúng{" "}
-            {isCanva ? "trang" : "slide"}.
-            {isPptx &&
-              " PowerPoint nạp lại khung xem mỗi lần lật nên chờ một chút."}
-          </p>
         </div>
       )}
 
@@ -990,9 +983,9 @@ export function AnnotationEditor({
           presentationMode
             ? undefined
             : {
-                // Chừa chỗ cho thanh chấm nổi (+ cụm chọn slide khi chấm file
-                // nhúng, + thêm 1 hàng khi có nút chụp link Canva).
-                paddingTop: isEmbed ? (isCanva && submissionId ? 176 : 140) : 80,
+                // Chừa chỗ cho thanh chấm nổi (+ thanh chọn slide khi chấm
+                // file nhúng, + thêm 1 hàng khi có nút chụp link Canva).
+                paddingTop: isEmbed ? (isCanva && submissionId ? 148 : 112) : 80,
               }
         }
       >

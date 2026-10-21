@@ -39,9 +39,9 @@ export function EmbedSlideBar({
   const curCount = counts.get(slide) ?? 0
 
   return (
-    <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-sm shadow-sm">
+    <div className="rounded-lg border border-teal-200 bg-teal-50 px-2 py-1 text-[13px] shadow-sm">
       {/* Tất cả trên MỘT hàng ngang cho thanh mỏng, nhường chỗ cho bài chấm. */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
         <span className="font-medium text-teal-900">
           {noun} {verb}:
         </span>
@@ -49,10 +49,10 @@ export function EmbedSlideBar({
           type="button"
           onClick={() => onSlide(Math.max(1, slide - 1))}
           disabled={slide <= 1}
-          className="rounded-md border border-teal-300 bg-white p-1 text-teal-800 hover:bg-teal-100 disabled:opacity-40"
+          className="rounded-md border border-teal-300 bg-white p-0.5 text-teal-800 hover:bg-teal-100 disabled:opacity-40"
           aria-label={`${noun} trước`}
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="h-3.5 w-3.5" />
         </button>
         <input
           value={draft}
@@ -62,22 +62,22 @@ export function EmbedSlideBar({
             if (e.key === "Enter") (e.target as HTMLInputElement).blur()
           }}
           inputMode="numeric"
-          className="w-14 rounded-md border border-teal-300 bg-white px-2 py-0.5 text-center font-semibold text-teal-900"
+          className="w-12 rounded-md border border-teal-300 bg-white px-1 py-0 text-center font-semibold text-teal-900"
           aria-label={`Số ${noun.toLowerCase()}`}
         />
         <button
           type="button"
           onClick={() => onSlide(slide + 1)}
-          className="rounded-md border border-teal-300 bg-white p-1 text-teal-800 hover:bg-teal-100"
+          className="rounded-md border border-teal-300 bg-white p-0.5 text-teal-800 hover:bg-teal-100"
           aria-label={`${noun} tiếp`}
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-3.5 w-3.5" />
         </button>
         <span className="text-teal-800">
           • {noun} này: <strong>{curCount} dấu</strong>
         </span>
         {marked.length > 0 && (
-          <span className="flex flex-wrap items-center gap-1 text-xs text-teal-800">
+          <span className="flex flex-wrap items-center gap-1 text-[11px] text-teal-800">
             <span className="text-teal-300">|</span>
             <span>Đã có dấu ở {noun.toLowerCase()}:</span>
             {marked.map((n) => (
@@ -85,7 +85,7 @@ export function EmbedSlideBar({
                 key={n}
                 type="button"
                 onClick={() => onSlide(n)}
-                className={`rounded-full px-2 py-0.5 font-medium ${
+                className={`rounded-full px-1.5 py-0 font-medium ${
                   n === slide
                     ? "bg-teal-600 text-white"
                     : "bg-white text-teal-800 ring-1 ring-teal-300 hover:bg-teal-100"
