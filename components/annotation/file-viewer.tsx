@@ -1,6 +1,6 @@
 "use client"
 
-import type { RefObject } from "react"
+import { useEffect, useState, type RefObject } from "react"
 import { Button } from "@/components/ui/button"
 import { PdfPages } from "@/components/pdf-pages"
 import { cn } from "@/lib/utils"
@@ -12,6 +12,70 @@ import { isSignUrl } from "@/lib/file-url"
 
 export function officeEmbed(url: string) {
   return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
+}
+
+/**
+ * PowerPoint qua Office viewer: mỗi số slide là 1 URL khác nhau — đổi URL là
+ * trình xem khởi động lại từ đầu, máy yếu phải chờ lâu như quét lại file.
+ * Vá bằng "hồ khung": luôn nạp sẵn slide hiện tại + slide kề trước/sau vào
+ * các iframe xếp chồng (khung kề để ẩn bằng visibility, vẫn nạp bình thường);
+ * lật slide chỉ đổi khung nào đang hiện → TỨC THÌ, không nạp gì lúc lật.
+ * Nhảy xa (bấm chip số slide) thì slide đích nạp mới 1 lần, các slide kề nó
+ * lại được nạp ngầm ngay sau đó.
+ */
+function PptxSlidePool({
+  src,
+  name,
+  slide,
+  annotateLocked,
+}: {
+  src: string
+  name: string
+  slide: number
+  annotateLocked: boolean
+}) {
+  const [mounted, setMounted] = useState<number[]>(() => [slide])
+  useEffect(() => {
+    setMounted((cur) => {
+      const want = [slide - 1, slide, slide + 1].filter((n) => n >= 1)
+      const kept = cur.filter((n) => want.includes(n))
+      const merged = Array.from(new Set([...kept, ...want])).sort(
+        (a, b) => a - b,
+      )
+      return merged.join() === cur.join() ? cur : merged
+    })
+  }, [slide])
+
+  return (
+    <div className="w-[1000px] h-[78vh] relative mx-auto">
+      {mounted.map((n) => (
+        <iframe
+          key={n}
+          src={`${officeEmbed(src)}&wdSlideIndex=${n}`}
+          title={name}
+          allow="fullscreen"
+          aria-hidden={n !== slide}
+          className={cn(
+            "absolute inset-0 w-full h-full rounded-md",
+            // Khóa iframe khi đang chấm: chuột không xuyên qua, chỉ đặt dấu
+            annotateLocked && "pointer-events-none",
+          )}
+          style={{ visibility: n === slide ? "visible" : "hidden" }}
+        />
+      ))}
+      <div
+        className="absolute top-2 right-2 z-20"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <Button asChild variant="outline" size="sm" className="gap-1">
+          <a href={src} target="_blank" rel="noreferrer" download>
+            <Download className="size-3.5" />
+            Tải tệp
+          </a>
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 export type FileViewerProps = {
@@ -180,26 +244,13 @@ export function FileViewer(props: FileViewerProps) {
 
   if (isPptx) {
     return (
-      <div className="w-[1000px] h-[78vh] relative mx-auto">
-        <iframe
-          src={`${officeEmbed(src)}&wdSlideIndex=${slide}`}
-          title={file.name}
-          allow="fullscreen"
-          className={cn(
-            "w-full h-full rounded-md",
-            // Khóa iframe khi đang chấm: chuột không xuyên qua, chỉ đặt dấu
-            annotateLocked && "pointer-events-none",
-          )}
-        />
-        <div className="absolute top-2 right-2 z-20" onPointerDown={(e) => e.stopPropagation()}>
-          <Button asChild variant="outline" size="sm" className="gap-1">
-            <a href={src} target="_blank" rel="noreferrer" download>
-              <Download className="size-3.5" />
-              Tải tệp
-            </a>
-          </Button>
-        </div>
-      </div>
+      <PptxSlidePool
+        key={src}
+        src={src}
+        name={file.name}
+        slide={slide}
+        annotateLocked={annotateLocked}
+      />
     )
   }
 
