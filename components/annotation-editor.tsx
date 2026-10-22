@@ -37,6 +37,7 @@ import {
   File as FileIcon,
   Loader2,
   Camera,
+  Unlock,
 } from "lucide-react"
 
 type Tool = AnnotationTool
@@ -152,6 +153,8 @@ export function AnnotationEditor({
   submissionId,
   onSave,
   onClose,
+  onUnlock,
+  unlockLabel = "Mở lại",
 }: {
   title: string
   files: SubmissionFile[]
@@ -174,7 +177,22 @@ export function AnnotationEditor({
   submissionId?: string
   onSave: (data: AnnotationItem[], score: number | null) => Promise<void> | void
   onClose: () => void
+  /**
+   * Có prop này => hiện nút "Mở lại" trong khung chấm: GV đang mở bài của
+   * nhóm/ô chọn nhầm thì mở lại ngay tại đây (xoá bài + nhả khoá cho HS chọn
+   * lại) thay vì phải quay ra bảng tìm icon mở khoá trên thẻ. Parent thực thi
+   * action mở khoá và tự đóng editor.
+   */
+  onUnlock?: () => Promise<void> | void
+  unlockLabel?: string
 }) {
+  const [unlockArm, setUnlockArm] = useState(false)
+  const [unlockBusy, setUnlockBusy] = useState(false)
+  useEffect(() => {
+    if (!unlockArm) return
+    const t = setTimeout(() => setUnlockArm(false), 4000)
+    return () => clearTimeout(t)
+  }, [unlockArm])
   // Bài HS nộp link Canva (dán trong text_content, không kèm file): thêm 1
   // "file ảo" Canva ở cuối danh sách để khung chấm hiện trình xem nhúng và
   // chấm lên được như file thường. Vị trí cuối phải nhất quán với trang kết
@@ -796,6 +814,51 @@ export function AnnotationEditor({
         <X className="size-4" />
         Quay lại
       </Button>
+
+      {/* Mở lại nhóm/ô chọn nhầm ngay trong khung chấm — xác nhận 2 chạm tại
+          chỗ (không dùng confirm() native để khỏi thoát fullscreen trình chiếu) */}
+      {onUnlock &&
+        (unlockArm ? (
+          <div className="absolute top-14 left-3 z-40 flex gap-1.5">
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={unlockBusy}
+              className="gap-1.5 shadow-lg"
+              onClick={async () => {
+                setUnlockBusy(true)
+                try {
+                  await onUnlock()
+                } finally {
+                  setUnlockBusy(false)
+                  setUnlockArm(false)
+                }
+              }}
+            >
+              {unlockBusy ? <Loader2 className="size-4 animate-spin" /> : <Unlock className="size-4" />}
+              Xoá bài &amp; {unlockLabel.toLowerCase()}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="shadow-lg"
+              onClick={() => setUnlockArm(false)}
+            >
+              Huỷ
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setUnlockArm(true)}
+            className="absolute top-14 left-3 z-40 gap-1.5 shadow-lg"
+            title="Mở lại cho học sinh chọn lại — bài đã nộp trong nhóm/ô này sẽ bị xoá"
+          >
+            <Unlock className="size-4" />
+            {unlockLabel}
+          </Button>
+        ))}
 
       {/* Floating toolbar pill */}
       {!presentationMode && (

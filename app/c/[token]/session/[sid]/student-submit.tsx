@@ -36,6 +36,7 @@ import {
   studentClaimGroupAction,
   submitGroupReportAction,
   studentClaimSessionSlotAction,
+  studentClaimSlotAction,
   submitIndividualReportAction,
 } from "@/app/actions"
 import type {
@@ -67,6 +68,19 @@ function deviceId() {
     localStorage.setItem(key, id)
   }
   return id
+}
+
+// Token thiết bị DÙNG CHUNG với sảnh lớp (key "device_token" — students.device_token
+// được gắn bằng token này). Mọi kiểm tra danh tính HS phải dùng token này, khác
+// với deviceId() ở trên vốn chỉ là định danh phiên nộp.
+function lobbyDeviceToken() {
+  if (typeof window === "undefined") return ""
+  let t = localStorage.getItem("device_token")
+  if (!t) {
+    t = crypto.randomUUID()
+    localStorage.setItem("device_token", t)
+  }
+  return t
 }
 
 // Khóa lưu trạng thái "đang chọn nhóm/ô" cho phiên — để tải lại trang không bị mất
@@ -110,7 +124,7 @@ type StagedFile = {
 
 export function StudentSubmit({
   kind,
-  classId: _classId,
+  classId,
   className,
   session: initialSession,
   groups: g0,
@@ -145,6 +159,13 @@ export function StudentSubmit({
   const needsSelfIdentify =
     kind === "group" && !session.use_fixed_groups && students.length > 0 && !selfStudentId
 
+  // Phiên cá nhân: HS phải được nhận diện (theo thiết bị/tên) TRƯỚC khi chọn ô,
+  // để không ai bấm nhầm vào ô mang tên bạn khác. Danh tính lấy theo thứ tự:
+  // tên đã chọn ở sảnh lớp trên chính thiết bị này → tên gắn với device_token
+  // của thiết bị → tên đã tự nhận diện trong phiên (khi chưa bị thiết bị khác chiếm).
+  const identityMode = kind === "individual" && students.length > 0
+  const needsSelfIdentifyInd = identityMode && !selfStudentId
+
   // Load tên đã chọn từ localStorage
   useEffect(() => {
     if (kind !== "group" || session.use_fixed_groups) return
@@ -156,6 +177,36 @@ export function StudentSubmit({
     }
     setIdentityLoaded(true)
   }, [kind, session.id, session.use_fixed_groups, students])
+
+  // Load danh tính cho phiên cá nhân (cùng quy tắc tin cậy như sảnh lớp)
+  useEffect(() => {
+    if (kind !== "individual" || students.length === 0) return
+    if (typeof window === "undefined") return
+    const dt = lobbyDeviceToken()
+    const savedClass = localStorage.getItem(`class_${classId}_student`)
+    const byClassKey = savedClass ? students.find((s) => s.id === savedClass) : undefined
+    if (byClassKey && byClassKey.device_token === dt) {
+      setSelfStudentId(byClassKey.id)
+      setIdentityLoaded(true)
+      return
+    }
+    const byToken = students.find((s) => s.device_token === dt)
+    if (byToken) {
+      setSelfStudentId(byToken.id)
+      setIdentityLoaded(true)
+      return
+    }
+    const savedSelf = localStorage.getItem(`tln_self_${session.id}`)
+    if (savedSelf) {
+      const st = students.find((s) => s.id === savedSelf)
+      if (st && (!st.device_token || st.device_token === dt)) {
+        setSelfStudentId(st.id)
+        setIdentityLoaded(true)
+        return
+      }
+    }
+    setIdentityLoaded(true)
+  }, [kind, classId, session.id, students])
 
   // Realtime
   useEffect(() => {
@@ -216,6 +267,43 @@ export function StudentSubmit({
     }
   }, [groups, kind, selectedId, session.id])
 
+  // Phiên cá nhân: ô đang chọn không còn thuộc về mình nữa (GV mở lại ô →
+  // student_id về null, hoặc bạn khác đã vào ô) → tự nhả chọn, quay về màn
+  // chọn ô để chọn lại. Trước đây chỉ bản nhóm có cơ chế này.
+  useEffect(() => {
+    if (kind !== "individual" || !selectedId || !selfStudentId) return
+    const s = slots.find((x) => x.id === selectedId)
+    if (s && s.student_id !== selfStudentId) {
+      setSelectedId(null)
+      setSubmitted(false)
+      autoSubmitted.current = false
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(selectedKey(session.id))
+      }
+      toast("Giáo viên đã mở lại ô — em chọn lại ô của mình nhé.")
+    }
+  }, [slots, kind, selectedId, selfStudentId, session.id])
+
+  // HS tự nhận diện ở phiên cá nhân: gắn tên với thiết bị này (như sảnh lớp).
+  // Tên đã gắn thiết bị khác → action từ chối, HS nhờ GV mở khóa trong danh sách lớp.
+  async function identifyStudent(studentId: string) {
+    setBusy(true)
+    try {
+      const res = await studentClaimSlotAction(studentId, lobbyDeviceToken())
+      if (!res.ok) {
+        toast.error(res.error ?? "Không chọn được tên này.")
+        return
+      }
+      setSelfStudentId(studentId)
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`tln_self_${session.id}`, studentId)
+        localStorage.setItem(`class_${classId}_student`, studentId)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function pickGroup(gid: string) {
     setBusy(true)
     try {
@@ -237,12 +325,23 @@ export function StudentSubmit({
     }
   }
 
-  async function pickSlot(slotId: string, studentId?: string | null) {
+  async function pickSlot(slotId: string) {
     setBusy(true)
     try {
-      const res = await studentClaimSessionSlotAction(slotId, deviceId(), studentId ?? null)
+      // Người bấm claim BẰNG DANH TÍNH CỦA CHÍNH MÌNH — trước đây code truyền
+      // student_id của bạn đang chiếm ô nên chốt chặn "ô đã có chủ" bị vô hiệu,
+      // bấm nhầm tên bạn là vào luôn bằng danh tính của bạn đó.
+      const slot = slots.find((s) => s.id === slotId)
+      const claimant = identityMode ? selfStudentId : (slot?.student_id ?? null)
+      const token = identityMode ? lobbyDeviceToken() : deviceId()
+      const res = await studentClaimSessionSlotAction(slotId, token, claimant)
       if (!res.ok) toast.error(res.error ?? "Không thể chọn ô.")
       else {
+        // Cập nhật ngay state cục bộ (như pickGroup): nếu chờ realtime, effect
+        // nhả chọn sẽ thấy ô chưa thuộc về mình và đá ra ngay sau khi chọn.
+        if (claimant) {
+          setSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, student_id: claimant } : s)))
+        }
         setSelectedId(slotId)
         if (typeof window !== "undefined") localStorage.setItem(selectedKey(session.id), slotId)
       }
@@ -561,24 +660,73 @@ export function StudentSubmit({
           </div>
         )}
 
-        {!selectedId && kind === "individual" && (
+        {!selectedId && kind === "individual" && needsSelfIdentifyInd && (
           <div>
+            <h2 className="font-heading font-semibold text-lg mb-2 flex items-center gap-2">
+              <User className="w-5 h-5" /> Em là ai?
+            </h2>
+            <p className="text-sm text-muted-foreground mb-3">
+              Chọn đúng tên em trong danh sách lớp. Chọn nhầm tên bạn là bài nộp sẽ ghi cho bạn đó —
+              chọn sai sẽ phải nhờ giáo viên mở khóa mới chọn lại được.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[60vh] overflow-y-auto">
+              {students
+                .slice()
+                .sort((a, b) => (a.slot_number ?? 0) - (b.slot_number ?? 0))
+                .map((st) => (
+                  <Button
+                    key={st.id}
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => identifyStudent(st.id)}
+                    className="h-auto py-3 flex-col items-start gap-0.5"
+                  >
+                    <span className="text-xs text-muted-foreground">Số {st.slot_number}</span>
+                    <span className="font-medium text-sm text-left line-clamp-2">
+                      {st.name || "Chưa đặt tên"}
+                    </span>
+                  </Button>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {!selectedId && kind === "individual" && !needsSelfIdentifyInd && (
+          <div>
+            {identityMode && selfStudentId && (
+              <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="size-4" />
+                <span>
+                  Em là:{" "}
+                  <strong className="text-foreground">
+                    {students.find((s) => s.id === selfStudentId)?.name || "?"}
+                  </strong>
+                </span>
+                <span className="text-xs ml-auto">Sai tên? Nhờ giáo viên mở khóa trong danh sách lớp.</span>
+              </div>
+            )}
             <h2 className="font-heading font-semibold text-lg mb-2 flex items-center gap-2">
               <User className="w-5 h-5" /> Chọn ô của bạn
             </h2>
             <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
               {slots.map((s) => {
                 const student = students.find((st) => st.id === s.student_id)
+                const isMine = !!selfStudentId && s.student_id === selfStudentId
+                const takenByOther = !!s.student_id && !isMine
+                const iHaveSlot = !!selfStudentId && slots.some((x) => x.student_id === selfStudentId)
+                const blockedEmpty = !s.student_id && iHaveSlot
                 return (
                   <Button
                     key={s.id}
-                    variant="secondary"
-                    disabled={busy || !running}
-                    onClick={() => pickSlot(s.id, student?.id ?? null)}
+                    variant={isMine ? "default" : "secondary"}
+                    disabled={busy || !running || takenByOther || blockedEmpty}
+                    onClick={() => pickSlot(s.id)}
                     className="h-16 flex-col gap-1 px-1"
                   >
                     <span className="text-xs text-muted-foreground">#{s.slot_number}</span>
-                    <span className="text-xs truncate max-w-full">{student?.name ?? "Trống"}</span>
+                    <span className="text-xs truncate max-w-full">
+                      {isMine ? "Ô của em" : (student?.name ?? "Trống")}
+                    </span>
                   </Button>
                 )
               })}

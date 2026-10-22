@@ -954,6 +954,11 @@ export function GroupSessionBoard({
           sessionGroupId={openGroup.id}
           submissionId={openSub?.id}
           groupLabel={openGroup.label}
+          unlockLabel="Mở lại nhóm"
+          onUnlock={async () => {
+            await handleUnlock(openGroup)
+            setOpenGroupId(null)
+          }}
           onSave={async (data, score) => {
             await saveAnnotationAction({
               sessionId: session.id,
@@ -1043,6 +1048,7 @@ export function GroupSessionBoard({
           durationSeconds={displaySession.duration_seconds}
           barsOnCollapse={displaySession.status === "running" || previewData !== null}
           onSessionChanged={handleSessionChanged}
+          onUnlockGroup={handleUnlock}
           sessionPickerOpen={sessionPickerOpen}
           createSessionOpen={createSessionOpen}
           board={(openGroup) =>

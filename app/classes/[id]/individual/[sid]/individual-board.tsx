@@ -355,6 +355,12 @@ export function IndividualBoard({
           dataReady={isAnnReady(openAnn)}
           autoFullscreen
           submissionId={openSub?.id}
+          unlockLabel="Mở lại ô"
+          onUnlock={async () => {
+            await unlockSlotAction(openSlot.id, true)
+            toast.success("Đã mở lại ô — bài đã nộp đã xoá, học sinh chọn lại được")
+            setOpenSlotId(null)
+          }}
           onSave={async (data, score) => {
             await saveAnnotationAction({
               sessionId: session.id,

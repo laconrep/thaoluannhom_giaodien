@@ -50,6 +50,8 @@ export interface PresentationViewerProps {
   onSessionChanged?: (session: any) => void
   sessionPickerOpen?: boolean
   createSessionOpen?: boolean
+  /** Mở lại nhóm đang mở trong khung chấm (xoá bài + nhả khoá) — tuỳ chọn */
+  onUnlockGroup?: (group: any) => Promise<void> | void
 }
 
 function colsFor(count: number): string {
@@ -78,6 +80,7 @@ export function PresentationViewer({
   onSessionChanged,
   sessionPickerOpen = false,
   createSessionOpen = false,
+  onUnlockGroup,
 }: PresentationViewerProps) {
   const [presentation, setPresentation] = useState<any>(
     initialPresentation?.id === presentationId ? initialPresentation : null,
@@ -706,6 +709,20 @@ export function PresentationViewer({
                 // T3.3: chưa tải xong nét vẽ → chặn vẽ + chặn lưu.
                 dataReady={isAnnReady(openAnn)}
                 autoFullscreen
+                unlockLabel="Mở lại nhóm"
+                onUnlock={
+                  onUnlockGroup
+                    ? async () => {
+                        await onUnlockGroup(openGroupRow)
+                        clearCloseTimer()
+                        if (drawerStateBeforeEditorRef.current !== null) {
+                          setDrawerOpen(drawerStateBeforeEditorRef.current)
+                          drawerStateBeforeEditorRef.current = null
+                        }
+                        setOpenGroupId(null)
+                      }
+                    : undefined
+                }
                 onSave={async (data, score) => {
                   await saveAnnotationAction({
                     sessionId,

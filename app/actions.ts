@@ -767,6 +767,11 @@ export async function unlockGroupAction(sessionGroupId: string, clearSubmission 
     .eq("id", sessionGroupId)
   if (error) throw new Error(error.message)
 
+  // Gỡ luôn danh sách thành viên tự gán của nhóm: HS claim nhầm không còn là
+  // thành viên nhóm này nữa (tránh tự gán điểm sai về sau). Ai vào lại nhóm sẽ
+  // được ghi danh lại khi claim.
+  await supabase.from("session_group_members").delete().eq("session_group_id", sessionGroupId)
+
   if (clearSubmission) {
     await supabase.from("submissions").delete().eq("session_group_id", sessionGroupId)
     await supabase.from("annotations").delete().eq("session_group_id", sessionGroupId)
@@ -1140,18 +1145,32 @@ export async function studentClaimGroupAction(
 
 export async function studentClaimSessionSlotAction(
   sessionSlotId: string,
-  _deviceToken: string,
+  deviceToken: string,
   studentId: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
-  if (!sessionSlotId || !_deviceToken || !studentId) return { ok: false, error: "Thông tin chọn ô không hợp lệ." }
+  if (!sessionSlotId || !deviceToken || !studentId) return { ok: false, error: "Thông tin chọn ô không hợp lệ." }
   const { data: slot, error: slotError } = await supabase
     .from("session_slots")
     .select("id, student_id")
     .eq("id", sessionSlotId)
     .maybeSingle()
   if (slotError || !slot) return { ok: false, error: "Không tìm thấy ô." }
-  if (slot.student_id && slot.student_id !== studentId) return { ok: false, error: "Ô này đã được chọn." }
+  if (slot.student_id && slot.student_id !== studentId) return { ok: false, error: "Ô này đã được bạn khác chọn." }
+  // Buộc danh tính với thiết bị (token do sảnh lớp cấp, key localStorage
+  // "device_token"): tên đã gắn với thiết bị khác thì không cho nhận — chặn
+  // chọn nhầm tên bạn. GV mở khóa tên trong danh sách lớp để chọn lại.
+  const { data: stu } = await supabase
+    .from("students")
+    .select("id, device_token")
+    .eq("id", studentId)
+    .maybeSingle()
+  if (stu?.device_token && stu.device_token !== deviceToken) {
+    return {
+      ok: false,
+      error: "Tên này đã được chọn trên thiết bị khác. Nếu em chọn nhầm, hãy nhờ giáo viên mở khóa trong danh sách lớp.",
+    }
+  }
   const { data: updated, error } = await supabase
     .from("session_slots")
     .update({ student_id: studentId })
