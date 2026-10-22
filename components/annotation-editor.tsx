@@ -993,9 +993,15 @@ export function AnnotationEditor({
           className="mx-auto"
           style={{
             width: "100%",
-            transform: `scale(${zoomLevel})`,
-            transformOrigin: "top center",
-            transition: "transform 120ms ease-out",
+            // Zoom bằng CSS `zoom` thay cho transform scale: `zoom` phóng to
+            // cả kích thước layout thật nên vùng cuộn của viewport nở đúng
+            // bằng ảnh đã phóng — kéo (pan)/cuộn tới được mọi góc khi ảnh
+            // tràn màn hình. Transform scale chỉ phóng phần hiển thị, phần
+            // tràn sang trái nằm ngoài vùng cuộn (scrollLeft không âm được)
+            // nên zoom to là kéo chết. Mọi tọa độ dấu/chữ vẫn đo theo layout
+            // (getBoundingClientRect đã gồm hệ số zoom, offsetWidth thì
+            // không) nên hệ tọa độ chấm không đổi.
+            zoom: zoomLevel,
           }}
         >
           <div
