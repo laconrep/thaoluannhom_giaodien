@@ -820,7 +820,10 @@ export async function toggleDownloadAction(sessionId: string, allow: boolean) {
   if (error) throw new Error(error.message)
 }
 
-/** Lưu đề bài của phiên giao việc cá nhân (migration 008: prompt_text/prompt_file/prompt_source). */
+/**
+ * Lưu đề bài của phiên giao việc cá nhân (migration 008: prompt_text/prompt_file/prompt_source).
+ * Trả {ok, error} thay vì throw: lỗi throw từ server action bị Next che mất nội dung ở bản production.
+ */
 export async function saveSessionPromptAction(
   sessionId: string,
   prompt: {
@@ -828,7 +831,7 @@ export async function saveSessionPromptAction(
     file: import("@/lib/types").SubmissionFile | null
     source: "text" | "file" | null
   },
-) {
+): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
   const { error } = await supabase
     .from("sessions")
@@ -841,12 +844,15 @@ export async function saveSessionPromptAction(
   if (error) {
     const { isMissingSchemaError } = await import("@/lib/ai/schema-error")
     if (isMissingSchemaError(error)) {
-      throw new Error(
-        "Tính năng đề bài cần chạy migration 008 trước (file supabase-migrations/008_session_prompt.sql trong repo).",
-      )
+      return {
+        ok: false,
+        error:
+          "Chưa chạy migration 008 nên chưa lưu được đề. Vào Supabase → SQL Editor, chạy 3 dòng trong file supabase-migrations/008_session_prompt.sql rồi thử lại.",
+      }
     }
-    throw new Error(error.message)
+    return { ok: false, error: error.message }
   }
+  return { ok: true }
 }
 
 export async function deleteSessionAction(sessionId: string, classId: string) {

@@ -147,11 +147,12 @@ export function AssignTaskDialog({
       const finalText = hasText ? text : null
       const both = !!finalText && !!finalFile
       const finalSource = both ? source : finalFile ? "file" : "text"
-      await saveSessionPromptAction(session.id, {
+      const saved = await saveSessionPromptAction(session.id, {
         text: finalText,
         file: finalFile,
         source: finalSource,
       })
+      if (!saved.ok) throw new Error(saved.error ?? "Không lưu được đề bài.")
       setSource(finalSource)
       setStep("preview")
       toast.success("Đã lưu đề — kiểm tra bản xem trước rồi bấm Bắt đầu để giao cho học sinh.")
@@ -166,11 +167,12 @@ export function AssignTaskDialog({
     setBusy(true)
     try {
       // Lưu lại nguồn đề GV đang chọn ở bản xem trước (khi có cả chữ lẫn file).
-      await saveSessionPromptAction(session.id, {
+      const saved = await saveSessionPromptAction(session.id, {
         text: hasText ? text : null,
         file: fileMeta,
         source,
       })
+      if (!saved.ok) throw new Error(saved.error ?? "Không lưu được đề bài.")
       await startSessionAction(session.id, durationToSeconds(duration))
       toast.success("Đã giao bài cho học sinh.")
       onOpenChange(false)
