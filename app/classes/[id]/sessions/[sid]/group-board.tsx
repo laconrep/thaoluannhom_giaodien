@@ -747,7 +747,7 @@ export function GroupSessionBoard({
                   <span className="font-semibold">Chia sẻ kết quả cho HS</span>
                 </div>
                 <label className="flex items-center justify-between gap-2 text-[11px]">
-                  <span className="leading-tight">HS xem được 8 nhóm</span>
+                  <span className="leading-tight">Mỗi HS chỉ xem được bài của mình</span>
                   <Switch
                     checked={!!displaySession.results_shared_at}
                     onCheckedChange={toggleShareResults}

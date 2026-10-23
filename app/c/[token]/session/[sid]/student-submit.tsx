@@ -152,7 +152,7 @@ export function StudentSubmit({
   const ended = session.status === "ended" || (session.ends_at != null && remaining <= 0)
   const running = session.status === "running" && !ended
   const allowPaste = session.allow_paste
-  const resultsShared = !!session.results_shared_at && kind === "group"
+  const resultsShared = !!session.results_shared_at
 
   // Với phiên group "chia lại nhóm" (không dùng nhóm cố định), HS phải khai tên mình
   // để hệ thống biết ai thuộc nhóm nào, phục vụ tự động gán điểm sau khi GV chấm.
@@ -517,7 +517,7 @@ export function StudentSubmit({
               <Button asChild className="w-full gap-2">
                 <Link href={`/c/${shareToken}/session/${session.id}/results`}>
                   <Sparkles className="size-4" />
-                  Xem kết quả các nhóm
+                  Xem kết quả của em
                 </Link>
               </Button>
             )}
@@ -564,7 +564,7 @@ export function StudentSubmit({
             <Sparkles className="size-5 text-accent-foreground shrink-0" />
             <div className="flex-1 text-sm">
               <p className="font-semibold">Giáo viên đã chia sẻ kết quả</p>
-              <p className="text-xs text-muted-foreground">Xem bài của tất cả các nhóm kèm chấm.</p>
+              <p className="text-xs text-muted-foreground">Xem bài của em kèm điểm và nhận xét của giáo viên.</p>
             </div>
             <Button asChild size="sm" variant="secondary" className="gap-1">
               <Link href={`/c/${shareToken}/session/${session.id}/results`}>

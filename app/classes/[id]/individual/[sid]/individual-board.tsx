@@ -4,7 +4,13 @@ import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
-import { saveAnnotationAction, togglePasteAction, unlockSlotAction } from "@/app/actions"
+import {
+  saveAnnotationAction,
+  shareResultsAction,
+  toggleDownloadAction,
+  togglePasteAction,
+  unlockSlotAction,
+} from "@/app/actions"
 import type {
   AnnotationItem,
   AnnotationRow,
@@ -48,6 +54,8 @@ import {
   FileText,
   File as FileIcon,
   Check,
+  Sparkles,
+  Share2,
 } from "lucide-react"
 
 function getFilesI(sub: SubmissionRow | undefined): SubmissionFile[] {
@@ -187,6 +195,16 @@ export function IndividualBoard({
     toast.success("Đã sao chép liên kết cho học sinh")
   }
 
+  function copyResultsLink() {
+    const url = `${window.location.origin}/c/${shareToken}/session/${session.id}/results`
+    navigator.clipboard.writeText(url)
+    toast.success("Đã sao chép link xem kết quả", { duration: 2000 })
+  }
+
+  async function toggleShareResults() {
+    await shareResultsAction(session.id, !session.results_shared_at)
+  }
+
   const submittedCount = Object.keys(subsBySlot).length
 
   return (
@@ -227,6 +245,43 @@ export function IndividualBoard({
               aria-label="Cho phép dán"
             />
           </label>
+
+          {/* Chia sẻ kết quả cho HS */}
+          <div className="rounded-md border bg-accent/10 border-accent/40 p-2 flex flex-col gap-1.5 mt-1">
+            <div className="flex items-center gap-2 text-xs">
+              <Sparkles className="size-3.5 text-accent-foreground" aria-hidden="true" />
+              <span className="font-semibold">Chia sẻ kết quả cho HS</span>
+            </div>
+            <label className="flex items-center justify-between gap-2 text-[11px]">
+              <span className="leading-tight">Mỗi HS chỉ xem được bài của mình</span>
+              <Switch
+                checked={!!session.results_shared_at}
+                onCheckedChange={toggleShareResults}
+                aria-label="Bật chia sẻ kết quả"
+              />
+            </label>
+            {session.results_shared_at && (
+              <>
+                <label className="flex items-center justify-between gap-2 text-[11px]">
+                  <span className="leading-tight">Cho phép tải xuống</span>
+                  <Switch
+                    checked={session.allow_download}
+                    onCheckedChange={(v) => toggleDownloadAction(session.id, v)}
+                    aria-label="Cho phép tải xuống"
+                  />
+                </label>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={copyResultsLink}
+                  className="gap-1 h-7 text-xs"
+                >
+                  <Share2 className="size-3" />
+                  Copy link kết quả
+                </Button>
+              </>
+            )}
+          </div>
 
           <AiGradePanel
             sessionId={session.id}
