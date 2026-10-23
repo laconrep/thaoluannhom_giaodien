@@ -52,6 +52,12 @@ export type SessionRow = {
   ai_enabled?: boolean
   ai_rubric?: string | null
   ai_max_score?: number
+  /** Đề bài giao việc cá nhân (migration 008): bản chữ GV nhập/dán */
+  prompt_text?: string | null
+  /** Đề bài: file đính kèm Word/PDF/TXT (SubmissionFile, bucket submissions) */
+  prompt_file?: SubmissionFile | null
+  /** Khi có cả chữ lẫn file: bản nào giao cho HS */
+  prompt_source?: "text" | "file" | null
 }
 
 export type GeminiTier = "free" | "pro"

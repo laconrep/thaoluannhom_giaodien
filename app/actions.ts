@@ -820,6 +820,35 @@ export async function toggleDownloadAction(sessionId: string, allow: boolean) {
   if (error) throw new Error(error.message)
 }
 
+/** Lưu đề bài của phiên giao việc cá nhân (migration 008: prompt_text/prompt_file/prompt_source). */
+export async function saveSessionPromptAction(
+  sessionId: string,
+  prompt: {
+    text: string | null
+    file: import("@/lib/types").SubmissionFile | null
+    source: "text" | "file" | null
+  },
+) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("sessions")
+    .update({
+      prompt_text: prompt.text,
+      prompt_file: prompt.file,
+      prompt_source: prompt.source,
+    })
+    .eq("id", sessionId)
+  if (error) {
+    const { isMissingSchemaError } = await import("@/lib/ai/schema-error")
+    if (isMissingSchemaError(error)) {
+      throw new Error(
+        "Tính năng đề bài cần chạy migration 008 trước (file supabase-migrations/008_session_prompt.sql trong repo).",
+      )
+    }
+    throw new Error(error.message)
+  }
+}
+
 export async function deleteSessionAction(sessionId: string, classId: string) {
   const supabase = await createClient()
   const { error } = await supabase.from("sessions").delete().eq("id", sessionId)

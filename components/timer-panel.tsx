@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Clock, Play, RotateCcw, StopCircle } from "lucide-react"
+import { Clock, Play, RotateCcw, Send, StopCircle } from "lucide-react"
 import { useCountdown, formatClock } from "@/lib/use-countdown"
 import { toast } from "sonner"
 import {
@@ -21,18 +21,109 @@ function isUnlimitedDuration(seconds: number) {
   return seconds <= 0
 }
 
+export type DurationValue = { unlimited: boolean; minutes: number; seconds: number }
+
+export function durationToSeconds(v: DurationValue) {
+  return v.unlimited ? UNLIMITED : Math.max(5, v.minutes * 60 + v.seconds)
+}
+
+/** Bộ set thời gian dùng chung: ô phút/giây + nút nhanh + "Không hạn". */
+export function DurationSettings({
+  value,
+  onChange,
+}: {
+  value: DurationValue
+  onChange: (v: DurationValue) => void
+}) {
+  const { unlimited, minutes, seconds } = value
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1">
+        <Input
+          type="number"
+          min={0}
+          max={180}
+          value={unlimited ? "" : minutes}
+          placeholder={unlimited ? "—" : undefined}
+          onChange={(e) =>
+            onChange({
+              unlimited: false,
+              minutes: Math.max(0, Math.min(180, Number(e.target.value) || 0)),
+              seconds,
+            })
+          }
+          className="h-8 text-xs text-center"
+          aria-label="Phút"
+        />
+        <span className="text-xs text-muted-foreground">phút</span>
+        <Input
+          type="number"
+          min={0}
+          max={59}
+          value={unlimited ? "" : seconds}
+          placeholder={unlimited ? "—" : undefined}
+          onChange={(e) =>
+            onChange({
+              unlimited: false,
+              minutes,
+              seconds: Math.max(0, Math.min(59, Number(e.target.value) || 0)),
+            })
+          }
+          className="h-8 text-xs text-center"
+          aria-label="Giây"
+        />
+        <span className="text-xs text-muted-foreground">giây</span>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {PRESETS.map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => onChange({ unlimited: false, minutes: m, seconds: 0 })}
+            className={`text-[10px] px-1.5 py-0.5 rounded border ${
+              !unlimited && minutes === m && seconds === 0
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-muted/40 hover:bg-muted"
+            }`}
+          >
+            {m}p
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => onChange({ unlimited: true, minutes: 0, seconds: 0 })}
+          className={`text-[10px] px-1.5 py-0.5 rounded border ${
+            unlimited
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-muted/40 hover:bg-muted"
+          }`}
+          title="Không thời hạn"
+          aria-label="Không thời hạn"
+        >
+          Không hạn
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function TimerPanel({
   sessionId,
   status,
   endsAt,
   durationSeconds,
   onChanged,
+  assignMode = false,
+  onAssignClick,
 }: {
   sessionId: string
   status: Status
   endsAt: string | null
   durationSeconds: number
   onChanged?: (session: any) => void
+  /** Luồng giao việc cá nhân: nút "Bắt đầu" thành "Giao bài" mở popup soạn đề; set giờ nằm trong popup. */
+  assignMode?: boolean
+  onAssignClick?: () => void
 }) {
   const [unlimited, setUnlimited] = useState(() => isUnlimitedDuration(durationSeconds))
   const [minutes, setMinutes] = useState<number>(() =>
@@ -148,15 +239,10 @@ export function TimerPanel({
     }
     runAction(reopenSessionAction(sessionId, duration), optimistic, { status, ends_at: endsAt, duration_seconds: durationSeconds })
   }
-  function applyPreset(mins: number) {
-    setUnlimited(false)
-    setMinutes(mins)
-    setSeconds(0)
-  }
-  function applyUnlimited() {
-    setUnlimited(true)
-    setMinutes(0)
-    setSeconds(0)
+  function applyDuration(v: DurationValue) {
+    setUnlimited(v.unlimited)
+    setMinutes(v.minutes)
+    setSeconds(v.seconds)
   }
 
   return (
@@ -184,76 +270,22 @@ export function TimerPanel({
         />
       </div>
 
-      {status !== "running" && (
-        <>
-          <div className="flex items-center gap-1">
-            <Input
-              type="number"
-              min={0}
-              max={180}
-              value={unlimited ? "" : minutes}
-              placeholder={unlimited ? "—" : undefined}
-              onChange={(e) => {
-                setUnlimited(false)
-                setMinutes(Math.max(0, Math.min(180, Number(e.target.value) || 0)))
-              }}
-              className="h-8 text-xs text-center"
-              aria-label="Phút"
-            />
-            <span className="text-xs text-muted-foreground">phút</span>
-            <Input
-              type="number"
-              min={0}
-              max={59}
-              value={unlimited ? "" : seconds}
-              placeholder={unlimited ? "—" : undefined}
-              onChange={(e) => {
-                setUnlimited(false)
-                setSeconds(Math.max(0, Math.min(59, Number(e.target.value) || 0)))
-              }}
-              className="h-8 text-xs text-center"
-              aria-label="Giây"
-            />
-            <span className="text-xs text-muted-foreground">giây</span>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {PRESETS.map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => applyPreset(m)}
-                className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                  !unlimited && minutes === m && seconds === 0
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted/40 hover:bg-muted"
-                }`}
-              >
-                {m}p
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={applyUnlimited}
-              className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                unlimited
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-muted/40 hover:bg-muted"
-              }`}
-              title="Không thời hạn"
-              aria-label="Không thời hạn"
-            >
-              Không hạn
-            </button>
-          </div>
-        </>
+      {status !== "running" && !(assignMode && status === "idle") && (
+        <DurationSettings value={{ unlimited, minutes, seconds }} onChange={applyDuration} />
       )}
 
-      {status === "idle" && (
-        <Button size="sm" onClick={handleStart} className="gap-1">
-          <Play className="size-4" aria-hidden="true" />
-          Bắt đầu
-        </Button>
-      )}
+      {status === "idle" &&
+        (assignMode ? (
+          <Button size="sm" onClick={onAssignClick} className="gap-1">
+            <Send className="size-4" aria-hidden="true" />
+            Giao bài
+          </Button>
+        ) : (
+          <Button size="sm" onClick={handleStart} className="gap-1">
+            <Play className="size-4" aria-hidden="true" />
+            Bắt đầu
+          </Button>
+        ))}
 
       {status === "running" && (
         <Button size="sm" variant="destructive" onClick={handleEnd} className="gap-1 w-full">

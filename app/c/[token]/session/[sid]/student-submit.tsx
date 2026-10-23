@@ -20,12 +20,14 @@ import {
   Ban,
   Sparkles,
   Share2,
+  BookOpen,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { RichTextEditor } from "@/components/rich-text-editor"
+import { PromptView, promptHasText } from "@/components/prompt-view"
 import { createClient } from "@/lib/supabase/client"
 import { compressImageIfNeeded } from "@/lib/compress-image"
 import { useCountdown } from "@/lib/use-countdown"
@@ -733,6 +735,23 @@ export function StudentSubmit({
             </div>
           </div>
         )}
+
+        {kind === "individual" &&
+          selfStudentId &&
+          session.status !== "idle" &&
+          (promptHasText(session.prompt_text) || session.prompt_file) && (
+            <Card className="p-4 space-y-2">
+              <h2 className="font-heading font-semibold text-lg flex items-center gap-2">
+                <BookOpen className="w-5 h-5" aria-hidden="true" /> Đề bài
+              </h2>
+              <PromptView
+                text={session.prompt_text ?? null}
+                file={session.prompt_file ?? null}
+                source={session.prompt_source ?? null}
+                maxHeight="70vh"
+              />
+            </Card>
+          )}
 
         {selectedId && (
           <div className="space-y-4">

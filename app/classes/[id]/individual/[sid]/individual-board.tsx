@@ -24,6 +24,7 @@ import { AnnotationEditor } from "@/components/annotation-editor"
 import { useLazyAnnotationData } from "@/hooks/use-lazy-annotation-data"
 import { SubmissionText } from "@/components/submission-text"
 import { TimerPanel } from "@/components/timer-panel"
+import { AssignTaskDialog } from "@/components/assign-task-dialog"
 import { Switch } from "@/components/ui/switch"
 import { AvatarInitials } from "@/components/avatar-initials"
 import { toast } from "sonner"
@@ -102,6 +103,7 @@ export function IndividualBoard({
   const { ensureData: ensureAnnData, dataFor: annDataFor, isReady: isAnnReady } =
     useLazyAnnotationData()
   const [openSlotId, setOpenSlotId] = useState<string | null>(null)
+  const [assignOpen, setAssignOpen] = useState(false)
 
   const studentMap = useMemo(() => {
     const m: Record<string, { id: string; slot_number: number; name: string | null }> = {}
@@ -230,6 +232,8 @@ export function IndividualBoard({
             status={session.status}
             endsAt={session.ends_at}
             durationSeconds={session.duration_seconds}
+            assignMode
+            onAssignClick={() => setAssignOpen(true)}
           />
 
           <Button variant="outline" size="sm" onClick={copyShareLink} className="gap-1">
@@ -428,6 +432,8 @@ export function IndividualBoard({
           onClose={() => setOpenSlotId(null)}
         />
       )}
+
+      <AssignTaskDialog open={assignOpen} onOpenChange={setAssignOpen} session={session} />
     </div>
   )
 }
