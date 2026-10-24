@@ -4,6 +4,14 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { colorForIndex } from "@/lib/group-colors"
+import {
+  checkTeacherForClass,
+  checkTeacherForClassGroup,
+  checkTeacherForSession,
+  checkTeacherForSessionGroup,
+  checkTeacherForSessionSlot,
+  checkTeacherForStudent,
+} from "@/lib/teacher-guard"
 import { PLAN_DEFAULT, planLimits, type Plan } from "@/lib/plans"
 
 /* Bảo mật: device_token/student_id đều là UUID (crypto.randomUUID() ở sảnh
@@ -118,6 +126,8 @@ export async function createClassAction(
 
 export async function deleteClassAction(classId: string) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClass(supabase, classId)
+  if (guardError) throw new Error(guardError)
   const { error } = await supabase.from("classes").delete().eq("id", classId)
   if (error) throw new Error(error.message)
   revalidatePath("/dashboard")
@@ -126,6 +136,8 @@ export async function deleteClassAction(classId: string) {
 
 export async function renameClassAction(classId: string, name: string) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClass(supabase, classId)
+  if (guardError) throw new Error(guardError)
   const { error } = await supabase.from("classes").update({ name }).eq("id", classId)
   if (error) throw new Error(error.message)
   revalidatePath(`/classes/${classId}`)
@@ -133,6 +145,8 @@ export async function renameClassAction(classId: string, name: string) {
 
 export async function rotateShareTokenAction(classId: string) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClass(supabase, classId)
+  if (guardError) throw new Error(guardError)
   const token = crypto.randomUUID().replace(/-/g, "").slice(0, 20)
   const { error } = await supabase
     .from("classes")
@@ -146,6 +160,8 @@ export async function rotateShareTokenAction(classId: string) {
 
 export async function updateStudentNameAction(studentId: string, name: string) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForStudent(supabase, studentId)
+  if (guardError) throw new Error(guardError)
   const { error } = await supabase
     .from("students")
     .update({ name: name.trim() || null })
@@ -155,6 +171,8 @@ export async function updateStudentNameAction(studentId: string, name: string) {
 
 export async function bulkSetNamesAction(classId: string, names: string[]) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClass(supabase, classId)
+  if (guardError) return
   const { data: students } = await supabase
     .from("students")
     .select("id, slot_number")
@@ -173,6 +191,8 @@ export async function importStudentsFromListAction(
   names: string[],
 ): Promise<{ ok: boolean; added?: number; error?: string }> {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClass(supabase, classId)
+  if (guardError) return { ok: false, error: guardError }
   const clean = names
     .map((n) => (typeof n === "string" ? n.trim() : ""))
     .filter((n) => n.length > 0)
@@ -240,6 +260,8 @@ export async function importStudentsFromListAction(
 
 export async function setCapacityAction(classId: string, newCapacity: number) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClass(supabase, classId)
+  if (guardError) return
   const cap = Math.max(1, Math.min(80, newCapacity))
   const { data: cls } = await supabase
     .from("classes")
@@ -265,6 +287,8 @@ export async function setCapacityAction(classId: string, newCapacity: number) {
 
 export async function addClassGroupAction(classId: string) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClass(supabase, classId)
+  if (guardError) throw new Error(guardError)
   const { data: groups } = await supabase
     .from("class_groups")
     .select("group_number")
@@ -292,6 +316,19 @@ export async function moveStudentsToGroupAction(
   classId: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClass(supabase, classId)
+  if (guardError) return { ok: false, error: guardError }
+  // Nhóm đích cũng phải thuộc đúng lớp này (không cho chuyển HS sang nhóm của lớp khác).
+  if (targetGroupId) {
+    const { data: target } = await supabase
+      .from("class_groups")
+      .select("class_id")
+      .eq("id", targetGroupId)
+      .maybeSingle()
+    if (!target || target.class_id !== classId) {
+      return { ok: false, error: "Nhóm đích không thuộc lớp này." }
+    }
+  }
 
   if (studentIds.length === 0) return { ok: true }
 
@@ -358,6 +395,17 @@ export async function setGroupLeaderAction(
   classId: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClass(supabase, classId)
+  if (guardError) return { ok: false, error: guardError }
+  // Nhóm được gán leader cũng phải thuộc đúng lớp này.
+  const { data: groupRow } = await supabase
+    .from("class_groups")
+    .select("class_id")
+    .eq("id", groupId)
+    .maybeSingle()
+  if (!groupRow || groupRow.class_id !== classId) {
+    return { ok: false, error: "Nhóm không thuộc lớp này." }
+  }
 
   if (leaderStudentId) {
     // Leader phải là thành viên của nhóm
@@ -400,6 +448,8 @@ export async function leaderUpdateGroupMembersAction(input: {
   action: "add" | "remove"
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
+  // device_token luôn là UUID — từ chối sớm giá trị lạ (phòng thủ theo chiều sâu).
+  if (!isUuid(input.deviceToken)) return { ok: false, error: "Không xác thực được nhóm trưởng" }
 
   // Xác thực leader + device_token
   const { data: leader } = await supabase
@@ -532,6 +582,8 @@ export async function swapStudentSlotsAction(
   studentBId: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClass(supabase, classId)
+  if (guardError) return { ok: false, error: guardError }
   const res = await swapStudentSlots(supabase, classId, studentAId, studentBId)
   if (res.ok) revalidatePath(`/classes/${classId}/roster`)
   return res
@@ -547,6 +599,7 @@ export async function leaderSwapSlotsAction(input: {
   targetStudentId: string
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
+  if (!isUuid(input.deviceToken)) return { ok: false, error: "Không xác thực được nhóm trưởng" }
 
   // Xác thực leader + device_token
   const { data: leader } = await supabase
@@ -583,6 +636,8 @@ export async function leaderSwapSlotsAction(input: {
 
 export async function removeClassGroupAction(classGroupId: string, classId: string) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClassGroup(supabase, classGroupId)
+  if (guardError) throw new Error(guardError)
   const { error } = await supabase.from("class_groups").delete().eq("id", classGroupId)
   if (error) throw new Error(error.message)
   revalidatePath(`/classes/${classId}/roster`)
@@ -594,6 +649,8 @@ export async function setGroupMembersAction(
   classId: string,
 ) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClassGroup(supabase, classGroupId)
+  if (guardError) throw new Error(guardError)
   await supabase.from("class_group_members").delete().eq("class_group_id", classGroupId)
   if (studentIds.length > 0) {
     await supabase
@@ -616,6 +673,8 @@ export async function createSessionAction(
   },
 ) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClass(supabase, classId)
+  if (guardError) throw new Error(guardError)
   const useFixed = input.useFixedGroups ?? true
   const { data: session, error } = await supabase
     .from("sessions")
@@ -706,6 +765,8 @@ async function revalidateSessionPage(sessionId: string) {
 
 export async function startSessionAction(sessionId: string, durationSeconds: number) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSession(supabase, sessionId)
+  if (guardError) throw new Error(guardError)
   const startedAt = new Date()
   const unlimited = durationSeconds <= 0
   const endsAt = unlimited ? null : new Date(startedAt.getTime() + durationSeconds * 1000)
@@ -726,6 +787,8 @@ export async function startSessionAction(sessionId: string, durationSeconds: num
 
 export async function pauseSessionAction(sessionId: string) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSession(supabase, sessionId)
+  if (guardError) throw new Error(guardError)
   const { error } = await supabase
     .from("sessions")
     .update({ status: "idle", ends_at: null })
@@ -737,6 +800,8 @@ export async function pauseSessionAction(sessionId: string) {
 
 export async function endSessionAction(sessionId: string) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSession(supabase, sessionId)
+  if (guardError) throw new Error(guardError)
   const { error } = await supabase
     .from("sessions")
     .update({ status: "ended", ends_at: null })
@@ -749,6 +814,8 @@ export async function endSessionAction(sessionId: string) {
 
 export async function reopenSessionAction(sessionId: string, extraSeconds: number) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSession(supabase, sessionId)
+  if (guardError) throw new Error(guardError)
   const startedAt = new Date()
   const unlimited = extraSeconds <= 0
   const endsAt = unlimited ? null : new Date(startedAt.getTime() + Math.max(30, extraSeconds) * 1000)
@@ -769,6 +836,8 @@ export async function reopenSessionAction(sessionId: string, extraSeconds: numbe
 
 export async function unlockGroupAction(sessionGroupId: string, clearSubmission = false) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSessionGroup(supabase, sessionGroupId)
+  if (guardError) throw new Error(guardError)
   // Mở khóa nhóm: trả claimed về false
   const { error } = await supabase
     .from("session_groups")
@@ -789,6 +858,8 @@ export async function unlockGroupAction(sessionGroupId: string, clearSubmission 
 
 export async function unlockSlotAction(sessionSlotId: string, clearSubmission = true) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSessionSlot(supabase, sessionSlotId)
+  if (guardError) throw new Error(guardError)
   // Mở khóa ô cá nhân: gỡ student_id để ô trở về trống, HS khác có thể chọn lại
   const { error } = await supabase
     .from("session_slots")
@@ -804,6 +875,8 @@ export async function unlockSlotAction(sessionSlotId: string, clearSubmission = 
 
 export async function togglePasteAction(sessionId: string, allow: boolean) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSession(supabase, sessionId)
+  if (guardError) throw new Error(guardError)
   const { error } = await supabase
     .from("sessions")
     .update({ allow_paste: allow })
@@ -813,6 +886,8 @@ export async function togglePasteAction(sessionId: string, allow: boolean) {
 
 export async function shareResultsAction(sessionId: string, share: boolean) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSession(supabase, sessionId)
+  if (guardError) throw new Error(guardError)
   const { error } = await supabase
     .from("sessions")
     .update({ results_shared_at: share ? new Date().toISOString() : null })
@@ -822,6 +897,8 @@ export async function shareResultsAction(sessionId: string, share: boolean) {
 
 export async function toggleDownloadAction(sessionId: string, allow: boolean) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSession(supabase, sessionId)
+  if (guardError) throw new Error(guardError)
   const { error } = await supabase
     .from("sessions")
     .update({ allow_download: allow })
@@ -842,6 +919,8 @@ export async function saveSessionPromptAction(
   },
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSession(supabase, sessionId)
+  if (guardError) return { ok: false, error: guardError }
   // Bảo mật 24/10/2026: đề bài cũng phải sanitize như bài nộp — trước đây
   // prompt_text lưu thô, chỉ được cứu ở tầng render (stored XSS tiềm ẩn).
   const { sanitizeSubmissionHtml } = await import("@/lib/rich-text")
@@ -869,6 +948,8 @@ export async function saveSessionPromptAction(
 
 export async function deleteSessionAction(sessionId: string, classId: string) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSession(supabase, sessionId)
+  if (guardError) throw new Error(guardError)
   const { error } = await supabase.from("sessions").delete().eq("id", sessionId)
   if (error) throw new Error(error.message)
   revalidatePath(`/classes/${classId}/sessions`)
@@ -876,6 +957,8 @@ export async function deleteSessionAction(sessionId: string, classId: string) {
 
 export async function toggleShareScoresAction(classId: string, shared: boolean) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForClass(supabase, classId)
+  if (guardError) return
   const { data: cls } = await supabase
     .from("classes")
     .select("teacher_id")
@@ -921,6 +1004,26 @@ export async function saveAnnotationAction(args: {
   score: number | null
 }) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSession(supabase, args.sessionId)
+  if (guardError) throw new Error(guardError)
+  // Nhóm/ô chấm cũng phải thuộc đúng phiên này — nếu không, khối cập nhật
+  // điểm bên dưới sẽ ghi điểm sang phiên của GV khác.
+  if (args.sessionGroupId) {
+    const { data: sgCheck } = await supabase
+      .from("session_groups")
+      .select("session_id")
+      .eq("id", args.sessionGroupId)
+      .maybeSingle()
+    if (!sgCheck || sgCheck.session_id !== args.sessionId) throw new Error("Nhóm không thuộc phiên này.")
+  }
+  if (args.sessionSlotId) {
+    const { data: ssCheck } = await supabase
+      .from("session_slots")
+      .select("session_id")
+      .eq("id", args.sessionSlotId)
+      .maybeSingle()
+    if (!ssCheck || ssCheck.session_id !== args.sessionId) throw new Error("Ô không thuộc phiên này.")
+  }
   // Upsert via unique partial index; easier: find existing first
   const q = supabase.from("annotations").select("id").eq("session_id", args.sessionId)
   if (args.sessionGroupId) q.eq("session_group_id", args.sessionGroupId)
@@ -1051,6 +1154,8 @@ export async function overrideStudentScoreAction(
   score: number | null,
 ) {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSession(supabase, sessionId)
+  if (guardError) throw new Error(guardError)
   const { data: existed } = await supabase
     .from("student_scores")
     .select("id, score")
@@ -1080,6 +1185,8 @@ export async function getGroupMembersWithScoresAction(
   sessionGroupId: string,
 ): Promise<{ studentId: string; name: string; score: number | null }[]> {
   const supabase = await createClient()
+  const guardError = await checkTeacherForSessionGroup(supabase, sessionGroupId)
+  if (guardError) return []
   const { data: sg } = await supabase
     .from("session_groups")
     .select("class_group_id, session_id")

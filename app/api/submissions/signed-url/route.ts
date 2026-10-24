@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { createClient } from "@/lib/supabase/server"
+import { validateStoragePath } from "@/lib/route-guards"
 
 const SUBMISSIONS_BUCKET = "submissions"
 // Bucket được phép ký URL qua API này (allowlist — không ký bừa bucket khác).
@@ -20,6 +22,17 @@ export async function POST(request: NextRequest) {
     const bucket: string = ALLOWED_BUCKETS.includes(body.bucket as (typeof ALLOWED_BUCKETS)[number])
       ? (body.bucket as string)
       : SUBMISSIONS_BUCKET
+
+    // Bảo mật 24/10/2026 (GĐ2): trước đây route ký URL cho bất kỳ path nào.
+    // Giờ path phải gắn với phiên thật (và GV thì phải là phiên của mình).
+    const userClient = await createClient()
+    const {
+      data: { user },
+    } = await userClient.auth.getUser()
+    const pathError = await validateStoragePath(userClient, bucket, path, user?.id ?? null)
+    if (pathError) {
+      return NextResponse.json({ error: pathError }, { status: 403 })
+    }
 
     const supabase = createAdminClient()
     if (!supabase) {

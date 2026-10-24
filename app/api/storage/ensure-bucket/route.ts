@@ -41,6 +41,14 @@ function configFor(bucket: string): BucketConfig {
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as { bucket?: string }
   const bucket = body.bucket ?? SUBMISSIONS_BUCKET
+  // Bảo mật 24/10/2026 (GĐ2): trước đây nhận tên bucket tùy ý để tạo/sửa
+  // bucket bằng service key. Giờ chỉ đúng 3 bucket của app, cấu hình cố định
+  // theo configFor (caller không chỉnh được limit/public). Route vẫn cho ẩn
+  // danh gọi vì trang nộp bài của HS cũng gọi nó (lỗi ở đó chỉ warn).
+  const ALLOWED_BUCKETS = [SUBMISSIONS_BUCKET, PRESENTATIONS_BUCKET, SUBMISSION_MEDIA_BUCKET]
+  if (!ALLOWED_BUCKETS.includes(bucket)) {
+    return NextResponse.json({ ok: false, error: "Bucket không hợp lệ.", bucket }, { status: 400 })
+  }
   const config = configFor(bucket)
   const fileSizeLimit = config.fileSizeLimit
 
