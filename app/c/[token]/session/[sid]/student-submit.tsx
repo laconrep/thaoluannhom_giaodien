@@ -42,11 +42,11 @@ import {
   studentClaimSlotAction,
   submitIndividualReportAction,
 } from "@/app/actions"
+import { resolveStudentIdentityAction } from "@/app/student-privacy-actions"
 import type {
   SessionRow,
   SessionGroupRow,
   SessionSlotRow,
-  StudentRow,
   SubmissionFile,
   SubmissionFileKind,
 } from "@/lib/types"
@@ -58,7 +58,9 @@ type Props = {
   session: SessionRow
   groups: SessionGroupRow[]
   slots: SessionSlotRow[]
-  students: StudentRow[]
+  // Bảo mật 24/10/2026 (GĐ3): roster KHÔNG còn device_token — nhận diện
+  // thiết bị chuyển sang server action resolveStudentIdentityAction.
+  students: { id: string; slot_number: number; name: string | null }[]
   shareToken: string
 }
 
@@ -181,34 +183,38 @@ export function StudentSubmit({
     setIdentityLoaded(true)
   }, [kind, session.id, session.use_fixed_groups, students])
 
-  // Load danh tính cho phiên cá nhân (cùng quy tắc tin cậy như sảnh lớp)
+  // Load danh tính cho phiên cá nhân (cùng quy tắc tin cậy như sảnh lớp).
+  // Bảo mật 24/10/2026 (GĐ3): đối chiếu device_token chuyển sang server
+  // action — client không còn nhận device_token của cả lớp để tự so sánh.
+  // Thứ tự như cũ: tên sảnh lớp (khớp token chính xác) → token thiết bị →
+  // tên tự nhận trong phiên (chưa gắn thiết bị hoặc khớp token).
   useEffect(() => {
     if (kind !== "individual" || students.length === 0) return
     if (typeof window === "undefined") return
+    let cancelled = false
     const dt = lobbyDeviceToken()
     const savedClass = localStorage.getItem(`class_${classId}_student`)
-    const byClassKey = savedClass ? students.find((s) => s.id === savedClass) : undefined
-    if (byClassKey && byClassKey.device_token === dt) {
-      setSelfStudentId(byClassKey.id)
-      setIdentityLoaded(true)
-      return
-    }
-    const byToken = students.find((s) => s.device_token === dt)
-    if (byToken) {
-      setSelfStudentId(byToken.id)
-      setIdentityLoaded(true)
-      return
-    }
     const savedSelf = localStorage.getItem(`tln_self_${session.id}`)
-    if (savedSelf) {
-      const st = students.find((s) => s.id === savedSelf)
-      if (st && (!st.device_token || st.device_token === dt)) {
-        setSelfStudentId(st.id)
+    resolveStudentIdentityAction(classId, dt, savedClass, true).then((r) => {
+      if (cancelled) return
+      if (r.studentId) {
+        setSelfStudentId(r.studentId)
         setIdentityLoaded(true)
         return
       }
+      if (savedSelf) {
+        resolveStudentIdentityAction(classId, dt, savedSelf).then((r2) => {
+          if (cancelled) return
+          if (r2.studentId) setSelfStudentId(r2.studentId)
+          setIdentityLoaded(true)
+        })
+      } else {
+        setIdentityLoaded(true)
+      }
+    })
+    return () => {
+      cancelled = true
     }
-    setIdentityLoaded(true)
   }, [kind, classId, session.id, students])
 
   // Realtime

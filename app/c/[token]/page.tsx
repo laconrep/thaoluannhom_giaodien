@@ -19,9 +19,12 @@ export default async function StudentLanding({
 
   const [{ data: students }, { data: sessions }, groups, { data: members }] =
     await Promise.all([
+      // Bảo mật 24/10/2026 (GĐ3): KHÔNG gửi device_token xuống client nữa.
+      // Cờ "ô của mình / ô bị khóa" được tính phía server qua
+      // getLobbyRosterAction trong class-lobby.
       supabase
         .from("students")
-        .select("id, slot_number, name, device_token")
+        .select("id, slot_number, name")
         .eq("class_id", cls.id)
         .order("slot_number"),
       supabase

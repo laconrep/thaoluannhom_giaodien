@@ -10,6 +10,10 @@ import {
   leaderUpdateGroupMembersAction,
   studentClaimSlotAction,
 } from "@/app/actions"
+import {
+  getLobbyRosterAction,
+  resolveStudentIdentityAction,
+} from "@/app/student-privacy-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -26,11 +30,15 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { groupCardStyle, groupPillStyle } from "@/lib/group-colors"
 
+// Bảo mật 24/10/2026 (GĐ3): roster KHÔNG còn device_token. Cờ mine/locked
+// được tính phía server (getLobbyRosterAction) từ token của chính thiết bị
+// gọi — client không bao giờ thấy token của bạn khác.
 type Student = {
   id: string
   slot_number: number
   name: string | null
-  device_token: string | null
+  mine: boolean
+  locked: boolean
 }
 type Session = {
   id: string
@@ -66,12 +74,16 @@ export function ClassLobby({
   classId: string
   className: string
   token: string
-  students: Student[]
+  students: { id: string; slot_number: number; name: string | null }[]
   sessions: Session[]
   groups: Group[]
   members: GroupMember[]
 }) {
-  const [students, setStudents] = useState(initialStudents)
+  // Cờ mine/locked ban đầu chưa biết (page chỉ gửi tên) → refreshStudents
+  // lúc mount sẽ điền cờ thật từ server.
+  const [students, setStudents] = useState<Student[]>(() =>
+    initialStudents.map((s) => ({ ...s, mine: false, locked: false })),
+  )
   const [sessions, setSessions] = useState(initialSessions)
   const [groups, setGroups] = useState<Group[]>(initialGroups)
   const [members, setMembers] = useState<GroupMember[]>(initialMembers)
@@ -83,14 +95,15 @@ export function ClassLobby({
   // Đồng bộ dữ liệu từ DB (dùng cho Realtime event + polling fallback + sau các action).
   // Dùng useCallback để ổn định tham chiếu, tránh chạy lại effect liên tục.
   const refreshStudents = useCallback(async () => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from("students")
-      .select("id, slot_number, name, device_token")
-      .eq("class_id", classId)
-      .order("slot_number")
-    if (data) setStudents(data as Student[])
-  }, [classId])
+    const { students: roster } = await getLobbyRosterAction(classId, deviceToken)
+    setStudents(roster)
+  }, [classId, deviceToken])
+
+  // Nạp cờ mine/locked ngay khi mở sảnh (trước đây page gửi kèm token nên
+  // cờ có sẵn; giờ phải hỏi server để không lộ token).
+  useEffect(() => {
+    refreshStudents()
+  }, [refreshStudents])
 
   const refreshGroups = useCallback(async () => {
     const supabase = createClient()
@@ -109,24 +122,25 @@ export function ClassLobby({
 
   // Load identity từ localStorage — chỉ vào thẳng nếu ô còn giữ đúng device_token của thiết bị mình.
   // Nếu GV đã mở khóa hoặc thiết bị khác đã chiếm ô → quay về màn chọn ô để chọn lại.
+  // Bảo mật 24/10/2026 (GĐ3): đối chiếu token chuyển sang server action.
   useEffect(() => {
     const dt = getDeviceToken()
     const saved = localStorage.getItem(`class_${classId}_student`)
-    if (saved) {
-      const st = students.find((s) => s.id === saved)
-      if (st && st.device_token === dt) {
-        setMyStudentId(saved)
-        return
+    let cancelled = false
+    resolveStudentIdentityAction(classId, dt, saved, true).then((r) => {
+      if (cancelled) return
+      if (r.studentId) {
+        setMyStudentId(r.studentId)
+        localStorage.setItem(`class_${classId}_student`, r.studentId)
+      } else {
+        localStorage.removeItem(`class_${classId}_student`)
+        setMyStudentId(null)
       }
-      localStorage.removeItem(`class_${classId}_student`)
+    })
+    return () => {
+      cancelled = true
     }
-    // cũng thử tìm qua device_token
-    const match = students.find((s) => s.device_token === dt)
-    if (match) {
-      setMyStudentId(match.id)
-      localStorage.setItem(`class_${classId}_student`, match.id)
-    }
-  }, [classId, students])
+  }, [classId, students, deviceToken])
 
   // Realtime khỏe hay không → quyết định nhịp poll dự phòng (xem useSmartPoll).
   const realtimeOk = useRef(false)
@@ -319,8 +333,8 @@ export function ClassLobby({
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 max-h-[60vh] overflow-auto p-1">
               {students.map((s) => {
                 const hasName = !!s.name?.trim()
-                const isMine = s.device_token === deviceToken
-                const lockedByOther = !!s.device_token && s.device_token !== deviceToken
+                const isMine = s.mine
+                const lockedByOther = s.locked
                 const clickable = hasName && !lockedByOther
                 const g = studentToGroup.get(s.id)
                 const isLeader = groups.some((x) => x.leader_student_id === s.id)

@@ -1,17 +1,14 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import type {
   SessionRow,
-  SessionGroupRow,
-  SessionSlotRow,
   SubmissionRow,
-  AnnotationRow,
   SubmissionFile,
   AnnotationItem,
-  StudentRow,
 } from "@/lib/types"
+import { getOwnResultsAction, type OwnResults } from "@/app/student-privacy-actions"
 import { Button } from "@/components/ui/button"
 import { SubmissionText } from "@/components/submission-text"
 import { Users, Download, FileText, Presentation, File as FileIcon, RotateCw } from "lucide-react"
@@ -55,24 +52,12 @@ export function ResultsViewer({
   classId,
   className,
   session,
-  groups,
-  slots,
-  submissions,
-  annotations,
   students,
-  ownGroupByStudent,
-  feedbacks,
 }: {
   classId: string
   className: string
   session: SessionRow
-  groups: SessionGroupRow[]
-  slots: SessionSlotRow[]
-  submissions: SubmissionRow[]
-  annotations: AnnotationRow[]
-  students: StudentRow[]
-  ownGroupByStudent: Record<string, string>
-  feedbacks: Record<string, string>
+  students: { id: string; slot_number: number; name: string | null }[]
 }) {
   const isGroup = session.kind === "group"
   const [activeFileIdx, setActiveFileIdx] = useState(0)
@@ -82,81 +67,63 @@ export function ResultsViewer({
   // đúng bộ dấu của slide đó.
   const [embedSlide, setEmbedSlide] = useState(1)
 
+  // Bảo mật 24/10/2026 (GĐ3): nhận diện + dữ liệu kết quả lấy qua server
+  // action getOwnResultsAction — server đối chiếu device_token rồi chỉ trả
+  // đúng bài của em đó. Client không bao giờ nhận device_token hay bài của
+  // bạn khác (trước đây toàn bộ dữ liệu phiên được gửi xuống rồi lọc ở
+  // client, sửa localStorage là xem được bài bạn).
+  const [selfId, setSelfId] = useState<string | null>(null)
+  const [identityReady, setIdentityReady] = useState(false)
+  const [own, setOwn] = useState<OwnResults | null>(null)
+  const [ownLoading, setOwnLoading] = useState(false)
+
+  const loadOwn = useCallback(
+    async (deviceToken: string | null, studentId: string | null) => {
+      setOwnLoading(true)
+      try {
+        const res = await getOwnResultsAction(session.id, deviceToken, studentId)
+        setOwn(res)
+        setSelfId(res.student?.id ?? null)
+      } catch {
+        setOwn(null)
+      } finally {
+        setOwnLoading(false)
+      }
+    },
+    [session.id],
+  )
+
   // Nhận diện học sinh trên thiết bị này (cùng cơ chế với sảnh lớp và trang
   // nộp bài): ưu tiên device_token đã gắn với một học sinh; nếu chưa có thì
   // dùng tên đã chọn trước đó trên thiết bị. Mỗi học sinh chỉ xem được bài
   // của mình/nhóm mình.
-  const [selfId, setSelfId] = useState<string | null>(null)
-  const [identityReady, setIdentityReady] = useState(false)
   useEffect(() => {
+    let cancelled = false
     try {
       const dt = localStorage.getItem("device_token")
-      let found: StudentRow | undefined
-      if (dt) found = students.find((s) => !!s.device_token && s.device_token === dt)
-      if (!found) {
-        const saved =
-          localStorage.getItem(`class_${classId}_student`) ||
-          localStorage.getItem(`tln_self_${session.id}`)
-        if (saved) found = students.find((s) => s.id === saved)
-      }
-      if (found) setSelfId(found.id)
+      const saved =
+        localStorage.getItem(`class_${classId}_student`) ||
+        localStorage.getItem(`tln_self_${session.id}`)
+      loadOwn(dt, saved).then(() => {
+        if (!cancelled) setIdentityReady(true)
+      })
     } catch {
       // localStorage không khả dụng — học sinh sẽ chọn tên thủ công.
+      setIdentityReady(true)
     }
-    setIdentityReady(true)
-  }, [students, classId, session.id])
+    return () => {
+      cancelled = true
+    }
+  }, [classId, session.id, loadOwn])
 
-  const selfStudent = selfId ? students.find((s) => s.id === selfId) ?? null : null
-
-  const subsByGroup = useMemo(() => {
-    const m: Record<string, SubmissionRow> = {}
-    for (const s of submissions) if (s.session_group_id) m[s.session_group_id] = s
-    return m
-  }, [submissions])
-
-  const annsByGroup = useMemo(() => {
-    const m: Record<string, AnnotationRow> = {}
-    for (const a of annotations) if (a.session_group_id) m[a.session_group_id] = a
-    return m
-  }, [annotations])
-
-  const subsBySlot = useMemo(() => {
-    const m: Record<string, SubmissionRow> = {}
-    for (const s of submissions) if (s.session_slot_id) m[s.session_slot_id] = s
-    return m
-  }, [submissions])
-
-  const annsBySlot = useMemo(() => {
-    const m: Record<string, AnnotationRow> = {}
-    for (const a of annotations) if (a.session_slot_id) m[a.session_slot_id] = a
-    return m
-  }, [annotations])
-
+  const selfStudent = own?.student ?? null
+  const hasTarget = own?.hasTarget ?? false
+  const targetLabel = own?.targetLabel ?? ""
   // Bài duy nhất học sinh được xem: nhóm của mình (phiên nhóm) hoặc ô của
-  // mình (phiên cá nhân).
-  const myGroup = isGroup && selfId ? groups.find((g) => g.id === ownGroupByStudent[selfId]) ?? null : null
-  const mySlot = !isGroup && selfId ? slots.find((s) => s.student_id === selfId) ?? null : null
-  const hasTarget = isGroup ? !!myGroup : !!mySlot
-  const sub = isGroup
-    ? myGroup
-      ? subsByGroup[myGroup.id]
-      : undefined
-    : mySlot
-      ? subsBySlot[mySlot.id]
-      : undefined
-  const ann = isGroup
-    ? myGroup
-      ? annsByGroup[myGroup.id]
-      : undefined
-    : mySlot
-      ? annsBySlot[mySlot.id]
-      : undefined
-  const targetLabel = isGroup
-    ? (myGroup?.label ?? "")
-    : selfStudent?.name
-      ? `Bài của ${selfStudent.name}`
-      : "Bài của em"
-  const feedback = sub ? feedbacks[sub.id] : undefined
+  // mình (phiên cá nhân) — đã lọc phía server.
+  const sub = own?.submission ?? undefined
+  const ann = own?.annotation ?? undefined
+  const feedback = own?.feedback ?? undefined
 
   useEffect(() => {
     setEmbedSlide(1)
@@ -205,7 +172,9 @@ export function ResultsViewer({
     } catch {
       // bỏ qua nếu localStorage không khả dụng
     }
-    setSelfId(studentId)
+    // Chọn tên trực tiếp (không kèm device_token) để server trả đúng bài của
+    // tên vừa chọn, kể cả khi thiết bị này đã gắn với tên khác trước đó.
+    void loadOwn(null, studentId)
   }
 
   function resetSelf() {
@@ -215,6 +184,7 @@ export function ResultsViewer({
       // bỏ qua
     }
     setSelfId(null)
+    setOwn(null)
   }
 
   return (
@@ -233,9 +203,15 @@ export function ResultsViewer({
       </header>
 
       <div className="max-w-5xl mx-auto p-4">
-        {!identityReady ? (
+        {!identityReady || ownLoading ? (
           <div className="bg-card rounded-lg border p-12 text-center">
             <p className="text-muted-foreground">Đang tải kết quả…</p>
+          </div>
+        ) : own?.notShared ? (
+          <div className="bg-card rounded-lg border p-12 text-center space-y-3">
+            <p className="text-muted-foreground">
+              Giáo viên chưa mở chia sẻ kết quả cho phiên này. Em vui lòng quay lại sau.
+            </p>
           </div>
         ) : !selfId ? (
           <div className="bg-card rounded-lg border p-6 space-y-4">
