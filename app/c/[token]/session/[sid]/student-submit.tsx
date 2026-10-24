@@ -30,6 +30,7 @@ import { RichTextEditor } from "@/components/rich-text-editor"
 import { PromptView, promptHasText } from "@/components/prompt-view"
 import { createClient } from "@/lib/supabase/client"
 import { compressImageIfNeeded } from "@/lib/compress-image"
+import { computeImageHash } from "@/lib/image-hash"
 import { useCountdown } from "@/lib/use-countdown"
 import { formatDuration } from "@/lib/utils-format"
 import { isRichTextEmpty } from "@/lib/rich-text"
@@ -445,12 +446,16 @@ export function StudentSubmit({
       if (!signedRes.ok || !signedBody?.signedUrl) {
         throw new Error(signedBody?.error ?? "Không tạo được link tệp.")
       }
+      // aHash của ảnh (tính trên đúng file đã nén vừa upload) — server dùng để
+      // cảnh báo trùng bài ngay lúc nộp. Lỗi thì bỏ qua, không chặn nộp bài.
+      const hash = s.kind === "image" ? await computeImageHash(s.file) : undefined
       uploaded.push({
         url: signedBody.signedUrl,
         name: s.file.name,
         kind: s.kind,
         mime: s.file.type || "application/octet-stream",
         rotation: 0,
+        hash,
       })
     }
     return uploaded

@@ -14,6 +14,7 @@ import {
 import type {
   AnnotationItem,
   AnnotationRow,
+  DuplicateFlagRow,
   SessionRow,
   SessionSlotRow,
   SubmissionFile,
@@ -57,6 +58,7 @@ import {
   Check,
   Sparkles,
   Share2,
+  TriangleAlert,
 } from "lucide-react"
 
 function getFilesI(sub: SubmissionRow | undefined): SubmissionFile[] {
@@ -85,6 +87,7 @@ export function IndividualBoard({
   students,
   submissions: initialSubs,
   annotations: initialAnns,
+  flags: initialFlags = [],
 }: {
   classId: string
   className: string
@@ -94,11 +97,13 @@ export function IndividualBoard({
   students: { id: string; slot_number: number; name: string | null }[]
   submissions: SubmissionRow[]
   annotations: AnnotationRow[]
+  flags?: DuplicateFlagRow[]
 }) {
   const [session, setSession] = useState(initialSession)
   const [slots, setSlots] = useState(initialSlots)
   const [subs, setSubs] = useState(initialSubs)
   const [anns, setAnns] = useState(initialAnns)
+  const [flags, setFlags] = useState(initialFlags)
   // T3: cache nét vẽ tải lười (cột data không select ở page)
   const { ensureData: ensureAnnData, dataFor: annDataFor, isReady: isAnnReady } =
     useLazyAnnotationData()
@@ -163,6 +168,31 @@ export function IndividualBoard({
           }
         },
       )
+      // Cờ trùng bài: HS vừa nộp là GV đang mở bảng thấy badge ngay.
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "submission_duplicate_flags",
+          filter: `session_id=eq.${session.id}`,
+        },
+        (p: { eventType: string; new?: DuplicateFlagRow; old?: { id?: string } }) => {
+          if ((p.eventType === "INSERT" || p.eventType === "UPDATE") && p.new) {
+            setFlags((cur) => {
+              const idx = cur.findIndex((x) => x.id === p.new!.id)
+              if (idx >= 0) {
+                const n = cur.slice()
+                n[idx] = p.new!
+                return n
+              }
+              return [...cur, p.new!]
+            })
+          } else if (p.eventType === "DELETE" && p.old?.id) {
+            setFlags((cur) => cur.filter((x) => x.id !== p.old!.id))
+          }
+        },
+      )
       .subscribe()
     return () => {
       supabase.removeChannel(ch)
@@ -181,10 +211,34 @@ export function IndividualBoard({
     return m
   }, [anns])
 
+  // Cờ trùng bài theo bài nộp — chỉ giữ cờ của bài vẫn còn (bài bị "Mở lại
+  // ô" xoá thì cờ cũ không hiện nữa).
+  const flagsBySubmission = useMemo(() => {
+    const m: Record<string, DuplicateFlagRow[]> = {}
+    for (const f of flags) {
+      if (!subs.some((s) => s.id === f.submission_id)) continue
+      ;(m[f.submission_id] ??= []).push(f)
+    }
+    return m
+  }, [flags, subs])
+
+  // Tên HS của ô bị nghi là trùng với — để GV biết so với bài của ai.
+  function matchedName(f: DuplicateFlagRow): string {
+    const mSlot = slots.find((s) => s.id === f.matched_slot_id)
+    if (!mSlot) return "một ô khác"
+    if (mSlot.student_id) return studentMap[mSlot.student_id]?.name?.trim() || `Ô ${mSlot.slot_number}`
+    return `Ô ${mSlot.slot_number}`
+  }
+
   const openSlot = openSlotId ? slots.find((s) => s.id === openSlotId) : null
   const openStudent = openSlot?.student_id ? studentMap[openSlot.student_id] : null
   const openSub = openSlot ? subsBySlot[openSlot.id] : null
   const openAnn = openSlot ? annsBySlot[openSlot.id] : null
+  const openFlags = openSub ? flagsBySubmission[openSub.id] ?? [] : []
+  const openFlagNote =
+    openFlags.length > 0
+      ? ` — ⚠ Nghi ngờ trùng bài với ${matchedName(openFlags[0])} (${openFlags[0].similarity}%)`
+      : ""
 
   // T3.2: mở editor → tải lười cột data của annotation (nếu chưa có).
   useEffect(() => {
@@ -319,6 +373,7 @@ export function IndividualBoard({
               const firstImage = files.find((f) => f.kind === "image")
               const firstFile = files[0]
               const hasStudent = !!slot.student_id
+              const slotFlags = sub ? flagsBySubmission[sub.id] ?? [] : []
               return (
                 <div
                   key={slot.id}
@@ -334,6 +389,22 @@ export function IndividualBoard({
                       #{slot.slot_number}
                     </span>
                     <div className="flex items-center gap-0.5">
+                      {slotFlags.length > 0 && (
+                        <span
+                          title={slotFlags
+                            .map(
+                              (f) =>
+                                `Nghi ngờ trùng bài với ${matchedName(f)} (${f.similarity}% — ${
+                                  f.kind === "text" ? "nội dung giống hệt" : "ảnh giống nhau"
+                                })`,
+                            )
+                            .join("\n")}
+                          className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-px text-[9px] font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                        >
+                          <TriangleAlert className="size-3" aria-hidden="true" />
+                          Trùng?
+                        </span>
+                      )}
                       {sub && <Check className="size-3 text-primary" aria-hidden="true" />}
                       {ann?.score !== null && ann?.score !== undefined && (
                         <span className="text-[10px] font-bold text-primary tabular-nums">
@@ -405,7 +476,7 @@ export function IndividualBoard({
 
       {openSlot && (
         <AnnotationEditor
-          title={`${openStudent?.name || `Ô ${openSlot.slot_number}`} — ${session.title}`}
+          title={`${openStudent?.name || `Ô ${openSlot.slot_number}`} — ${session.title}${openFlagNote}`}
           files={getFilesI(openSub ?? undefined)}
           textContent={openSub?.text_content ?? null}
           initialData={annDataFor(openAnn)}

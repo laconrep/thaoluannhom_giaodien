@@ -39,7 +39,7 @@ export default async function IndividualSessionPage({
   }
   if (!session || session.kind !== "individual") notFound()
 
-  const [{ data: slots }, { data: students }, { data: cls }, { data: subs }, { data: anns }] =
+  const [{ data: slots }, { data: students }, { data: cls }, { data: subs }, { data: anns }, { data: flags }] =
     await Promise.all([
       supabase
         .from("session_slots")
@@ -52,6 +52,14 @@ export default async function IndividualSessionPage({
         .from("submissions")
         .select(
           "id, session_id, session_group_id, session_slot_id, image_url, text_content, files, submitted_at, is_auto_submitted",
+        )
+        .eq("session_id", sid),
+      // Cờ trùng bài (migration 009) — chưa chạy migration thì select lỗi,
+      // data null → flags rỗng, bảng vẫn chạy bình thường.
+      supabase
+        .from("submission_duplicate_flags")
+        .select(
+          "id, session_id, submission_id, matched_submission_id, matched_slot_id, kind, similarity, created_at",
         )
         .eq("session_id", sid),
       // T3: KHÔNG select cột data (nặng) — tải lười khi mở editor.
@@ -71,6 +79,7 @@ export default async function IndividualSessionPage({
       students={(students ?? []) as any}
       submissions={(subs ?? []) as any}
       annotations={(anns ?? []) as any}
+      flags={(flags ?? []) as any}
     />
   )
 }

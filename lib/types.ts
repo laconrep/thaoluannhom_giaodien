@@ -256,6 +256,23 @@ export type SubmissionFile = {
   kind: SubmissionFileKind
   mime: string
   rotation?: number // degrees: 0, 90, 180, 270
+  /** aHash 8x8 (16 ký tự hex) của ảnh — tính phía client lúc nộp bài, dùng
+   * để cảnh báo trùng bài (cùng tờ giấy chụp lại). Không khôi phục được ảnh
+   * từ hash nên lưu kèm file cũng không lộ nội dung bài của HS khác. */
+  hash?: string
+}
+
+/** Cờ cảnh báo trùng bài trong phiên cá nhân — CHỈ giáo viên thấy trên bảng
+ * chấm. Không tự trừ điểm, không chặn nộp bài. */
+export type DuplicateFlagRow = {
+  id: string
+  session_id: string
+  submission_id: string
+  matched_submission_id: string
+  matched_slot_id: string
+  kind: "text" | "image"
+  similarity: number // 0-100
+  created_at: string
 }
 
 export type SubmissionRow = {

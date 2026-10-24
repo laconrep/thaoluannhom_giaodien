@@ -1353,6 +1353,7 @@ export async function submitIndividualReportAction(args: {
     const firstImage = filesArr.find(
       (f: any) => f && typeof f === "object" && f.kind === "image" && typeof f.url === "string",
     ) as { url?: string } | undefined
+    let submissionId: string | null = existing?.id ?? null
     if (existing) {
       const { error } = await supabase
         .from("submissions")
@@ -1366,15 +1367,36 @@ export async function submitIndividualReportAction(args: {
         .eq("id", existing.id)
       if (error) return { ok: false, error: error.message }
     } else {
-      const { error } = await supabase.from("submissions").insert({
-        session_id: args.sessionId,
-        session_slot_id: args.sessionSlotId,
-        text_content: textContent,
-        files: filesArr,
-        image_url: firstImage?.url ?? null,
-        is_auto_submitted: args.isAuto ?? false,
-      })
+      const { data: inserted, error } = await supabase
+        .from("submissions")
+        .insert({
+          session_id: args.sessionId,
+          session_slot_id: args.sessionSlotId,
+          text_content: textContent,
+          files: filesArr,
+          image_url: firstImage?.url ?? null,
+          is_auto_submitted: args.isAuto ?? false,
+        })
+        .select("id")
+        .single()
       if (error) return { ok: false, error: error.message }
+      submissionId = (inserted as { id?: string } | null)?.id ?? null
+    }
+    // Cảnh báo trùng bài (phiên cá nhân): so với các ô khác trong cùng phiên
+    // ngay lúc nộp — chỉ ghi cờ cho GV, không bao giờ làm hỏng bài nộp.
+    if (submissionId) {
+      try {
+        const { refreshIndividualDuplicateFlags } = await import("@/lib/duplicate-flags")
+        await refreshIndividualDuplicateFlags(supabase, {
+          sessionId: args.sessionId,
+          slotId: args.sessionSlotId,
+          submissionId,
+          textContent,
+          files: filesArr as any,
+        })
+      } catch {
+        // Nuốt lỗi: cảnh báo là tính năng phụ, bài nộp đã lưu xong.
+      }
     }
     return { ok: true }
   } catch (e: any) {
