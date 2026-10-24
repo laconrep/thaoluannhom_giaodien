@@ -6,6 +6,15 @@ import { revalidatePath } from "next/cache"
 import { colorForIndex } from "@/lib/group-colors"
 import { PLAN_DEFAULT, planLimits, type Plan } from "@/lib/plans"
 
+/* Bảo mật: device_token/student_id đều là UUID (crypto.randomUUID() ở sảnh
+ * lớp và trang nộp bài). Các filter .or() dưới đây nội suy giá trị vào chuỗi
+ * — UUID không chứa dấu phẩy/chấm nên regex này chặn hẳn trò chèn
+ * `,device_token.like.%` để chiếm ô/tên của HS khác (báo cáo bảo mật
+ * 24/10/2026, mục 11). */
+function isUuid(v: string | null | undefined): v is string {
+  return !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+}
+
 /* ============ PLANS / QUOTA ============ */
 
 async function getPlan(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<Plan> {
@@ -833,10 +842,13 @@ export async function saveSessionPromptAction(
   },
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
+  // Bảo mật 24/10/2026: đề bài cũng phải sanitize như bài nộp — trước đây
+  // prompt_text lưu thô, chỉ được cứu ở tầng render (stored XSS tiềm ẩn).
+  const { sanitizeSubmissionHtml } = await import("@/lib/rich-text")
   const { error } = await supabase
     .from("sessions")
     .update({
-      prompt_text: prompt.text,
+      prompt_text: prompt.text ? sanitizeSubmissionHtml(prompt.text) : null,
       prompt_file: prompt.file,
       prompt_source: prompt.source,
     })
@@ -1113,7 +1125,7 @@ export async function getGroupMembersWithScoresAction(
 export async function studentSetNameAction(studentId: string, name: string, deviceToken: string) {
   const supabase = await createClient()
   const cleanName = name.trim().slice(0, 120)
-  if (!studentId || !deviceToken || !cleanName) throw new Error("Thông tin học sinh không hợp lệ.")
+  if (!studentId || !deviceToken || !cleanName || !isUuid(deviceToken)) throw new Error("Thông tin học sinh không hợp lệ.")
   const { error } = await supabase
     .from("students")
     .update({ name: cleanName, device_token: deviceToken })
@@ -1184,7 +1196,7 @@ export async function studentClaimSessionSlotAction(
   studentId: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
-  if (!sessionSlotId || !deviceToken || !studentId) return { ok: false, error: "Thông tin chọn ô không hợp lệ." }
+  if (!sessionSlotId || !deviceToken || !studentId || !isUuid(deviceToken) || !isUuid(studentId)) return { ok: false, error: "Thông tin chọn ô không hợp lệ." }
   const { data: slot, error: slotError } = await supabase
     .from("session_slots")
     .select("id, student_id")
@@ -1225,7 +1237,7 @@ export async function studentClaimSlotAction(
   deviceToken: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
-  if (!studentId || !deviceToken) return { ok: false, error: "Thông tin chọn ô không hợp lệ." }
+  if (!studentId || !deviceToken || !isUuid(deviceToken)) return { ok: false, error: "Thông tin chọn ô không hợp lệ." }
   const { data: updated, error } = await supabase
     .from("students")
     .update({ device_token: deviceToken })

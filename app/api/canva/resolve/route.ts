@@ -18,6 +18,8 @@ export async function POST(request: NextRequest) {
 
     const res = await fetch(url, {
       redirect: "follow",
+      // Bảo mật 24/10/2026: không để server lạ treo function (DoS nhẹ).
+      signal: AbortSignal.timeout(10000),
       headers: {
         // Canva trả nội dung khác cho bot — dùng UA trình duyệt thường.
         "User-Agent":
