@@ -7,6 +7,7 @@ import {
   SUBMISSION_IMAGE_EXTENSIONS,
   submissionMediaPublicUrl,
 } from "@/lib/submission-media"
+import { checkApiRateLimit } from "@/lib/rate-limit"
 
 function safePath(input: string): string | null {
   const path = input.trim().replace(/^\/+/, "")
@@ -20,6 +21,12 @@ function safePath(input: string): string | null {
 // Cấp signed upload URL cho ảnh học sinh chèn vào bài viết.
 // Bucket là public nên trả kèm publicUrl để nhúng trực tiếp vào HTML.
 export async function POST(request: NextRequest) {
+  if (!checkApiRateLimit(request)) {
+    return NextResponse.json(
+      { error: "Gửi quá nhiều yêu cầu, thử lại sau." },
+      { status: 429 },
+    )
+  }
   try {
     const body = (await request.json().catch(() => ({}))) as { path?: string }
     const path = safePath(typeof body.path === "string" ? body.path : "")
@@ -49,8 +56,9 @@ export async function POST(request: NextRequest) {
       .from(SUBMISSION_MEDIA_BUCKET)
       .createSignedUploadUrl(path, { upsert: false })
     if (error || !data?.token) {
+      console.error("[inline-image-upload-url]", error)
       return NextResponse.json(
-        { error: `Không tạo được đường dẫn tải ảnh: ${error?.message ?? "unknown error"}` },
+        { error: "Không tạo được đường dẫn tải ảnh." },
         { status: 502 },
       )
     }
@@ -61,8 +69,9 @@ export async function POST(request: NextRequest) {
       publicUrl: submissionMediaPublicUrl(data.path),
     })
   } catch (e: any) {
+    console.error("[inline-image-upload-url]", e)
     return NextResponse.json(
-      { error: `Không tạo được đường dẫn tải ảnh: ${e?.message ?? "lỗi không xác định"}` },
+      { error: "Không tạo được đường dẫn tải ảnh." },
       { status: 502 },
     )
   }

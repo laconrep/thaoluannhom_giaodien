@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { extractCanvaUrl } from "@/lib/canva"
 import { isMissingSchemaError } from "@/lib/ai/schema-error"
+import { checkTeacherForSession } from "@/lib/teacher-guard"
 
 // Luồng "chụp link Canva thành ảnh": giáo viên bấm nút trong khung chấm →
 // insert 1 dòng link_render_requests (pending) → trạm chấm (hook Muse chat)
@@ -53,6 +54,11 @@ export async function requestLinkRenderAction(
       .eq("id", submissionId)
       .single()
     if (!sub) return { ok: false, error: "Không tìm thấy bài nộp." }
+
+    // Bảo mật 24/10/2026 (GĐ4): trước đây GV nào cũng tạo được yêu cầu chụp
+    // link cho bài của GV khác. Giờ bài phải thuộc phiên của chính GV gọi.
+    const guardError = await checkTeacherForSession(supabase, sub.session_id as string)
+    if (guardError) return { ok: false, error: guardError }
 
     const sourceUrl = extractCanvaUrl(sub.text_content as string | null)
     if (!sourceUrl)
@@ -117,6 +123,16 @@ export async function getLinkRenderStatusAction(
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return { ok: false, status: null }
+
+    // Bảo mật 24/10/2026 (GĐ4): trạng thái render cũng chỉ chủ phiên mới xem.
+    const { data: sub } = await supabase
+      .from("submissions")
+      .select("session_id")
+      .eq("id", submissionId)
+      .maybeSingle()
+    if (!sub) return { ok: false, status: null }
+    const guardError = await checkTeacherForSession(supabase, sub.session_id as string)
+    if (guardError) return { ok: false, status: null }
 
     const { data, error } = await supabase
       .from("link_render_requests")

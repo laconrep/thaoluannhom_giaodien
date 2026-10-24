@@ -25,13 +25,15 @@ export function createServiceClient() {
   })
 }
 
+// Bảo mật 24/10/2026 (GĐ4): trước đây hàm này tự fallback về anon key khi
+// thiếu service key — code gọi nó tưởng mình có quyền admin nhưng thực chất
+// chỉ có quyền anon (fail-open tiềm ẩn). Giờ thiếu key thì trả null để
+// caller báo lỗi rõ ràng thay vì chạy lén bằng quyền anon. Mọi caller hiện
+// tại đều đã kiểm tra null (admin actions throw "Thiếu quyền service role",
+// các route ký URL trả 500, run-grade-job trả lỗi job).
 export function createAdminClient() {
   const url = supabaseUrl()
-  const key =
-    serviceRoleKey() ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    ""
+  const key = serviceRoleKey()
 
   if (!url || !key) {
     return null

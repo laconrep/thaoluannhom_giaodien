@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { validateStoragePath } from "@/lib/route-guards"
+import { checkApiRateLimit } from "@/lib/rate-limit"
 
 const SUBMISSIONS_BUCKET = "submissions"
 
 export async function POST(request: NextRequest) {
+  if (!checkApiRateLimit(request)) {
+    return NextResponse.json(
+      { error: "Gửi quá nhiều yêu cầu, thử lại sau." },
+      { status: 429 },
+    )
+  }
   try {
     const body = (await request.json().catch(() => ({}))) as { path?: string }
     const path = typeof body.path === "string" && body.path ? body.path : ""
@@ -39,16 +46,18 @@ export async function POST(request: NextRequest) {
       .from(SUBMISSIONS_BUCKET)
       .createSignedUploadUrl(path, { upsert: false })
     if (error || !data?.token) {
+      console.error("[upload-url]", error)
       return NextResponse.json(
-        { error: `Không tạo được đường dẫn tải lên: ${error?.message ?? "unknown error"}` },
+        { error: "Không tạo được đường dẫn tải lên." },
         { status: 502 },
       )
     }
 
     return NextResponse.json({ ok: true, upload: { path: data.path, token: data.token } })
   } catch (e: any) {
+    console.error("[upload-url]", e)
     return NextResponse.json(
-      { error: `Không tạo được đường dẫn tải lên: ${e?.message ?? "lỗi không xác định"}` },
+      { error: "Không tạo được đường dẫn tải lên." },
       { status: 502 },
     )
   }

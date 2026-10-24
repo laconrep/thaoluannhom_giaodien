@@ -23,6 +23,18 @@ async function requireTeacherForSession(sessionId: string) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) throw new Error("Cần đăng nhập.")
+  // Bảo mật 24/10/2026 (GĐ4): tài khoản bị vô hiệu thì signOut + về login
+  // (như teacher-guard; ensureActiveUser trước đây chỉ chặn ở layout/page).
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("status")
+    .eq("id", user.id)
+    .maybeSingle()
+  if ((profile as { status?: string | null } | null)?.status === "disabled") {
+    await supabase.auth.signOut()
+    const { redirect } = await import("next/navigation")
+    redirect("/auth/login?reason=disabled")
+  }
   let session: TeacherSession | null = null
   try {
     const first = await supabase

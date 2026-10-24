@@ -6,6 +6,7 @@ import {
   SUBMISSION_MEDIA_BUCKET,
   SUBMISSION_IMAGE_MIME_TYPES,
 } from "@/lib/submission-media"
+import { checkApiRateLimit } from "@/lib/rate-limit"
 
 const SUBMISSIONS_BUCKET = "submissions"
 
@@ -39,6 +40,12 @@ function configFor(bucket: string): BucketConfig {
 }
 
 export async function POST(request: NextRequest) {
+  if (!checkApiRateLimit(request)) {
+    return NextResponse.json(
+      { ok: false, error: "Gửi quá nhiều yêu cầu, thử lại sau." },
+      { status: 429 },
+    )
+  }
   const body = (await request.json().catch(() => ({}))) as { bucket?: string }
   const bucket = body.bucket ?? SUBMISSIONS_BUCKET
   // Bảo mật 24/10/2026 (GĐ2): trước đây nhận tên bucket tùy ý để tạo/sửa
@@ -63,7 +70,12 @@ export async function POST(request: NextRequest) {
   try {
     const { data: buckets, error: listError } = await supabase.storage.listBuckets()
     if (listError) {
-      return NextResponse.json({ ok: false, error: listError.message, bucket }, { status: 502 })
+      // Bảo mật 24/10/2026 (GĐ4): không trả message thô của Supabase.
+      console.error("[ensure-bucket]", listError)
+      return NextResponse.json(
+        { ok: false, error: "Không đọc được kho lưu trữ.", bucket },
+        { status: 502 },
+      )
     }
 
     const current = buckets?.find((b) => b.id === bucket)
@@ -74,7 +86,11 @@ export async function POST(request: NextRequest) {
         allowedMimeTypes: config.allowedMimeTypes,
       })
       if (createError && !/already exists/i.test(createError.message)) {
-        return NextResponse.json({ ok: false, error: createError.message, bucket }, { status: 502 })
+        console.error("[ensure-bucket]", createError)
+        return NextResponse.json(
+          { ok: false, error: "Không tạo được kho lưu trữ.", bucket },
+          { status: 502 },
+        )
       }
     }
 
@@ -86,11 +102,12 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       const after = (await supabase.storage.listBuckets()).data?.find((b) => b.id === bucket)
       const limit = parseLimit(after?.file_size_limit)
+      console.error("[ensure-bucket]", updateError)
       return NextResponse.json({
         ok: limit !== null && limit >= fileSizeLimit,
         bucket,
         fileSizeLimit: limit,
-        error: updateError.message,
+        error: "Không nâng được hạn mức kho lưu trữ.",
       })
     }
 
@@ -102,6 +119,7 @@ export async function POST(request: NextRequest) {
       fileSizeLimit: parseLimit(after?.file_size_limit) ?? fileSizeLimit,
     })
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? "Lỗi không xác định" }, { status: 500 })
+    console.error("[ensure-bucket]", e)
+    return NextResponse.json({ ok: false, error: "Lỗi kho lưu trữ." }, { status: 500 })
   }
 }

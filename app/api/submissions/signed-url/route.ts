@@ -2,12 +2,20 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { validateStoragePath } from "@/lib/route-guards"
+import { checkApiRateLimit } from "@/lib/rate-limit"
 
 const SUBMISSIONS_BUCKET = "submissions"
 // Bucket được phép ký URL qua API này (allowlist — không ký bừa bucket khác).
 const ALLOWED_BUCKETS = ["submissions", "presentations"] as const
 
 export async function POST(request: NextRequest) {
+  // Bảo mật 24/10/2026 (GĐ4): chặn spam route ký URL.
+  if (!checkApiRateLimit(request)) {
+    return NextResponse.json(
+      { error: "Gửi quá nhiều yêu cầu, thử lại sau." },
+      { status: 429 },
+    )
+  }
   try {
     const body = (await request.json().catch(() => ({}))) as {
       path?: string
@@ -43,16 +51,20 @@ export async function POST(request: NextRequest) {
       .from(bucket)
       .createSignedUrl(path, 60 * 60 * 24 * 7)
     if (error || !data?.signedUrl) {
+      // Bảo mật 24/10/2026 (GĐ4): không trả message thô của Supabase ra
+      // ngoài (lộ cấu trúc kho); log phía server để debug.
+      console.error("[signed-url]", error)
       return NextResponse.json(
-        { error: `Không tạo được link tệp: ${error?.message ?? "unknown error"}` },
+        { error: "Không tạo được link tệp." },
         { status: 502 },
       )
     }
 
     return NextResponse.json({ ok: true, signedUrl: data.signedUrl })
   } catch (e: any) {
+    console.error("[signed-url]", e)
     return NextResponse.json(
-      { error: `Không tạo được link tệp: ${e?.message ?? "lỗi không xác định"}` },
+      { error: "Không tạo được link tệp." },
       { status: 502 },
     )
   }

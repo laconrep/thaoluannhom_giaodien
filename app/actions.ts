@@ -488,7 +488,7 @@ export async function leaderUpdateGroupMembersAction(input: {
     const { error } = await supabase
       .from("class_group_members")
       .insert({ class_group_id: groupId, student_id: input.targetStudentId })
-    if (error) return { ok: false, error: error.message }
+    if (error) return { ok: false, error: "Không cập nhật được nhóm. Thử lại sau." }
   } else {
     // remove: chỉ gỡ thành viên trong nhóm mình, không cho gỡ chính mình
     if (input.targetStudentId === input.leaderStudentId) {
@@ -499,7 +499,7 @@ export async function leaderUpdateGroupMembersAction(input: {
       .delete()
       .eq("class_group_id", groupId)
       .eq("student_id", input.targetStudentId)
-    if (error) return { ok: false, error: error.message }
+    if (error) return { ok: false, error: "Không cập nhật được nhóm. Thử lại sau." }
   }
 
   revalidatePath(`/c/${input.classId}`)
@@ -631,6 +631,9 @@ export async function leaderSwapSlotsAction(input: {
 
   const res = await swapStudentSlots(supabase, input.classId, input.draggedStudentId, input.targetStudentId)
   if (res.ok) revalidatePath(`/c/${input.classId}`)
+  // Bảo mật 24/10/2026 (GĐ4): swapStudentSlots trả message thô của DB —
+  // nhóm trưởng là luồng ẩn danh nên chỉ nhận thông báo chung.
+  if (!res.ok) return { ok: false, error: "Không đổi được vị trí. Thử lại sau." }
   return res
 }
 
@@ -1238,7 +1241,8 @@ export async function studentSetNameAction(studentId: string, name: string, devi
     .update({ name: cleanName, device_token: deviceToken })
     .eq("id", studentId)
     .or(`device_token.is.null,device_token.eq.${deviceToken}`)
-  if (error) throw new Error(error.message)
+  // Bảo mật 24/10/2026 (GĐ4): luồng HS ẩn danh không nhận message thô của DB.
+  if (error) throw new Error("Không lưu được tên. Thử lại sau.")
 }
 
 export async function studentClaimGroupAction(
@@ -1265,7 +1269,7 @@ export async function studentClaimGroupAction(
       .eq("claimed", false)
       .select("id")
       .maybeSingle()
-    if (error) return { ok: false, error: error.message }
+    if (error) return { ok: false, error: "Không chọn được nhóm. Thử lại sau." }
     if (!claimed) return { ok: false, error: "Nhóm vừa được người khác chọn." }
   }
 
@@ -1332,7 +1336,7 @@ export async function studentClaimSessionSlotAction(
     .or(`student_id.is.null,student_id.eq.${studentId}`)
     .select("id")
     .maybeSingle()
-  if (error) return { ok: false, error: error.message }
+  if (error) return { ok: false, error: "Không chọn được ô. Thử lại sau." }
   if (!updated) return { ok: false, error: "Ô này vừa được chọn bởi người khác." }
   return { ok: true }
 }
@@ -1352,7 +1356,7 @@ export async function studentClaimSlotAction(
     .or(`device_token.is.null,device_token.eq.${deviceToken}`)
     .select("id")
     .maybeSingle()
-  if (error) return { ok: false, error: error.message }
+  if (error) return { ok: false, error: "Không chọn được ô. Thử lại sau." }
   if (!updated) return { ok: false, error: "Ô này đã được thiết bị khác chọn" }
   return { ok: true }
 }
@@ -1433,7 +1437,7 @@ export async function submitGroupReportAction(args: {
           is_auto_submitted: args.isAuto ?? false,
         })
         .eq("id", existing.id)
-      if (error) return { ok: false, error: error.message }
+      if (error) return { ok: false, error: "Không nộp được bài. Thử lại sau." }
     } else {
       const { error } = await supabase.from("submissions").insert({
         session_id: args.sessionId,
@@ -1443,11 +1447,18 @@ export async function submitGroupReportAction(args: {
         image_url: firstImage?.url ?? null,
         is_auto_submitted: args.isAuto ?? false,
       })
-      if (error) return { ok: false, error: error.message }
+      if (error) return { ok: false, error: "Không nộp được bài. Thử lại sau." }
     }
     return { ok: true }
   } catch (e: any) {
-    return { ok: false, error: e?.message ?? "Có lỗi khi nộp bài." }
+    // Bảo mật 24/10/2026 (GĐ4): chỉ giữ lại 2 thông báo an toàn của
+    // assertSessionAcceptsSubmission; lỗi DB thì báo chung, log phía server.
+    const msg = e?.message as string | undefined
+    if (msg === "Phiên làm bài đã kết thúc." || msg === "Không tìm thấy phiên làm bài.") {
+      return { ok: false, error: msg }
+    }
+    console.error("[submit]", e)
+    return { ok: false, error: "Không nộp được bài. Thử lại sau." }
   }
 }
 
@@ -1484,7 +1495,7 @@ export async function submitIndividualReportAction(args: {
           is_auto_submitted: args.isAuto ?? false,
         })
         .eq("id", existing.id)
-      if (error) return { ok: false, error: error.message }
+      if (error) return { ok: false, error: "Không nộp được bài. Thử lại sau." }
     } else {
       const { data: inserted, error } = await supabase
         .from("submissions")
@@ -1498,7 +1509,7 @@ export async function submitIndividualReportAction(args: {
         })
         .select("id")
         .single()
-      if (error) return { ok: false, error: error.message }
+      if (error) return { ok: false, error: "Không nộp được bài. Thử lại sau." }
       submissionId = (inserted as { id?: string } | null)?.id ?? null
     }
     // Cảnh báo trùng bài (phiên cá nhân): so với các ô khác trong cùng phiên
@@ -1519,7 +1530,14 @@ export async function submitIndividualReportAction(args: {
     }
     return { ok: true }
   } catch (e: any) {
-    return { ok: false, error: e?.message ?? "Có lỗi khi nộp bài." }
+    // Bảo mật 24/10/2026 (GĐ4): chỉ giữ lại 2 thông báo an toàn của
+    // assertSessionAcceptsSubmission; lỗi DB thì báo chung, log phía server.
+    const msg = e?.message as string | undefined
+    if (msg === "Phiên làm bài đã kết thúc." || msg === "Không tìm thấy phiên làm bài.") {
+      return { ok: false, error: msg }
+    }
+    console.error("[submit]", e)
+    return { ok: false, error: "Không nộp được bài. Thử lại sau." }
   }
 }
 

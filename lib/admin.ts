@@ -25,5 +25,9 @@ export async function requireAdmin() {
   }
 
   const admin = createAdminClient()
+  // Bảo mật 24/10/2026 (GĐ4): createAdminClient giờ trả null khi thiếu
+  // service key (không fallback anon nữa) — trang admin không được chạy
+  // với client null (trước đây nó chạy lén bằng quyền anon).
+  if (!admin) throw new Error("Thiếu quyền service role.")
   return { user, supabase, admin }
 }

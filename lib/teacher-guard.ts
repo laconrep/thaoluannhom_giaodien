@@ -18,6 +18,7 @@
 // CHỈ dùng trong server action / route handler. Không import vào client
 // component (file này đi qua lib/supabase/server).
 
+import { redirect } from "next/navigation"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 type Client = SupabaseClient<any, "public", any>
@@ -26,7 +27,22 @@ async function authedUserId(supabase: Client): Promise<string | null> {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  return user?.id ?? null
+  if (!user) return null
+  // Bảo mật 24/10/2026 (GĐ4): tài khoản bị admin vô hiệu vẫn gọi được server
+  // action trước đây (ensureActiveUser chỉ chặn ở layout/page). Guard này
+  // chạy ở đầu mọi teacher action nên chặn luôn tại đây: signOut + về trang
+  // đăng nhập. Tài khoản chưa có dòng profiles (data null) thì không bị
+  // chặn — khớp hành vi ensureActiveUser.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("status")
+    .eq("id", user.id)
+    .maybeSingle()
+  if ((profile as { status?: string | null } | null)?.status === "disabled") {
+    await supabase.auth.signOut()
+    redirect("/auth/login?reason=disabled")
+  }
+  return user.id
 }
 
 async function teacherIdOfClass(supabase: Client, classId: string): Promise<string | null> {

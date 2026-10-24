@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
 import { runAiGradeJob } from "@/lib/ai/run-grade-job"
 import { createClient } from "@/lib/supabase/server"
+import { checkGradeRunRateLimit } from "@/lib/rate-limit"
 
 export const maxDuration = 300
 
 export async function POST(request: NextRequest) {
+  // Bảo mật 24/10/2026 (GĐ4): route này chạy job tới 300s — chặn spam kích
+  // hoạt trước khi chạm DB.
+  if (!checkGradeRunRateLimit(request)) {
+    return NextResponse.json(
+      { error: "Gửi quá nhiều yêu cầu chấm, thử lại sau." },
+      { status: 429 },
+    )
+  }
   const body = (await request.json().catch(() => ({}))) as { jobId?: string }
   const jobId = typeof body.jobId === "string" ? body.jobId : ""
   if (!jobId) return NextResponse.json({ error: "Thiếu jobId" }, { status: 400 })
