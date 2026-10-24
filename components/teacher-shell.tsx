@@ -6,6 +6,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { AvatarInitials } from "@/components/avatar-initials"
 import { TourReplayButton } from "@/components/tour/tour-replay-button"
 import { isAdminEmail } from "@/lib/admin"
+import { SHOW_PRICING } from "@/lib/plans"
 
 export function TeacherShell({
   children,
@@ -31,12 +32,14 @@ export function TeacherShell({
               Lớp của tôi
             </Link>
           </Button>
-          <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-            <Link href="/pricing" prefetch={false} className="gap-2">
-              <CreditCard className="size-4" aria-hidden="true" />
-              Gói sử dụng
-            </Link>
-          </Button>
+          {SHOW_PRICING && (
+            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Link href="/pricing" prefetch={false} className="gap-2">
+                <CreditCard className="size-4" aria-hidden="true" />
+                Gói sử dụng
+              </Link>
+            </Button>
+          )}
           <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
             <Link href="/settings/ai" prefetch={false} className="gap-2">
               <Bot className="size-4" aria-hidden="true" />

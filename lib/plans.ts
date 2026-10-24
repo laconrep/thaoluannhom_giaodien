@@ -1,3 +1,12 @@
+/**
+ * Công tắc hiển thị gói trên giao diện — dùng trong thời gian dự thi.
+ * false = ẩn nút "Gói sử dụng" trên thanh điều hướng và trang /pricing
+ * (truy cập trực tiếp sẽ chuyển về /dashboard). Toàn bộ dữ liệu gói,
+ * giới hạn (planLimits) và logic nâng cấp trong code vẫn giữ nguyên.
+ * Thi xong: đổi thành true là giao diện gói hiện lại, không cần code lại.
+ */
+export const SHOW_PRICING = false
+
 export type Plan = "free" | "pro" | "school"
 
 export const PLANS: {

@@ -3,12 +3,16 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getVerifiedAuthFromHeaders } from "@/lib/auth-headers"
 import { upgradeToPlanAction } from "@/app/actions"
-import { PLANS, PLAN_DEFAULT, type Plan } from "@/lib/plans"
+import { PLANS, PLAN_DEFAULT, SHOW_PRICING, type Plan } from "@/lib/plans"
 import { Button } from "@/components/ui/button"
 import { GraduationCap, Check, ArrowLeft } from "lucide-react"
 import { ensureActiveUser } from "@/lib/account-status"
 
 export default async function PricingPage() {
+  // Ẩn giao diện gói trong thời gian dự thi (SHOW_PRICING = false): truy cập
+  // trực tiếp cũng chuyển về dashboard. Toàn bộ nội dung trang vẫn giữ nguyên
+  // trong code, thi xong bật cờ là hiện lại.
+  if (!SHOW_PRICING) redirect("/dashboard")
   // T2: lấy định danh từ header nội bộ do middleware xác thực — không gọi getUser() nữa.
   const user = await getVerifiedAuthFromHeaders()
   if (!user) redirect("/auth/login")
