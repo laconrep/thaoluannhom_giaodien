@@ -1,7 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "*.supabase.co" }],
+    remotePatterns: [
+      { protocol: "https", hostname: "*.supabase.co" },
+      // 25/10/2026: sau khi chuyển kho sang B2, thumbnail dùng link B2 —
+      // không có dòng này là optimizer trả 400, vỡ hết ảnh (bản bfa2223 sót).
+      { protocol: "https", hostname: "*.backblazeb2.com" },
+    ],
   },
   // Bảo mật 24/10/2026: chặn clickjacking (trang chấm bị nhúng vào iframe lạ)
   // và MIME-sniffing. Chưa thêm CSP vì app nhúng nhiều iframe PPTX/Canva —
