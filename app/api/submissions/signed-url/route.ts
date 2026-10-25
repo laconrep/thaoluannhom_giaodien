@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { validateStoragePath } from "@/lib/route-guards"
 import { checkApiRateLimit } from "@/lib/rate-limit"
 import { isB2Configured, presignB2Download, B2_VIEW_EXPIRES_SECONDS } from "@/lib/b2"
@@ -46,7 +47,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: pathError }, { status: 403 })
     }
 
-    // Chuyển sang B2 (24/10/2026): ký GET 7 ngày, khớp hạn signed URL cũ.
+    // CẦU NỐI TẠM NGÀY 25/10/2026: B2 đã vượt mức tải miễn phí trong ngày
+    // (mọi GET đều 403 "download bandwidth or transaction cap exceeded")
+    // nên app không xem được ảnh cũ và không trình chiếu được PPT trong
+    // ngày — trong khi kho Supabase cũ vẫn còn đủ file và vẫn tải được
+    // (chưa bị siết, hạn siết là 15/11/2026). Vì vậy route ký ưu tiên
+    // Supabase trước; file nào không còn trên Supabase (chỉ mới tải lên
+    // B2 sau đợt chuyển kho) thì rơi về ký B2 như cũ. Khi B2 được nâng
+    // mức hoặc code tái dùng link ký xong thì đảo lại thứ tự này.
+    const admin = createAdminClient()
+    if (admin) {
+      const { data, error } = await admin.storage
+        .from(bucket)
+        .createSignedUrl(path, 60 * 60 * 24 * 7)
+      if (!error && data?.signedUrl) {
+        return NextResponse.json({ ok: true, signedUrl: data.signedUrl })
+      }
+      // File không còn trên Supabase → rơi xuống ký B2 bên dưới.
+      console.warn("[signed-url] supabase sign failed, fallback b2:", error?.message)
+    }
+
+    // Ký B2 (từ 24/10/2026): GET 7 ngày, khớp hạn signed URL cũ.
     // URL Supabase cũ trong DB tự chữa được: client tách path từ URL cũ rồi
     // gọi route này, nhận về URL B2 cho cùng object key.
     if (!isB2Configured()) {
