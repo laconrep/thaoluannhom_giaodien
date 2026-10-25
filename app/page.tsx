@@ -2,7 +2,6 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { getVerifiedAuthFromHeaders } from "@/lib/auth-headers"
 import { Button } from "@/components/ui/button"
-import { LandingSlideshow } from "@/components/landing-slideshow"
 import {
   GraduationCap,
   Users,
@@ -13,35 +12,61 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
+// Khung phong cách viễn tưởng: vát góc (clip-path) thay cho bo tròn,
+// viền gradient 1.5px + bóng glow ôm theo hình vát (drop-shadow).
+const FRAME_CLIP =
+  "[clip-path:polygon(14px_0,100%_0,100%_calc(100%-14px),calc(100%-14px)_100%,0_100%,0_14px)]"
+const CHIP_CLIP =
+  "[clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+
+type FeatureTone = {
+  // Gradient của viền khung + vạch năng lượng.
+  frame: string
+  // Màu đốm sáng góc trên-phải bên trong khung.
+  glow: string
+  // Màu chip icon.
+  chip: string
+  // Bóng glow ôm theo hình vát (drop-shadow, không bị clip-path cắt).
+  shadow: string
+  shadowHover: string
+}
+
 function FeatureCard({
-  img,
-  imgPosition,
+  tone,
   icon: Icon,
   title,
   desc,
 }: {
-  img: string
-  imgPosition?: string
+  tone: FeatureTone
   icon: LucideIcon
   title: string
   desc: string
 }) {
   return (
-    <li className="rounded-3xl bg-gradient-to-br from-cyan-400 via-blue-500 to-violet-500 p-[1.5px] shadow-[0_0_28px_rgba(59,130,246,0.22)]">
-      <div className="relative h-64 overflow-hidden rounded-[calc(1.5rem-1.5px)]">
-        <img
-          src={img}
-          alt=""
-          className={`absolute inset-0 h-full w-full object-cover ${imgPosition ?? ""}`}
+    <li
+      className={`h-full min-w-0 ${FRAME_CLIP} bg-gradient-to-br p-[1.5px] ${tone.frame} ${tone.shadow} transition duration-300 hover:-translate-y-1 ${tone.shadowHover}`}
+    >
+      <div className="relative flex h-full flex-col gap-2.5 overflow-hidden bg-gradient-to-b from-slate-900 to-slate-950 p-4">
+        {/* Ánh sáng nền + vệt sáng chéo, giữ chữ luôn đọc được. */}
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute -right-10 -top-10 size-28 rounded-full opacity-25 blur-2xl ${tone.glow}`}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/10" />
-        <div className="relative flex h-full flex-col justify-end gap-2 p-5">
-          <span className="grid size-10 place-items-center rounded-xl bg-white/15 text-white ring-1 ring-white/30 backdrop-blur">
-            <Icon className="size-5" aria-hidden="true" />
-          </span>
-          <p className="text-lg font-semibold text-white">{title}</p>
-          <p className="text-sm leading-relaxed text-white/85">{desc}</p>
-        </div>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.07] via-transparent to-transparent"
+        />
+        <span
+          className={`relative grid size-10 shrink-0 place-items-center ${CHIP_CLIP} ${tone.chip}`}
+        >
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+        <p className="relative text-[15px] font-semibold leading-snug text-white">{title}</p>
+        <span
+          aria-hidden="true"
+          className={`relative h-0.5 w-10 shrink-0 bg-gradient-to-r ${tone.frame}`}
+        />
+        <p className="relative text-[13px] leading-relaxed text-slate-300">{desc}</p>
       </div>
     </li>
   )
@@ -86,7 +111,7 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-6 py-12 md:py-16 grid lg:grid-cols-2 gap-10 items-center">
+      <section className="mx-auto max-w-7xl px-6 py-10 md:py-12 grid lg:grid-cols-2 gap-10 items-center">
         <div className="flex flex-col gap-4">
           <span className="inline-flex items-center gap-2 self-start rounded-full bg-secondary px-3 py-1 text-xs font-medium">
             Thảo luận - Sửa bài - Chấm điểm
@@ -112,39 +137,76 @@ export default async function HomePage() {
           </div>
         </div>
 
-        <LandingSlideshow />
+        <video
+          className="w-full rounded-2xl shadow-xl"
+          src="/landing/slideshow/video-trang-dau.mp4"
+          poster="/landing/slideshow/video-trang-dau-poster.jpg"
+          aria-label="Video giới thiệu: tạo phiên thảo luận, chấm bài theo barem, giao bài và bảng điểm"
+          autoPlay
+          muted
+          loop
+          playsInline
+        />
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 pb-16">
-        <ul className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <section className="mx-auto max-w-7xl px-6 pb-12">
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <FeatureCard
-            img="/landing/slideshow/bai-lam.jpg"
-            imgPosition="object-top"
+            tone={{
+              frame: "from-cyan-400 to-blue-600",
+              glow: "bg-cyan-400",
+              chip: "bg-cyan-400/20 text-cyan-300",
+              shadow: "drop-shadow-[0_0_14px_rgba(34,211,238,0.30)]",
+              shadowHover: "hover:drop-shadow-[0_0_22px_rgba(34,211,238,0.50)]",
+            }}
             icon={Users}
             title="Danh sách lớp và nhóm"
             desc="Tạo lớp, nhập hoặc để học sinh tự ghi tên vào ô của mình. Chia nhóm cố định."
           />
           <FeatureCard
-            img="/landing/slideshow/video-03-poster.jpg"
+            tone={{
+              frame: "from-violet-500 to-fuchsia-600",
+              glow: "bg-violet-500",
+              chip: "bg-violet-400/20 text-violet-300",
+              shadow: "drop-shadow-[0_0_14px_rgba(167,139,250,0.30)]",
+              shadowHover: "hover:drop-shadow-[0_0_22px_rgba(167,139,250,0.50)]",
+            }}
             icon={Presentation}
             title="Phiên thảo luận nhóm"
             desc="Mỗi nhóm chụp ảnh nộp bài, giáo viên thấy tất cả trên một màn chiếu."
           />
           <FeatureCard
-            img="/landing/slideshow/barem.jpg"
+            tone={{
+              frame: "from-teal-400 to-emerald-600",
+              glow: "bg-teal-400",
+              chip: "bg-teal-400/20 text-teal-300",
+              shadow: "drop-shadow-[0_0_14px_rgba(45,212,191,0.30)]",
+              shadowHover: "hover:drop-shadow-[0_0_22px_rgba(45,212,191,0.50)]",
+            }}
             icon={PenLine}
             title="Sửa bài trực tiếp"
             desc="Gõ textbox, gạch chân, vẽ bút, chấm điểm. Lưu vĩnh viễn."
           />
           <FeatureCard
-            img="/landing/slideshow/giao-bai.jpg"
+            tone={{
+              frame: "from-amber-400 to-rose-500",
+              glow: "bg-amber-400",
+              chip: "bg-amber-400/20 text-amber-300",
+              shadow: "drop-shadow-[0_0_14px_rgba(251,191,36,0.30)]",
+              shadowHover: "hover:drop-shadow-[0_0_22px_rgba(251,191,36,0.50)]",
+            }}
             icon={BookOpen}
             title="Giao bài tập về nhà"
             desc="Giao đề bằng văn bản hoặc file Word, PDF, TXT. Học sinh nộp bài, chấm điểm tự động, cờ trùng bài cảnh báo bài giống nhau; bảng điểm cả kỳ cho thấy ngay em nào đang yếu."
           />
           <FeatureCard
-            img="/landing/slideshow/bai-lam.jpg"
-            imgPosition="object-bottom"
+            tone={{
+              frame: "from-indigo-400 to-violet-600",
+              glow: "bg-indigo-400",
+              chip: "bg-indigo-400/20 text-indigo-300",
+              shadow: "drop-shadow-[0_0_14px_rgba(129,140,248,0.30)]",
+              shadowHover: "hover:drop-shadow-[0_0_22px_rgba(129,140,248,0.50)]",
+            }}
             icon={ClipboardList}
             title="Bảng điểm cả kỳ"
             desc="Mỗi phiên là một cột điểm. Chia sẻ link để học sinh xem (chỉ xem)."
