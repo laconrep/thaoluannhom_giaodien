@@ -3,9 +3,9 @@ import { gradeSubmissionWithGemini } from "@/lib/ai/gemini-grade"
 import { gradeSubmissionWithMuse } from "@/lib/ai/muse-grade"
 import { formatRubricForPrompt } from "@/lib/ai/rubric-format"
 import { getFiles } from "@/lib/submission-files"
+import { b2KeyFromUrl, isB2Configured, presignB2Download, B2_GRADE_EXPIRES_SECONDS } from "@/lib/b2"
 import type { SubmissionFile, SubmissionRow } from "@/lib/types"
 
-const SUBMISSIONS_BUCKET = "submissions"
 const MAX_SWEEPS = 6
 const SWEEP_GAP_MS = 1000
 const inFlight = new Set<string>()
@@ -23,16 +23,22 @@ function storagePathFromUrl(url: string): string | null {
   }
 }
 
-async function refreshFileUrls(supabase: AdminClient, files: SubmissionFile[]): Promise<SubmissionFile[]> {
+async function refreshFileUrls(files: SubmissionFile[]): Promise<SubmissionFile[]> {
+  // Chuyển sang B2 (24/10/2026): ký lại URL tải cho grader qua B2.
+  // - URL Supabase cũ trong DB: tách path kiểu cũ → ký B2 cho cùng key.
+  // - URL B2 đã ký: tách key → ký lại (URL B2 cũng hết hạn sau 7 ngày).
+  // - URL khác (Canva, ảnh remote): giữ nguyên như trước.
+  // B2 chưa cấu hình → giữ nguyên URL gốc (grader tải link cũ nếu còn hạn).
+  if (!isB2Configured()) return files
   const next: SubmissionFile[] = []
   for (const file of files) {
-    const path = storagePathFromUrl(file.url)
+    const path = storagePathFromUrl(file.url) ?? b2KeyFromUrl(file.url)
     if (!path) {
       next.push(file)
       continue
     }
-    const { data } = await supabase.storage.from(SUBMISSIONS_BUCKET).createSignedUrl(path, 60 * 60)
-    next.push({ ...file, url: data?.signedUrl || file.url })
+    const signedUrl = await presignB2Download(path, B2_GRADE_EXPIRES_SECONDS)
+    next.push({ ...file, url: signedUrl || file.url })
   }
   return next
 }
@@ -87,7 +93,7 @@ async function gradeOneRow(
   }
 
   try {
-    const files = await refreshFileUrls(supabase, getFiles(sub as SubmissionRow))
+    const files = await refreshFileUrls(getFiles(sub as SubmissionRow))
     const maxScore = Number(session.ai_max_score ?? 10)
     const out =
       keys.provider === "muse"

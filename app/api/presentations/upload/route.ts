@@ -1,12 +1,11 @@
 import { createClient } from "@/lib/supabase/server"
-import { createAdminClient, createServiceClient } from "@/lib/supabase/admin"
 import { NextRequest, NextResponse } from "next/server"
 import { PLAN_DEFAULT, planLimits, type Plan } from "@/lib/plans"
 import {
   MAX_PRESENTATION_BYTES,
-  PRESENTATIONS_BUCKET,
   powerpointContentType,
 } from "@/lib/storage-upload"
+import { isB2Configured, presignB2Upload } from "@/lib/b2"
 
 function getEstimatedSlideCount(fileSize: number): number {
   return Math.max(1, Math.min(100, Math.floor(fileSize / 50000)))
@@ -79,12 +78,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not authorized to upload presentation" }, { status: 403 })
     }
 
-    const admin = createServiceClient() ?? createAdminClient()
     const slideCount = getEstimatedSlideCount(fileSize)
     const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_")
     const timestamp = Date.now()
     const storagePath = `${user.id}/${sessionId}/${timestamp}_${safeFileName}`
-    const storageClient = admin ?? supabase
     const insertPayload = {
       session_id: sessionId,
       teacher_id: user.id,
@@ -94,26 +91,29 @@ export async function POST(request: NextRequest) {
       slide_count: slideCount,
     }
 
-    let [{ data: signedUpload, error: signedUploadError }, { data: presentation, error: presentationError }] =
-      await Promise.all([
-        storageClient.storage.from(PRESENTATIONS_BUCKET).createSignedUploadUrl(storagePath, { upsert: true }),
-        supabase.from("presentations").insert(insertPayload).select().single(),
-      ])
-
-    if ((!signedUpload?.token || signedUploadError) && admin && admin !== supabase) {
-      const fallback = await supabase.storage
-        .from(PRESENTATIONS_BUCKET)
-        .createSignedUploadUrl(storagePath, { upsert: true })
-      signedUpload = fallback.data
-      signedUploadError = fallback.error
-    }
-
-    if (signedUploadError || !signedUpload?.token) {
+    // Chuyển sang B2 (24/10/2026): ký PUT trực tiếp lên B2 thay cho signed
+    // upload Supabase. Key giữ nguyên dạng <teacherId>/<sessionId>/<file>
+    // nên viewer + DB không cần sửa gì thêm. Trước đây route ký upsert:true;
+    // key đã duy nhất theo timestamp nên hành vi thực tế không đổi.
+    // Ký trước khi insert để lỗi ký không để lại dòng presentations mồ côi.
+    if (!isB2Configured()) {
       return NextResponse.json(
-        { error: `Không tạo được đường dẫn upload: ${signedUploadError?.message ?? "unknown error"}` },
+        { error: "Kho lưu trữ chưa được cấu hình." },
+        { status: 500 },
+      )
+    }
+    const uploadUrl = await presignB2Upload(storagePath)
+    if (!uploadUrl) {
+      return NextResponse.json(
+        { error: "Không tạo được đường dẫn upload." },
         { status: 502 },
       )
     }
+    const { data: presentation, error: presentationError } = await supabase
+      .from("presentations")
+      .insert(insertPayload)
+      .select()
+      .single()
 
     if (presentationError || !presentation) {
       return NextResponse.json(
@@ -122,13 +122,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const uploadPath = signedUpload.path || storagePath
     return NextResponse.json({
       success: true,
       upload: {
-        path: uploadPath,
-        token: signedUpload.token,
-        signedUrl: signedUpload.signedUrl,
+        path: storagePath,
+        uploadUrl,
         contentType,
       },
       presentation: {

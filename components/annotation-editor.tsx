@@ -16,7 +16,7 @@ import {
 import { FileViewer } from "@/components/annotation/file-viewer"
 import { EmbedSlideBar } from "@/components/embed-slide-bar"
 import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
-import { isSignUrl } from "@/lib/file-url"
+import { isB2Url, isSignUrl } from "@/lib/file-url"
 import { extractCanvaUrl } from "@/lib/canva"
 import {
   getLinkRenderStatusAction,
@@ -322,7 +322,7 @@ export function AnnotationEditor({
     let cancelled = false
     setDocxLoading(true)
     // File cũ có signed URL đã hết hạn: chờ URL mới rồi mới tải, tránh fetch link chết.
-    if (isSignUrl(currentFile.url) && !freshCurrentUrl) {
+    if ((isSignUrl(currentFile.url) || isB2Url(currentFile.url)) && !freshCurrentUrl) {
       return
     }
     ;(async () => {

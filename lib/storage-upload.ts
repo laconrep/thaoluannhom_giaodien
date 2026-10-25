@@ -23,30 +23,10 @@ export function formatMegabytes(bytes: number): string {
 export function friendlyStorageError(message: string, fileSize?: number): string {
   if (/exceeded the maximum allowed size/i.test(message) || /maximum allowed size/i.test(message)) {
     const size = fileSize ? ` File đang tải: ${formatMegabytes(fileSize)}.` : ""
-    return `File vượt dung lượng tối đa của kho lưu trữ.${size} Hạn mức bucket presentations cần là 200 MB.`
+    return `File vượt dung lượng tối đa của kho lưu trữ.${size} Hạn mức file bài giảng là 200 MB.`
   }
   if (/mime type/i.test(message) || /not allowed/i.test(message)) {
-    return "Kho lưu trữ đang chặn định dạng PowerPoint. Hãy chạy lại SQL cấu hình bucket presentations."
+    return "Kho lưu trữ đang chặn định dạng PowerPoint. Hãy kiểm tra lại cấu hình kho lưu trữ."
   }
   return message
-}
-
-export function resolveSignedUploadUrl(signedUrl?: string, path?: string, token?: string): string {
-  const url = signedUrl || ""
-  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "").replace(
-    /\/$/,
-    "",
-  )
-  if (url.startsWith("http://") || url.startsWith("https://")) return url
-  if (url.startsWith("/storage/v1")) return `${base}${url}`
-  if (url.startsWith("/object/")) return `${base}/storage/v1${url}`
-  if (url.startsWith("/")) return `${base}/storage/v1${url}`
-  if (url) return `${base}/storage/v1/${url}`
-  if (!path || !token) return ""
-  const encoded = path
-    .replace(/^\/+/, "")
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/")
-  return `${base}/storage/v1/object/upload/sign/presentations/${encoded}?token=${encodeURIComponent(token)}`
 }

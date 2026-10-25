@@ -36,7 +36,21 @@ export async function validateStoragePath(
 
   if (bucket === "presentations") {
     if (parts.length < 3) return "Đường dẫn tệp không hợp lệ."
-    if (!userId || parts[0] !== userId) return "Không có quyền với tệp này."
+    if (!UUID_RE.test(parts[0]) || !UUID_RE.test(parts[1])) return "Đường dẫn tệp không hợp lệ."
+    if (userId) {
+      // GV đã đăng nhập: chỉ được ký bài giảng của chính mình.
+      if (parts[0] !== userId) return "Không có quyền với tệp này."
+      return null
+    }
+    // Ẩn danh (HS xem bài giảng trong giờ học): phiên ở parts[1] phải tồn
+    // tại. Trước đây viewer ký trực tiếp bằng anon key Supabase (bucket
+    // policy cho phép); quy tắc này giữ đúng mức đó sau khi chuyển sang B2.
+    const { data: presSession } = await supabase
+      .from("sessions")
+      .select("id")
+      .eq("id", parts[1])
+      .maybeSingle()
+    if (!presSession) return "Không tìm thấy phiên."
     return null
   }
 

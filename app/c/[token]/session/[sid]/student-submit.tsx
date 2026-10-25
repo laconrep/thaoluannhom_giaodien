@@ -422,21 +422,16 @@ export function StudentSubmit({
         body: JSON.stringify({ path }),
       })
       const urlBody = await urlRes.json().catch(() => ({}))
-      if (!urlRes.ok || !urlBody?.upload?.token) {
+      if (!urlRes.ok || !urlBody?.upload?.uploadUrl) {
         throw new Error(urlBody?.error ?? "Không tạo được đường dẫn tải lên.")
       }
-      const uploadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/upload/sign/submissions/${urlBody.upload.path}?token=${encodeURIComponent(urlBody.upload.token)}`
-      const anonKey =
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-        urlBody.upload.token
-      const putRes = await fetch(uploadUrl, {
+      // B2 (24/10/2026): PUT trực tiếp lên presigned URL — không còn
+      // Authorization/apikey/x-upsert kiểu Supabase (header không nằm trong
+      // chữ ký S3 thì vô hại nhưng thừa; chỉ giữ Content-Type).
+      const putRes = await fetch(urlBody.upload.uploadUrl, {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${anonKey}`,
-          apikey: anonKey,
           "Content-Type": s.file.type || "application/octet-stream",
-          "x-upsert": "true",
         },
         body: s.file,
       })
@@ -496,7 +491,7 @@ export function StudentSubmit({
     } catch (e: any) {
       const msg = e?.message ?? ""
       if (/bucket|storage|row-level security|RLS|denied/i.test(msg)) {
-        toast.error("Kho lưu trữ bài nộp chưa được cấu hình. Giáo viên cần chạy lại script cấu hình Supabase.")
+        toast.error("Kho lưu trữ bài nộp chưa được cấu hình. Giáo viên cần kiểm tra lại cấu hình kho lưu trữ.")
       } else {
         toast.error(msg || "Có lỗi xảy ra.")
       }

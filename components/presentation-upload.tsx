@@ -4,13 +4,11 @@ import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Presentation, Upload, X } from "lucide-react"
 import { toast } from "sonner"
-import { createClient } from "@/lib/supabase/client"
 import {
   MAX_PRESENTATION_BYTES,
   formatMegabytes,
   friendlyStorageError,
   powerpointContentType,
-  resolveSignedUploadUrl,
 } from "@/lib/storage-upload"
 
 function parseStorageError(status: number, body: string): string {
@@ -60,51 +58,19 @@ function xhrPut(
 }
 
 async function uploadToStorage(opts: {
-  signedUrl?: string
-  path: string
-  token: string
+  uploadUrl: string
   file: File
   onProgress: (percent: number) => void
 }) {
-  const uploadUrl = resolveSignedUploadUrl(opts.signedUrl, opts.path, opts.token)
-  if (!uploadUrl) {
-    throw new Error("Không tạo được đường dẫn tải lên kho lưu trữ.")
-  }
-
-  const contentType = powerpointContentType(opts.file.name, opts.file.type)
-  const anonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    ""
-  const baseHeaders: Record<string, string> = {
-    "Content-Type": contentType,
-    "x-upsert": "true",
-  }
-
-  try {
-    await xhrPut(uploadUrl, opts.file, baseHeaders, opts.onProgress)
-    return
-  } catch (error) {
-    const status = (error as { status?: number }).status
-    if (status === 401 || status === 403) {
-      const authHeaders = { ...baseHeaders }
-      if (anonKey) {
-        authHeaders.Authorization = `Bearer ${anonKey}`
-        authHeaders.apikey = anonKey
-      }
-      await xhrPut(uploadUrl, opts.file, authHeaders, opts.onProgress)
-      return
-    }
-    if (status !== 400 && status !== 415) throw error
-    const supabase = createClient()
-    const signed = await supabase.storage
-      .from("presentations")
-      .uploadToSignedUrl(opts.path, opts.token, opts.file)
-    if (signed.error) {
-      throw new Error(signed.error.message)
-    }
-    opts.onProgress(100)
-  }
+  // B2 (24/10/2026): PUT trực tiếp lên presigned URL, chỉ kèm Content-Type
+  // (header này không nằm trong chữ ký nên không làm lệch chữ ký S3).
+  // Không còn fallback uploadToSignedUrl kiểu Supabase.
+  await xhrPut(
+    opts.uploadUrl,
+    opts.file,
+    { "Content-Type": powerpointContentType(opts.file.name, opts.file.type) },
+    opts.onProgress,
+  )
 }
 
 function UploadProgressRing({ percent }: { percent: number }) {
@@ -204,14 +170,12 @@ export function PresentationUpload({
       }
 
       const data = await response.json()
-      if (!data?.upload?.token || !data?.upload?.path) {
+      if (!data?.upload?.uploadUrl || !data?.upload?.path) {
         throw new Error("Không tạo được đường dẫn tải lên kho lưu trữ.")
       }
 
       await uploadToStorage({
-        signedUrl: data.upload.signedUrl,
-        path: data.upload.path,
-        token: data.upload.token,
+        uploadUrl: data.upload.uploadUrl,
         file,
         onProgress: setProgress,
       })

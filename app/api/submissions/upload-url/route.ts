@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { validateStoragePath } from "@/lib/route-guards"
 import { checkApiRateLimit } from "@/lib/rate-limit"
+import { b2ObjectExists, isB2Configured, presignB2Upload } from "@/lib/b2"
 
 const SUBMISSIONS_BUCKET = "submissions"
 
@@ -35,25 +35,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: pathError }, { status: 403 })
     }
 
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Supabase chưa được cấu hình." }, { status: 500 })
+    // Chuyển sang B2 (24/10/2026): trả presigned PUT để client tải trực tiếp.
+    // S3 không có upsert:false — thay bằng kiểm tra tồn tại trước khi ký:
+    // mọi path upload của app đều duy nhất (timestamp + chuỗi ngẫu nhiên)
+    // nên va chạm thực tế không xảy ra; gặp 409 thì client nộp lại với path mới.
+    if (!isB2Configured()) {
+      return NextResponse.json({ error: "Kho lưu trữ chưa được cấu hình." }, { status: 500 })
     }
-
-    // Mọi path upload của app đều duy nhất (timestamp + chuỗi ngẫu nhiên) nên
-    // tắt upsert: không ai ghi đè được file đã biết đường dẫn.
-    const { data, error } = await supabase.storage
-      .from(SUBMISSIONS_BUCKET)
-      .createSignedUploadUrl(path, { upsert: false })
-    if (error || !data?.token) {
-      console.error("[upload-url]", error)
+    if (await b2ObjectExists(path)) {
+      return NextResponse.json(
+        { error: "Tệp đã tồn tại, vui lòng nộp lại." },
+        { status: 409 },
+      )
+    }
+    const uploadUrl = await presignB2Upload(path)
+    if (!uploadUrl) {
+      console.error("[upload-url] b2 presign failed")
       return NextResponse.json(
         { error: "Không tạo được đường dẫn tải lên." },
         { status: 502 },
       )
     }
 
-    return NextResponse.json({ ok: true, upload: { path: data.path, token: data.token } })
+    return NextResponse.json({ ok: true, upload: { path, uploadUrl } })
   } catch (e: any) {
     console.error("[upload-url]", e)
     return NextResponse.json(

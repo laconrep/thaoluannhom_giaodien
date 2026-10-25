@@ -8,7 +8,7 @@ import type { SubmissionFile } from "@/lib/types"
 import { Download, File as FileIcon, Loader2 } from "lucide-react"
 import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
 import { useCanvaEmbedUrl } from "@/hooks/use-canva-embed-url"
-import { isSignUrl } from "@/lib/file-url"
+import { isB2Url, isSignUrl } from "@/lib/file-url"
 
 export function officeEmbed(url: string) {
   return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
@@ -120,9 +120,9 @@ export function FileViewer(props: FileViewerProps) {
   } = props
 
   // Signed URL lưu trong DB hết hạn sau 7 ngày → đổi lấy URL mới trước khi hiện,
-  // tránh ảnh vỡ khi chấm bài cũ.
+  // tránh ảnh vỡ khi chấm bài cũ. Áp dụng cả URL Supabase cũ lẫn URL B2 mới.
   const freshUrl = useFreshFileUrl(file.url)
-  const refreshing = isSignUrl(file.url) && !freshUrl
+  const refreshing = (isSignUrl(file.url) || isB2Url(file.url)) && !freshUrl
   const src = freshUrl ?? file.url
 
   // Bài Canva: đổi link HS dán thành URL nhúng chuẩn rồi mới hiện iframe.

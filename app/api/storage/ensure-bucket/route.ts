@@ -56,6 +56,17 @@ export async function POST(request: NextRequest) {
   if (!ALLOWED_BUCKETS.includes(bucket)) {
     return NextResponse.json({ ok: false, error: "Bucket không hợp lệ.", bucket }, { status: 400 })
   }
+
+  // Chuyển sang B2 (24/10/2026): bucket B2 đã tạo sẵn ngoài app (private,
+  // không giới hạn từng file như Supabase) nên không còn gì để "ensure" —
+  // trả ok ngay để trang nộp bài không kẹt. Chỉ submission-media vẫn ở
+  // Supabase nên vẫn chạy tiếp logic cũ bên dưới.
+  if (bucket === SUBMISSIONS_BUCKET || bucket === PRESENTATIONS_BUCKET) {
+    const fileSizeLimit =
+      bucket === PRESENTATIONS_BUCKET ? MAX_PRESENTATION_BYTES : 50 * 1024 * 1024
+    return NextResponse.json({ ok: true, bucket, created: false, fileSizeLimit })
+  }
+
   const config = configFor(bucket)
   const fileSizeLimit = config.fileSizeLimit
 

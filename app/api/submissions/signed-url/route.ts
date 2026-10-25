@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { validateStoragePath } from "@/lib/route-guards"
 import { checkApiRateLimit } from "@/lib/rate-limit"
+import { isB2Configured, presignB2Download, B2_VIEW_EXPIRES_SECONDS } from "@/lib/b2"
 
 const SUBMISSIONS_BUCKET = "submissions"
-// Bucket được phép ký URL qua API này (allowlist — không ký bừa bucket khác).
+// Bucket logic được phép ký URL qua API này (allowlist — không ký bừa bucket
+// khác). Cả 2 đều nằm trong cùng 1 bucket B2; tham số này chỉ để
+// validateStoragePath chọn đúng quy tắc (xem lib/route-guards.ts).
+// submission-media KHÔNG có ở đây: ảnh nhúng dùng public URL, không qua route.
 const ALLOWED_BUCKETS = ["submissions", "presentations"] as const
 
 export async function POST(request: NextRequest) {
@@ -33,6 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Bảo mật 24/10/2026 (GĐ2): trước đây route ký URL cho bất kỳ path nào.
     // Giờ path phải gắn với phiên thật (và GV thì phải là phiên của mình).
+    // DB vẫn ở Supabase nên bước validate này không đổi.
     const userClient = await createClient()
     const {
       data: { user },
@@ -42,25 +46,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: pathError }, { status: 403 })
     }
 
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Supabase chưa được cấu hình." }, { status: 500 })
+    // Chuyển sang B2 (24/10/2026): ký GET 7 ngày, khớp hạn signed URL cũ.
+    // URL Supabase cũ trong DB tự chữa được: client tách path từ URL cũ rồi
+    // gọi route này, nhận về URL B2 cho cùng object key.
+    if (!isB2Configured()) {
+      return NextResponse.json({ error: "Kho lưu trữ chưa được cấu hình." }, { status: 500 })
     }
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(path, 60 * 60 * 24 * 7)
-    if (error || !data?.signedUrl) {
-      // Bảo mật 24/10/2026 (GĐ4): không trả message thô của Supabase ra
-      // ngoài (lộ cấu trúc kho); log phía server để debug.
-      console.error("[signed-url]", error)
+    const signedUrl = await presignB2Download(path, B2_VIEW_EXPIRES_SECONDS)
+    if (!signedUrl) {
+      console.error("[signed-url] b2 presign failed")
       return NextResponse.json(
         { error: "Không tạo được link tệp." },
         { status: 502 },
       )
     }
 
-    return NextResponse.json({ ok: true, signedUrl: data.signedUrl })
+    return NextResponse.json({ ok: true, signedUrl })
   } catch (e: any) {
     console.error("[signed-url]", e)
     return NextResponse.json(

@@ -167,7 +167,8 @@ export function PresentationViewer({
     load()
   }, [presentationId, initialPresentation, supabase, isTeacher])
 
-  // Tạo signed URL 24h một lần để Office Online Viewer tải được file cả buổi học
+  // Tạo signed URL 7 ngày một lần để Office Online Viewer tải được file cả buổi học
+  // (route ký qua B2 từ 24/10/2026; trước đây ký trực tiếp bằng anon key Supabase).
   useEffect(() => {
     const storagePath = presentation?.storage_path ?? presentation?.file_path
     if (!storagePath) return
@@ -175,19 +176,24 @@ export function PresentationViewer({
     let cancelled = false
 
     const createSignedUrl = async () => {
-      const { data: signed, error } = await supabase.storage
-        .from("presentations")
-        .createSignedUrl(storagePath, 60 * 60 * 24) // 24 giờ, đủ dài cho một buổi học
-      if (cancelled) return
-      if (error) {
-        console.error("Không tạo được signed URL cho presentation:", error)
-        return
-      }
-      if (signed?.signedUrl) {
+      try {
+        const res = await fetch("/api/submissions/signed-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: storagePath, bucket: "presentations" }),
+        })
+        const signed = await res.json().catch(() => ({}))
+        if (cancelled) return
+        if (!res.ok || !signed?.signedUrl) {
+          console.error("Không tạo được signed URL cho presentation:", signed?.error)
+          return
+        }
         setRawUrl(signed.signedUrl)
         setSourceUrl(
           `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(signed.signedUrl)}`,
         )
+      } catch (e) {
+        if (!cancelled) console.error("Không tạo được signed URL cho presentation:", e)
       }
     }
 
@@ -196,7 +202,7 @@ export function PresentationViewer({
     return () => {
       cancelled = true
     }
-  }, [presentation?.storage_path, presentation?.file_path, supabase])
+  }, [presentation?.storage_path, presentation?.file_path])
 
   useEffect(() => {
     if (!presentationId) return

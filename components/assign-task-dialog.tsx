@@ -45,21 +45,15 @@ async function uploadPromptFile(sessionId: string, file: File): Promise<Submissi
     body: JSON.stringify({ path }),
   })
   const urlBody = await urlRes.json().catch(() => ({}))
-  if (!urlRes.ok || !urlBody?.upload?.token) {
+  if (!urlRes.ok || !urlBody?.upload?.uploadUrl) {
     throw new Error(urlBody?.error ?? "Không tạo được đường dẫn tải lên.")
   }
-  const uploadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/upload/sign/submissions/${urlBody.upload.path}?token=${encodeURIComponent(urlBody.upload.token)}`
-  const anonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    urlBody.upload.token
-  const putRes = await fetch(uploadUrl, {
+  // B2 (24/10/2026): PUT trực tiếp lên presigned URL — không còn
+  // Authorization/apikey/x-upsert kiểu Supabase.
+  const putRes = await fetch(urlBody.upload.uploadUrl, {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${anonKey}`,
-      apikey: anonKey,
       "Content-Type": file.type || "application/octet-stream",
-      "x-upsert": "true",
     },
     body: file,
   })
