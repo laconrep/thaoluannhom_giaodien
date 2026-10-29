@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition, useEffect, useRef } from "react"
 import { overrideStudentScoreAction, toggleShareScoresAction } from "@/app/actions"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -49,6 +50,41 @@ export function GradebookView({
   }, [])
 
   const anyShared = useMemo(() => sessions.some((s) => s.scores_shared), [sessions])
+
+  // Realtime: giáo viên sửa điểm ở khung chấm (annotation) hoặc ở nơi khác →
+  // bảng điểm đang mở tự cập nhật ngay, không cần tải lại trang.
+  useEffect(() => {
+    if (sessions.length === 0) return
+    const supabase = createClient()
+    const ch = supabase.channel(`gradebook-${classId}`)
+    for (const s of sessions) {
+      ch.on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "student_scores",
+          filter: `session_id=eq.${s.id}`,
+        },
+        (p: any) => {
+          const row = (p.eventType === "DELETE" ? p.old : p.new) as any
+          if (!row?.student_id || !row?.session_id) return
+          setScoreMap((cur) => {
+            const next = { ...cur }
+            const per = { ...(next[row.student_id] ?? {}) }
+            if (p.eventType === "DELETE") delete per[row.session_id]
+            else per[row.session_id] = typeof row.score === "number" ? row.score : null
+            next[row.student_id] = per
+            return next
+          })
+        },
+      )
+    }
+    ch.subscribe()
+    return () => {
+      supabase.removeChannel(ch)
+    }
+  }, [classId, sessions])
 
   const averages = useMemo(() => {
     const m: Record<string, number> = {}
