@@ -1053,17 +1053,19 @@ export function AnnotationEditor({
         }
       >
         <div
-          className="mx-auto"
+          className={zoomLevel > 1 ? "" : "mx-auto"}
           style={{
-            width: "100%",
-            // Zoom bằng CSS `zoom` thay cho transform scale: `zoom` phóng to
-            // cả kích thước layout thật nên vùng cuộn của viewport nở đúng
-            // bằng ảnh đã phóng — kéo (pan)/cuộn tới được mọi góc khi ảnh
-            // tràn màn hình. Transform scale chỉ phóng phần hiển thị, phần
-            // tràn sang trái nằm ngoài vùng cuộn (scrollLeft không âm được)
-            // nên zoom to là kéo chết. Mọi tọa độ dấu/chữ vẫn đo theo layout
-            // (getBoundingClientRect đã gồm hệ số zoom, offsetWidth thì
-            // không) nên hệ tọa độ chấm không đổi.
+            // Khung rộng đúng bằng mức zoom (120% → 120% viewport...), KHÔNG
+            // dùng width:100% + zoom: vì đã đo trên trình duyệt thật: CSS `zoom`
+            // không nới khung theo (width:100% giữ nguyên bằng viewport, ảnh
+            // render to gấp zoomLevel lần nhưng khung local co lại còn
+            // 100%/zoomLevel) → ảnh `mx-auto` canh giữa tràn sang vùng tọa độ
+            // âm, thanh cuộn/kéo tay (scrollLeft không âm được) không tới được
+            // mép trái; đồng thời vị trí ảnh trong hệ tọa độ dấu thay đổi theo
+            // zoom → dấu trôi. Để width = zoom% + canh lề trái khi zoom > 1:
+            // vùng cuộn nở sang PHẢI, mép trái luôn ở 0, khung local bất biến
+            // theo zoom nên dấu/chữ không trôi nữa.
+            width: `${zoomLevel * 100}%`,
             zoom: zoomLevel,
           }}
         >
@@ -1223,6 +1225,9 @@ export function AnnotationEditor({
                     }}
                     className={cn(
                       "absolute whitespace-pre leading-none cursor-move transition-shadow",
+                      // Ở chế độ bàn tay (pan): chữ không được nuốt thao tác —
+                      // mọi cú bấm-giữ đều phải tới surface để kéo ảnh.
+                      tool === "pan" && "pointer-events-none",
                       selected
                         ? "ring-2 ring-primary ring-offset-2 ring-offset-card rounded-sm"
                         : "hover:ring-1 hover:ring-primary/40 rounded-sm",
@@ -1260,7 +1265,12 @@ export function AnnotationEditor({
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => removeStamp(origIdx)}
                     title="Click để xóa dấu"
-                    className="absolute font-heading font-bold select-none drop-shadow-sm cursor-pointer leading-none"
+                    className={cn(
+                      "absolute font-heading font-bold select-none drop-shadow-sm cursor-pointer leading-none",
+                      // Ở chế độ bàn tay (pan): dấu không được nuốt thao tác
+                      // kéo, và bấm vào dấu lúc này cũng không xóa dấu nữa.
+                      tool === "pan" && "pointer-events-none",
+                    )}
                     style={{
                       left: it.x,
                       top: it.y - it.fontSize,
