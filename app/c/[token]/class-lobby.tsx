@@ -8,6 +8,7 @@ import { fetchClassGroups } from "@/lib/class-groups"
 import {
   leaderSwapSlotsAction,
   leaderUpdateGroupMembersAction,
+  studentChooseGroupAction,
   studentClaimSlotAction,
 } from "@/app/actions"
 import {
@@ -17,6 +18,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useCountdown, formatClock } from "@/lib/use-countdown"
 import {
   ArrowRight,
@@ -88,6 +97,9 @@ export function ClassLobby({
   const [groups, setGroups] = useState<Group[]>(initialGroups)
   const [members, setMembers] = useState<GroupMember[]>(initialMembers)
   const [myStudentId, setMyStudentId] = useState<string | null>(null)
+  // Dialog "Chọn nhóm" của học sinh
+  const [chooseOpen, setChooseOpen] = useState(false)
+  const [pickedGroupId, setPickedGroupId] = useState<string | null>(null)
   const [dragStudentId, setDragStudentId] = useState<string | null>(null)
   const [saving, startTransition] = useTransition()
   const [deviceToken] = useState(() => getDeviceToken())
@@ -237,6 +249,28 @@ export function ClassLobby({
     setMyStudentId(null)
   }
 
+  // Học sinh tự chọn nhóm: gửi device_token để xác thực chính chủ.
+  // Sau khi đổi, màn hình GV + các bạn khác tự cập nhật qua realtime class_group_members.
+  function confirmChooseGroup() {
+    if (saving || !pickedGroupId || !myStudentId) return
+    startTransition(async () => {
+      const wasLeader = !!myLeaderGroup
+      const res = await studentChooseGroupAction({
+        classId,
+        deviceToken,
+        studentId: myStudentId,
+        targetGroupId: pickedGroupId,
+      })
+      if (!res.ok) {
+        toast.error(res.error ?? "Không đổi được nhóm")
+        return
+      }
+      toast.success(wasLeader ? "Đã đổi nhóm (em không còn là nhóm trưởng)" : "Đã đổi nhóm")
+      setChooseOpen(false)
+      setPickedGroupId(null)
+    })
+  }
+
   // Nhóm mà mình làm nhóm trưởng
   const myLeaderGroup = useMemo(
     () => (myStudentId ? groups.find((g) => g.leader_student_id === myStudentId) ?? null : null),
@@ -253,6 +287,12 @@ export function ClassLobby({
     }
     return m
   }, [groups, members])
+
+  // Nhóm hiện tại của chính em
+  const myGroup = useMemo(
+    () => (myStudentId ? (studentToGroup.get(myStudentId) ?? null) : null),
+    [myStudentId, studentToGroup],
+  )
 
   async function leaderAdd(targetStudentId: string) {
     const res = await leaderUpdateGroupMembersAction({
@@ -411,16 +451,29 @@ export function ClassLobby({
     <main className="min-h-svh bg-muted/40 p-4">
       <div className="mx-auto max-w-3xl flex flex-col gap-4">
         <Card>
-          <CardHeader className="flex-row items-start justify-between">
+          <CardHeader className="flex-row items-start justify-between gap-2">
             <div>
               <CardTitle>{className}</CardTitle>
               <CardDescription>
                 Ô số {me?.slot_number} — {me?.name}
+                {myGroup ? ` · Nhóm: ${myGroup.name}` : " · Chưa có nhóm"}
               </CardDescription>
             </div>
-            <Button variant="ghost" size="sm" onClick={changeSlot}>
-              Đổi ô
-            </Button>
+            <div className="flex gap-1 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setPickedGroupId(myGroup?.id ?? null)
+                  setChooseOpen(true)
+                }}
+              >
+                Chọn nhóm
+              </Button>
+              <Button variant="ghost" size="sm" onClick={changeSlot}>
+                Đổi ô
+              </Button>
+            </div>
           </CardHeader>
         </Card>
 
@@ -586,6 +639,63 @@ export function ClassLobby({
             </TabsContent>
           )}
         </Tabs>
+
+        <Dialog open={chooseOpen} onOpenChange={setChooseOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Chọn nhóm của em</DialogTitle>
+              <DialogDescription>
+                Em chỉ ở 1 nhóm — đổi nhóm sẽ tự gỡ em khỏi nhóm cũ.
+                {myLeaderGroup
+                  ? " Vì em đang là nhóm trưởng, đổi nhóm xong em sẽ mất chức nhóm trưởng."
+                  : ""}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-2 max-h-[50vh] overflow-auto p-1">
+              {groups.map((g) => {
+                const count = members.filter((m) => m.class_group_id === g.id).length
+                const isCurrent = myGroup?.id === g.id
+                const selected = pickedGroupId === g.id
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setPickedGroupId(g.id)}
+                    className={cn(
+                      "rounded-lg border px-3 py-2.5 flex items-center gap-2 text-left transition",
+                      selected
+                        ? "ring-2 ring-primary border-primary bg-primary/5"
+                        : "hover:bg-muted/40",
+                    )}
+                    style={groupCardStyle(g.color)}
+                  >
+                    <span
+                      className="size-3 rounded-full shrink-0"
+                      style={{ backgroundColor: g.color }}
+                    />
+                    <span className="flex-1 font-medium">{g.name}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {count} bạn
+                    </span>
+                    {isCurrent && (
+                      <span className="text-[10px] font-semibold text-primary shrink-0">
+                        Nhóm hiện tại
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setChooseOpen(false)}>
+                Hủy
+              </Button>
+              <Button disabled={!pickedGroupId || saving} onClick={confirmChooseGroup}>
+                {saving ? "Đang đổi..." : "Xác nhận"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </main>
   )

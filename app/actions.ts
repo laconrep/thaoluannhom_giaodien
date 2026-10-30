@@ -506,6 +506,85 @@ export async function leaderUpdateGroupMembersAction(input: {
   return { ok: true }
 }
 
+// Học sinh tự chọn nhóm cho mình.
+// - Ưu tiên cao hơn nhóm trưởng phân: em tự đổi được bất cứ lúc nào; khi em đã
+//   ở nhóm khác thì nhóm trưởng không kéo em về lại được (luật chặn sẵn ở
+//   leaderUpdateGroupMembersAction: "Chỉ giáo viên mới đổi được học sinh đã ở
+//   nhóm khác").
+// - Một em chỉ ở 1 nhóm: tự gỡ khỏi mọi nhóm trong lớp trước khi vào nhóm mới.
+// - Nếu em đang là nhóm trưởng ở nhóm cũ → mất chức nhóm trưởng ở nhóm đó.
+export async function studentChooseGroupAction(input: {
+  classId: string
+  deviceToken: string
+  studentId: string
+  targetGroupId: string
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient()
+  if (
+    !isUuid(input.classId) ||
+    !isUuid(input.deviceToken) ||
+    !isUuid(input.studentId) ||
+    !isUuid(input.targetGroupId)
+  ) {
+    return { ok: false, error: "Thông tin không hợp lệ." }
+  }
+  // Chính chủ mới được đổi nhóm cho mình (xác thực device_token như luồng leader)
+  const { data: student } = await supabase
+    .from("students")
+    .select("id")
+    .eq("id", input.studentId)
+    .eq("class_id", input.classId)
+    .eq("device_token", input.deviceToken)
+    .maybeSingle()
+  if (!student) return { ok: false, error: "Không xác thực được học sinh" }
+  // Nhóm đích phải thuộc đúng lớp
+  const { data: target } = await supabase
+    .from("class_groups")
+    .select("id")
+    .eq("id", input.targetGroupId)
+    .eq("class_id", input.classId)
+    .maybeSingle()
+  if (!target) return { ok: false, error: "Không tìm thấy nhóm" }
+
+  // Các nhóm em đang ở (thường chỉ 1; dữ liệu cũ có thể có hơn 1)
+  const { data: currentGroups } = await supabase
+    .from("class_group_members")
+    .select("class_group_id")
+    .eq("student_id", input.studentId)
+  const currentIds = (currentGroups ?? []).map((r) => r.class_group_id as string)
+  if (currentIds.includes(input.targetGroupId)) return { ok: true }
+
+  // Đang là nhóm trưởng ở nhóm cũ → mất chức
+  if (currentIds.length > 0) {
+    await supabase
+      .from("class_groups")
+      .update({ leader_student_id: null })
+      .in("id", currentIds)
+      .eq("leader_student_id", input.studentId)
+  }
+  // Gỡ khỏi mọi nhóm trong lớp (đảm bảo 1 em 1 nhóm)
+  const { data: allGroups } = await supabase
+    .from("class_groups")
+    .select("id")
+    .eq("class_id", input.classId)
+  const allIds = (allGroups ?? []).map((g) => g.id as string)
+  if (allIds.length > 0) {
+    const { error: delError } = await supabase
+      .from("class_group_members")
+      .delete()
+      .eq("student_id", input.studentId)
+      .in("class_group_id", allIds)
+    if (delError) return { ok: false, error: "Không cập nhật được nhóm. Thử lại sau." }
+  }
+  // Vào nhóm mới
+  const { error } = await supabase
+    .from("class_group_members")
+    .insert({ class_group_id: input.targetGroupId, student_id: input.studentId })
+  if (error) return { ok: false, error: "Không cập nhật được nhóm. Thử lại sau." }
+  // Màn hình GV + các HS khác tự cập nhật qua realtime class_group_members.
+  return { ok: true }
+}
+
 // Hoán đổi vị trí (slot_number) của 2 học sinh trong cùng 1 lớp.
 // Tránh vi phạm unique (class_id, slot_number) bằng cách đổi qua giá trị tạm -1.
 async function swapStudentSlots(
