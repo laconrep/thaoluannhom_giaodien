@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import {
   addClassGroupAction,
   bulkSetNamesAction,
+  bulkUnlockStudentSlotsAction,
   importStudentsFromListAction,
   moveStudentToGroupAction,
   moveStudentsToGroupAction,
@@ -26,12 +27,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Plus,
   Trash2,
   Users,
   ListPlus,
   Lock,
+  LockOpen,
   Save,
   Minus,
   ChevronDown,
@@ -103,7 +106,16 @@ export function RosterView({
   } | null>(null)
   const [, startTransition] = useTransition()
   const [confirmUnlockId, setConfirmUnlockId] = useState<string | null>(null)
+  // Popup mở khóa hàng loạt
+  const [unlockOpen, setUnlockOpen] = useState(false)
+  const [unlockSelected, setUnlockSelected] = useState<string[]>([])
   const fileImportRef = useRef<HTMLInputElement | null>(null)
+
+  // Các em đang bị khóa (đã gắn thiết bị) — đối tượng của mở khóa hàng loạt
+  const lockedStudents = useMemo(
+    () => students.filter((s) => s.device_token).sort((a, b) => a.slot_number - b.slot_number),
+    [students],
+  )
 
   // Đồng bộ dữ liệu từ DB (dùng cho Realtime event + polling fallback + sau các action).
   // Dùng useCallback để ổn định tham chiếu, tránh chạy lại effect liên tục.
@@ -249,6 +261,36 @@ export function RosterView({
     } catch {
       toast.error("Không mở khóa được.")
     }
+  }
+
+  // Mở khóa hàng loạt các em đã chọn trong popup
+  function doBulkUnlock() {
+    if (unlockSelected.length === 0) return
+    startTransition(async () => {
+      try {
+        const res = await bulkUnlockStudentSlotsAction({ classId, studentIds: unlockSelected })
+        if (!res.ok) {
+          toast.error(res.error ?? "Không mở khóa được.")
+          return
+        }
+        toast.success(`Đã mở khóa ${res.unlocked ?? unlockSelected.length} em.`)
+        setUnlockOpen(false)
+        setUnlockSelected([])
+        await refreshStudents()
+      } catch {
+        toast.error("Không mở khóa được.")
+      }
+    })
+  }
+
+  function toggleUnlockSelect(id: string) {
+    setUnlockSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
+  }
+
+  function toggleUnlockSelectAll() {
+    setUnlockSelected((cur) =>
+      cur.length === lockedStudents.length ? [] : lockedStudents.map((s) => s.id),
+    )
   }
 
   function onBulkPaste() {
@@ -662,6 +704,70 @@ export function RosterView({
         </DialogContent>
       </Dialog>
 
+      {/* Popup mở khóa hàng loạt: chọn nhiều HS đang bị khóa */}
+      <Dialog open={unlockOpen} onOpenChange={setUnlockOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mở khóa hàng loạt</DialogTitle>
+            <DialogDescription>
+              Chọn các em cần mở khóa. Sau khi mở, các em chọn lại tên trên thiết bị đang dùng
+              được ngay.
+            </DialogDescription>
+          </DialogHeader>
+          {lockedStudents.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">
+              Không có học sinh nào đang bị khóa.
+            </p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  Đã chọn {unlockSelected.length}/{lockedStudents.length} em
+                </span>
+                <Button variant="ghost" size="sm" onClick={toggleUnlockSelectAll}>
+                  {unlockSelected.length === lockedStudents.length ? "Bỏ chọn hết" : "Chọn tất cả"}
+                </Button>
+              </div>
+              <div className="grid gap-1 max-h-[50vh] overflow-auto p-1">
+                {lockedStudents.map((s) => {
+                  const checked = unlockSelected.includes(s.id)
+                  return (
+                    <label
+                      key={s.id}
+                      className={cn(
+                        "rounded-lg border px-3 py-2 flex items-center gap-2.5 cursor-pointer transition",
+                        checked ? "ring-2 ring-primary border-primary bg-primary/5" : "hover:bg-muted/40",
+                      )}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={() => toggleUnlockSelect(s.id)}
+                        aria-label={`Chọn ${s.name ?? `ô ${s.slot_number}`}`}
+                      />
+                      <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
+                        {s.slot_number}
+                      </span>
+                      <span className="flex-1 min-w-0 text-sm font-medium truncate">
+                        {s.name?.trim() || <span className="text-muted-foreground/70">Trống</span>}
+                      </span>
+                      <Lock className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
+                    </label>
+                  )
+                })}
+              </div>
+            </>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUnlockOpen(false)}>
+              Hủy
+            </Button>
+            <Button disabled={unlockSelected.length === 0} onClick={doBulkUnlock}>
+              Mở khóa ({unlockSelected.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid lg:grid-cols-[4fr_1fr] gap-5">
         {/* KHUNG CHÍNH: danh sách HS */}
         <Card className="float-card">
@@ -730,6 +836,29 @@ export function RosterView({
                   <FileSpreadsheet className="size-4 mr-1" aria-hidden="true" />
                 )}
                 Import Excel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="whitespace-nowrap"
+                disabled={lockedStudents.length === 0}
+                title={
+                  lockedStudents.length === 0
+                    ? "Không có học sinh nào đang bị khóa"
+                    : `Mở khóa hàng loạt (${lockedStudents.length} em đang bị khóa)`
+                }
+                onClick={() => {
+                  setUnlockSelected(lockedStudents.map((s) => s.id))
+                  setUnlockOpen(true)
+                }}
+              >
+                <LockOpen className="size-4 mr-1" aria-hidden="true" />
+                Mở khóa
+                {lockedStudents.length > 0 && (
+                  <span className="ml-1 rounded-full bg-muted px-1.5 text-[10px] font-semibold tabular-nums">
+                    {lockedStudents.length}
+                  </span>
+                )}
               </Button>
               <input
                 ref={fileImportRef}

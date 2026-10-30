@@ -1470,6 +1470,39 @@ export async function unlockStudentSlotAction(studentId: string): Promise<{ ok: 
   return { ok: true }
 }
 
+// Mở khóa hàng loạt: xóa device_token của nhiều HS trong cùng 1 lớp để các em
+// chọn lại tên trên thiết bị đang dùng. Chỉ giáo viên chủ lớp thực hiện được.
+export async function bulkUnlockStudentSlotsAction(input: {
+  classId: string
+  studentIds: string[]
+}): Promise<{ ok: boolean; unlocked?: number; error?: string }> {
+  const supabase = await createClient()
+  if (!isUuid(input.classId)) return { ok: false, error: "Thông tin không hợp lệ." }
+  const ids = [...new Set((input.studentIds ?? []).filter(isUuid))]
+  if (ids.length === 0) return { ok: false, error: "Chưa chọn học sinh nào." }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: "Chỉ giáo viên mới thực hiện được." }
+  const { data: cls } = await supabase
+    .from("classes")
+    .select("teacher_id")
+    .eq("id", input.classId)
+    .maybeSingle()
+  if (!cls || cls.teacher_id !== user.id) {
+    return { ok: false, error: "Bạn không có quyền với lớp này." }
+  }
+  const { error, count } = await supabase
+    .from("students")
+    .update({ device_token: null }, { count: "exact" })
+    .eq("class_id", input.classId)
+    .in("id", ids)
+    .not("device_token", "is", null)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath(`/classes/${input.classId}/roster`)
+  return { ok: true, unlocked: count ?? ids.length }
+}
+
 async function assertSessionAcceptsSubmission(
   supabase: Awaited<ReturnType<typeof createClient>>,
   sessionId: string,
