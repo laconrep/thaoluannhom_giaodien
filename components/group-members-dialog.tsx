@@ -244,7 +244,10 @@ export function GroupMembersDialog({
                       isHighlight && "border-amber-500 bg-amber-500/10",
                     )}
                   >
-                    <span className="text-sm font-medium truncate flex items-center gap-1.5">
+                    <span
+                      className="text-sm font-medium truncate flex items-center gap-1.5"
+                      title={m.name}
+                    >
                       {isPicked && !rolling && <Trophy className="size-4 text-amber-500 shrink-0" />}
                       {m.name}
                     </span>

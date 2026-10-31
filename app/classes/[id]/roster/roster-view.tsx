@@ -686,7 +686,7 @@ export function RosterView({
                       <span className="text-[10px] tabular-nums font-semibold bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
                         {m.slot_number}
                       </span>
-                      <span className="flex-1 font-medium truncate">
+                      <span className="flex-1 font-medium truncate" title={m.name?.trim() || undefined}>
                         {m.name?.trim() || "—"}
                       </span>
                       {isLeader && (
@@ -747,7 +747,10 @@ export function RosterView({
                       <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
                         {s.slot_number}
                       </span>
-                      <span className="flex-1 min-w-0 text-sm font-medium truncate">
+                      <span
+                        className="flex-1 min-w-0 text-sm font-medium truncate"
+                        title={s.name?.trim() || undefined}
+                      >
                         {s.name?.trim() || <span className="text-muted-foreground/70">Trống</span>}
                       </span>
                       <Lock className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
@@ -1282,7 +1285,10 @@ export function RosterView({
                                   <span className="text-[10px] tabular-nums font-semibold bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
                                     {m.slot_number}
                                   </span>
-                                  <span className="flex-1 text-sm font-medium truncate">
+                                  <span
+                                    className="flex-1 min-w-0 text-sm font-medium break-words"
+                                    title={m.name?.trim() || undefined}
+                                  >
                                     {m.name?.trim() || "—"}
                                   </span>
                                   {isLeaderMember && (

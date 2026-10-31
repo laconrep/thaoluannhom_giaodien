@@ -382,7 +382,10 @@ export function IndividualBoard({
                   <button
                     onClick={() => setOpenSlotId(slot.id)}
                     className="absolute inset-0 z-0"
-                    aria-label={`Mở ô ${slot.slot_number}`}
+                    aria-label={
+                      st?.name?.trim() ? `Mở bài của ${st.name.trim()}` : `Mở ô ${slot.slot_number}`
+                    }
+                    title={st?.name?.trim() ? `${st.name.trim()} — bấm để mở bài` : undefined}
                   />
                   <div className="relative z-10 flex items-center justify-between gap-1">
                     <span className="text-[10px] font-mono text-muted-foreground tabular-nums">
@@ -432,7 +435,7 @@ export function IndividualBoard({
 
                   <div className="relative z-10 flex items-center gap-1 pointer-events-none">
                     {st && <AvatarInitials name={st.name ?? ""} size="xs" />}
-                    <p className="text-xs font-medium leading-tight line-clamp-1 flex-1 min-w-0">
+                    <p className="text-xs font-medium leading-tight line-clamp-2 flex-1 min-w-0">
                       {st?.name?.trim() || <span className="text-muted-foreground">—</span>}
                     </p>
                   </div>
