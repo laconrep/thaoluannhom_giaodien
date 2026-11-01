@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/empty-state"
 import { Users } from "lucide-react"
 import { AccountsTable, type AdminAccountRow } from "@/app/admin/accounts-table"
 import { StationsSection } from "@/app/admin/stations-section"
+import { getTeacherActivityMap } from "@/app/admin/activity-stats"
 
 type AccountStatus = "active" | "disabled"
 type AccountRole = "user" | "admin"
@@ -86,6 +87,13 @@ export default async function AdminPage() {
   }
 
   const profileById = new Map((profiles ?? []).map((p) => [p.id as string, p]))
+  const activityByTeacher = await getTeacherActivityMap()
+  const emptyActivity = {
+    classCount: 0,
+    groupSessionsWithSubmissions: 0,
+    groupSessionsWithoutSubmissions: 0,
+    aiGradedCount: 0,
+  }
 
   const accounts: AdminAccountRow[] = (authData.users ?? []).map((u) => {
     const profile = profileById.get(u.id)
@@ -99,6 +107,7 @@ export default async function AdminPage() {
       role: asRole(profile?.role, email),
       status: asStatus(profile?.status),
       noDeviceLock: profile?.no_device_lock === true,
+      activity: activityByTeacher.get(u.id) ?? emptyActivity,
     }
   })
 

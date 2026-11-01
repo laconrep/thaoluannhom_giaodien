@@ -18,6 +18,7 @@ import { Users } from "lucide-react"
 import { AccountStatusButtons } from "@/app/admin/account-status-buttons"
 import { AccountPlanSelect } from "@/app/admin/account-plan-select"
 import { DeviceLockToggle } from "@/app/admin/device-lock-toggle"
+import type { TeacherActivity } from "@/app/admin/activity-stats"
 
 export type AdminAccountRow = {
   id: string
@@ -28,6 +29,7 @@ export type AdminAccountRow = {
   role: "user" | "admin"
   status: "active" | "disabled"
   noDeviceLock: boolean
+  activity: TeacherActivity
 }
 
 export function AccountsTable({ accounts }: { accounts: AdminAccountRow[] }) {
@@ -100,6 +102,7 @@ function PlanBlock({
               <TableHead>Trạng thái</TableHead>
               <TableHead>Quyền</TableHead>
               <TableHead>Khóa thiết bị</TableHead>
+              <TableHead>Hoạt động</TableHead>
               <TableHead className="text-right">Thao tác</TableHead>
             </TableRow>
           </TableHeader>
@@ -132,6 +135,32 @@ function PlanBlock({
                     email={row.email}
                     noDeviceLock={row.noDeviceLock}
                   />
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-0.5 text-xs">
+                    <span title="Số lớp">
+                      <span className="font-semibold">{row.activity.classCount}</span>{" "}
+                      <span className="text-muted-foreground">lớp</span>
+                    </span>
+                    <span title="Phiên nhóm có bài nộp">
+                      <span className="font-semibold text-emerald-600">
+                        {row.activity.groupSessionsWithSubmissions}
+                      </span>{" "}
+                      <span className="text-muted-foreground">phiên có bài</span>
+                    </span>
+                    <span title="Phiên nhóm không có bài nộp">
+                      <span className="font-semibold text-muted-foreground">
+                        {row.activity.groupSessionsWithoutSubmissions}
+                      </span>{" "}
+                      <span className="text-muted-foreground">phiên trống</span>
+                    </span>
+                    <span title="Tổng số bài đã chấm bằng AI">
+                      <span className="font-semibold text-violet-600">
+                        {row.activity.aiGradedCount}
+                      </span>{" "}
+                      <span className="text-muted-foreground">bài chấm AI</span>
+                    </span>
+                  </div>
                 </TableCell>
                 <TableCell className="text-right">
                   <AccountStatusButtons
