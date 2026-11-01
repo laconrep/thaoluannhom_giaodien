@@ -61,3 +61,26 @@ export async function setAccountPlanAction(userId: string, plan: Plan) {
   if (error) throw new Error(error.message)
   revalidatePath("/admin")
 }
+
+// Bật/tắt khóa thiết bị cho học sinh của giáo viên.
+// no_device_lock = true → HS chọn tên tự do trên mọi thiết bị (không chặn).
+// Tolerant khi chưa chạy migration 012: thiếu cột thì báo rõ để admin chạy SQL.
+export async function setNoDeviceLockAction(userId: string, disabled: boolean) {
+  if (!userId) throw new Error("Thiếu tài khoản.")
+
+  const { admin } = await assertAdminActor()
+  const now = new Date().toISOString()
+  const { data: existing } = await admin.from("profiles").select("id").eq("id", userId).maybeSingle()
+  const { error } = existing
+    ? await admin.from("profiles").update({ no_device_lock: disabled, updated_at: now }).eq("id", userId)
+    : await admin.from("profiles").insert({ id: userId, plan: "free", role: "user", status: "active", no_device_lock: disabled, updated_at: now })
+
+  if (error) {
+    // 42703 = cột chưa tồn tại → migration 012 chưa chạy
+    if ((error as { code?: string }).code === "42703") {
+      throw new Error("Chưa chạy migration 012_no_device_lock.sql trong Supabase SQL Editor.")
+    }
+    throw new Error(error.message)
+  }
+  revalidatePath("/admin")
+}

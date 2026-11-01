@@ -23,6 +23,39 @@ function isUuid(v: string | null | undefined): v is string {
   return !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
 }
 
+/* Kiểm tra giáo viên có tắt khóa thiết bị cho HS không (migration 012).
+ * Tolerant: cột no_device_lock chưa có (chưa chạy migration) → coi như vẫn khóa. */
+async function isDeviceLockDisabled(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  studentId: string,
+): Promise<boolean> {
+  try {
+    const { data: stu } = await supabase
+      .from("students")
+      .select("class_id")
+      .eq("id", studentId)
+      .maybeSingle()
+    const classId = (stu as { class_id?: string } | null)?.class_id
+    if (!classId) return false
+    const { data: cls } = await supabase
+      .from("classes")
+      .select("teacher_id")
+      .eq("id", classId)
+      .maybeSingle()
+    const teacherId = (cls as { teacher_id?: string } | null)?.teacher_id
+    if (!teacherId) return false
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("no_device_lock")
+      .eq("id", teacherId)
+      .maybeSingle()
+    if (error) return false // 42703: cột chưa có → giữ hành vi khóa cũ
+    return (profile as { no_device_lock?: boolean } | null)?.no_device_lock === true
+  } catch {
+    return false
+  }
+}
+
 /* ============ PLANS / QUOTA ============ */
 
 async function getPlan(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<Plan> {
@@ -1315,11 +1348,14 @@ export async function studentSetNameAction(studentId: string, name: string, devi
   const supabase = await createClient()
   const cleanName = name.trim().slice(0, 120)
   if (!studentId || !deviceToken || !cleanName || !isUuid(deviceToken)) throw new Error("Thông tin học sinh không hợp lệ.")
-  const { error } = await supabase
+  // GV tắt khóa thiết bị (migration 012) → cho ghi đè device_token tự do
+  const noLock = await isDeviceLockDisabled(supabase, studentId)
+  let q = supabase
     .from("students")
     .update({ name: cleanName, device_token: deviceToken })
     .eq("id", studentId)
-    .or(`device_token.is.null,device_token.eq.${deviceToken}`)
+  if (!noLock) q = q.or(`device_token.is.null,device_token.eq.${deviceToken}`) as typeof q
+  const { error } = await q
   // Bảo mật 24/10/2026 (GĐ4): luồng HS ẩn danh không nhận message thô của DB.
   if (error) throw new Error("Không lưu được tên. Thử lại sau.")
 }
@@ -1397,12 +1433,14 @@ export async function studentClaimSessionSlotAction(
   // Buộc danh tính với thiết bị (token do sảnh lớp cấp, key localStorage
   // "device_token"): tên đã gắn với thiết bị khác thì không cho nhận — chặn
   // chọn nhầm tên bạn. GV mở khóa tên trong danh sách lớp để chọn lại.
+  // Ngoại lệ: GV tắt khóa thiết bị ở trang Quản trị (migration 012) → bỏ qua.
   const { data: stu } = await supabase
     .from("students")
     .select("id, device_token")
     .eq("id", studentId)
     .maybeSingle()
-  if (stu?.device_token && stu.device_token !== deviceToken) {
+  const noLockSlot = await isDeviceLockDisabled(supabase, studentId)
+  if (!noLockSlot && stu?.device_token && stu.device_token !== deviceToken) {
     return {
       ok: false,
       error: "Tên này đã được chọn trên thiết bị khác. Nếu em chọn nhầm, hãy nhờ giáo viên mở khóa trong danh sách lớp.",
@@ -1428,13 +1466,14 @@ export async function studentClaimSlotAction(
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
   if (!studentId || !deviceToken || !isUuid(deviceToken)) return { ok: false, error: "Thông tin chọn ô không hợp lệ." }
-  const { data: updated, error } = await supabase
+  // GV tắt khóa thiết bị (migration 012) → cho ghi đè device_token tự do
+  const noLockClaim = await isDeviceLockDisabled(supabase, studentId)
+  let qc = supabase
     .from("students")
     .update({ device_token: deviceToken })
     .eq("id", studentId)
-    .or(`device_token.is.null,device_token.eq.${deviceToken}`)
-    .select("id")
-    .maybeSingle()
+  if (!noLockClaim) qc = qc.or(`device_token.is.null,device_token.eq.${deviceToken}`) as typeof qc
+  const { data: updated, error } = await qc.select("id").maybeSingle()
   if (error) return { ok: false, error: "Không chọn được ô. Thử lại sau." }
   if (!updated) return { ok: false, error: "Ô này đã được thiết bị khác chọn" }
   return { ok: true }

@@ -41,11 +41,35 @@ export default async function AdminPage() {
     )
   }
 
-  const [{ data: authData, error: authError }, { data: profiles, error: profileError }] =
-    await Promise.all([
-      admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
-      admin.from("profiles").select("id, plan, role, status, updated_at"),
-    ])
+  // Lấy profiles, tolerant khi chưa chạy migration 012 (thiếu cột no_device_lock).
+  let profiles: Array<{
+    id: string
+    plan?: unknown
+    role?: unknown
+    status?: unknown
+    updated_at?: unknown
+    no_device_lock?: unknown
+  }> | null = null
+  let profileError: { message: string } | null = null
+  {
+    const r1 = await admin
+      .from("profiles")
+      .select("id, plan, role, status, updated_at, no_device_lock")
+    if (!r1.error) {
+      profiles = r1.data
+    } else if ((r1.error as { code?: string }).code === "42703") {
+      // Migration 012 chưa chạy → đọc không kèm cột mới, mặc định khóa bật
+      const r2 = await admin.from("profiles").select("id, plan, role, status, updated_at")
+      profiles = r2.data
+      profileError = r2.error
+    } else {
+      profileError = r1.error
+    }
+  }
+  const { data: authData, error: authError } = await admin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  })
 
   if (authError) {
     return (
@@ -74,6 +98,7 @@ export default async function AdminPage() {
       plan: asPlan(profile?.plan),
       role: asRole(profile?.role, email),
       status: asStatus(profile?.status),
+      noDeviceLock: profile?.no_device_lock === true,
     }
   })
 

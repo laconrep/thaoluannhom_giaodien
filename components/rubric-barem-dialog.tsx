@@ -165,11 +165,73 @@ export function RubricBaremDialog({ sessionId, open, onOpenChange, initialRubric
       setSelectedSampleId(null)
       setSampleStep(1)
       setSelfCheck(null)
+      // Phục hồi yêu cầu đang dở (nếu GV tắt popup giữa chừng rồi mở lại)
+      resumePendingRequest()
     }
     return () => {
       stopWatch()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialRubric])
+
+  /** Khi mở popup: kiểm tra yêu cầu barem mới nhất của phiên.
+   * - Còn pending/processing → tiếp tục theo dõi, hiện "đang tạo".
+   * - Đã done (chưa lưu) → nạp tiêu chí lên để GV duyệt. */
+  async function resumePendingRequest() {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("ai_barem_requests")
+        .select("id,status,barem_json,source,sample_submission_id,max_score")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const row = data as {
+        id: string
+        status: string
+        barem_json: unknown
+        source: string | null
+        sample_submission_id: string | null
+        max_score: number | null
+      } | null
+      if (!row) return
+      const isSample = row.source === "sample"
+      if (row.status === "pending" || row.status === "processing") {
+        // Đang tạo dở → tiếp tục theo dõi
+        watchKind.current = isSample ? "sample" : "answer"
+        if (isSample) {
+          setTab("sample")
+          setSampleStep(2)
+          if (row.sample_submission_id) setSelectedSampleId(row.sample_submission_id)
+        } else {
+          setTab("answer")
+        }
+        if (row.max_score) setMaxScore(row.max_score)
+        setGenerating(true)
+        pollBaremRequest(row.id)
+      } else if (row.status === "done" && row.barem_json) {
+        // Đã xong nhưng chưa lưu → nạp lên để GV duyệt
+        const p = normalizeBarem(row.barem_json, row.max_score || 10)
+        if (p) {
+          watchKind.current = isSample ? "sample" : "answer"
+          watchRequestId.current = row.id
+          if (isSample) {
+            setTab("sample")
+            setSampleStep(3)
+            if (row.sample_submission_id) setSelectedSampleId(row.sample_submission_id)
+            fetchSelfCheck(row.id)
+          } else {
+            setTab("answer")
+          }
+          setBarem(p)
+          setMaxScore(p.max_score)
+        }
+      }
+    } catch {
+      // Không phục hồi được thì thôi, GV tạo mới bình thường.
+    }
+  }
 
   // Tải danh sách bài mẫu khi mở tab 2 lần đầu.
   useEffect(() => {
@@ -673,8 +735,8 @@ export function RubricBaremDialog({ sessionId, open, onOpenChange, initialRubric
         {generating && (
           <p className="text-[11px] text-muted-foreground">
             {watchKind.current === "sample"
-              ? "AI đang đọc bài mẫu và suy tiêu chí — thường mất dưới 2 phút. Cứ để popup mở."
-              : "AI đang đọc đáp án và chia tiêu chí — thường mất dưới 1 phút. Cứ để popup mở."}
+              ? "AI đang đọc bài mẫu và suy tiêu chí — thường mất dưới 2 phút. Bác cứ tắt popup làm việc khác, mở lại sẽ thấy tiếp."
+              : "AI đang đọc đáp án và chia tiêu chí — thường mất dưới 1 phút. Bác cứ tắt popup làm việc khác, mở lại sẽ thấy tiếp."}
           </p>
         )}
         {genError && <p className="text-[11px] text-destructive">{genError}</p>}

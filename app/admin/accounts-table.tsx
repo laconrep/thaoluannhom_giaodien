@@ -17,6 +17,7 @@ import { formatDateShort } from "@/lib/utils-format"
 import { Users } from "lucide-react"
 import { AccountStatusButtons } from "@/app/admin/account-status-buttons"
 import { AccountPlanSelect } from "@/app/admin/account-plan-select"
+import { DeviceLockToggle } from "@/app/admin/device-lock-toggle"
 
 export type AdminAccountRow = {
   id: string
@@ -26,6 +27,7 @@ export type AdminAccountRow = {
   plan: Plan
   role: "user" | "admin"
   status: "active" | "disabled"
+  noDeviceLock: boolean
 }
 
 export function AccountsTable({ accounts }: { accounts: AdminAccountRow[] }) {
@@ -97,6 +99,7 @@ function PlanBlock({
               <TableHead>Gói</TableHead>
               <TableHead>Trạng thái</TableHead>
               <TableHead>Quyền</TableHead>
+              <TableHead>Khóa thiết bị</TableHead>
               <TableHead className="text-right">Thao tác</TableHead>
             </TableRow>
           </TableHeader>
@@ -122,6 +125,13 @@ function PlanBlock({
                   <Badge variant={row.role === "admin" ? "default" : "outline"}>
                     {row.role === "admin" ? "Admin" : "User"}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  <DeviceLockToggle
+                    userId={row.id}
+                    email={row.email}
+                    noDeviceLock={row.noDeviceLock}
+                  />
                 </TableCell>
                 <TableCell className="text-right">
                   <AccountStatusButtons
