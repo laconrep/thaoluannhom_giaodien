@@ -16,7 +16,6 @@ import {
   updateStudentNameAction,
 } from "@/app/actions"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AvatarInitials } from "@/components/avatar-initials"
 import {
@@ -236,8 +235,7 @@ export function RosterView({
     realtimeOk,
   )
 
-  function onRenameStudent(id: string, name: string) {
-    setStudents((cur) => cur.map((s) => (s.id === id ? { ...s, name } : s)))
+  function onRenameStudent(id: string, name: string) {    setStudents((cur) => cur.map((s) => (s.id === id ? { ...s, name } : s)))
     startTransition(() => {
       updateStudentNameAction(id, name)
     })
@@ -245,6 +243,13 @@ export function RosterView({
 
   function onTypeName(id: string, name: string) {
     setStudents((cur) => cur.map((s) => (s.id === id ? { ...s, name } : s)))
+  }
+
+  // Ô tên tự dãn 1→2 dòng để tên dài không bị khuất (thay input 1 dòng)
+  function autoGrowNameField(el: HTMLTextAreaElement | null) {
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = Math.min(el.scrollHeight, 44) + "px"
   }
 
   // GV mở khóa ô đã bị HS chiếm — xác nhận ngay trong thẻ (không dùng confirm() trình duyệt)
@@ -1028,15 +1033,26 @@ export function RosterView({
                         <span className="size-5 rounded bg-muted text-muted-foreground grid place-items-center text-[10px] font-semibold tabular-nums shrink-0">
                           {s.slot_number}
                         </span>
-                        <Input
+                        <textarea
+                          ref={autoGrowNameField}
+                          rows={1}
                           className={cn(
-                            "h-7 border-0 shadow-none focus-visible:ring-1 focus-visible:bg-background px-1 text-sm font-medium flex-1",
+                            "min-h-7 border-0 shadow-none focus-visible:ring-1 focus-visible:bg-background px-1 py-1 text-sm font-medium flex-1 resize-none overflow-hidden leading-5",
                             isSelected && "read-only:opacity-80 cursor-not-allowed bg-muted/40",
                           )}
                           readOnly={isSelected}
                           value={s.name ?? ""}
                           placeholder="Chưa có tên"
-                          onChange={(e) => onTypeName(s.id, e.target.value)}
+                          onChange={(e) => {
+                            onTypeName(s.id, e.target.value)
+                            autoGrowNameField(e.target)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault()
+                              e.currentTarget.blur()
+                            }
+                          }}
                           onBlur={(e) => onRenameStudent(s.id, e.target.value)}
                         />
                         {isLeader && (
