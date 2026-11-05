@@ -377,7 +377,7 @@ export function IndividualBoard({
               return (
                 <div
                   key={slot.id}
-                  className="aspect-square rounded-lg border bg-card p-1.5 flex flex-col gap-1 hover:ring-2 hover:ring-primary/40 hover:-translate-y-0.5 transition relative overflow-hidden shadow-sm"
+                  className="rounded-lg border bg-card p-1.5 flex flex-col gap-1 hover:ring-2 hover:ring-primary/40 hover:-translate-y-0.5 transition relative overflow-hidden shadow-sm"
                 >
                   <button
                     onClick={() => setOpenSlotId(slot.id)}
@@ -435,12 +435,15 @@ export function IndividualBoard({
 
                   <div className="relative z-10 flex items-center gap-1 pointer-events-none">
                     {st && <AvatarInitials name={st.name ?? ""} size="xs" />}
-                    <p className="text-xs font-medium leading-tight line-clamp-2 flex-1 min-w-0">
+                    <p
+                      className="text-xs font-medium leading-tight break-words flex-1 min-w-0"
+                      title={st?.name?.trim() || undefined}
+                    >
                       {st?.name?.trim() || <span className="text-muted-foreground">—</span>}
                     </p>
                   </div>
 
-                  <div className="relative z-0 flex-1 rounded bg-muted/30 overflow-hidden pointer-events-none">
+                  <div className="relative z-0 flex-1 min-h-[84px] rounded bg-muted/30 overflow-hidden pointer-events-none">
                     {firstImage ? (
                       <SlotThumb file={firstImage} />
                     ) : firstFile ? (
