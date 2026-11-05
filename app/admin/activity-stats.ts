@@ -39,18 +39,21 @@ export async function getTeacherActivityMap(): Promise<Map<string, TeacherActivi
     ensure(c.teacher_id).classCount += 1
   }
 
-  // 2. Phiên nhóm theo giáo viên
+  // 2. Phiên theo giáo viên (mọi loại phiên cho mục 4; riêng phiên nhóm cho mục 3)
   const { data: sessions } = await admin
     .from("sessions")
-    .select("id, class_id")
-    .eq("kind", "group")
+    .select("id, class_id, kind")
   const sessionToTeacher = new Map<string, string>()
+  const groupSessionToTeacher = new Map<string, string>()
   const groupSessionIds: string[] = []
-  for (const s of (sessions ?? []) as Array<{ id: string; class_id: string }>) {
+  for (const s of (sessions ?? []) as Array<{ id: string; class_id: string; kind: string }>) {
     const tid = classToTeacher.get(s.class_id)
     if (!tid) continue
     sessionToTeacher.set(s.id, tid)
-    groupSessionIds.push(s.id)
+    if (s.kind === "group") {
+      groupSessionToTeacher.set(s.id, tid)
+      groupSessionIds.push(s.id)
+    }
   }
 
   // 3. Phiên nào có bài nộp (đếm submissions theo session)
@@ -68,7 +71,7 @@ export async function getTeacherActivityMap(): Promise<Map<string, TeacherActivi
       }
     }
   }
-  for (const [sid, tid] of sessionToTeacher) {
+  for (const [sid, tid] of groupSessionToTeacher) {
     if (sessionsWithSubmissions.has(sid)) {
       ensure(tid).groupSessionsWithSubmissions += 1
     } else {
@@ -76,15 +79,17 @@ export async function getTeacherActivityMap(): Promise<Map<string, TeacherActivi
     }
   }
 
-  // 4. Tổng số bài chấm bằng AI (ai_grade_results có điểm)
-  if (groupSessionIds.length > 0) {
-    for (let i = 0; i < groupSessionIds.length; i += 200) {
-      const chunk = groupSessionIds.slice(i, i + 200)
+  // 4. Tổng số bài chấm bằng AI (ai_grade_results có điểm) — mọi loại phiên
+  // (nhóm + cá nhân), trạng thái ready hoặc approved (bài đã duyệt vẫn tính).
+  const allSessionIds = [...sessionToTeacher.keys()]
+  if (allSessionIds.length > 0) {
+    for (let i = 0; i < allSessionIds.length; i += 200) {
+      const chunk = allSessionIds.slice(i, i + 200)
       const { data: results } = await admin
         .from("ai_grade_results")
         .select("session_id")
         .in("session_id", chunk)
-        .eq("status", "ready")
+        .in("status", ["ready", "approved"])
         .not("ai_score", "is", null)
       for (const r of (results ?? []) as Array<{ session_id: string }>) {
         const tid = sessionToTeacher.get(r.session_id)
