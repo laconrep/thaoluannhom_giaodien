@@ -343,6 +343,110 @@ export async function addClassGroupAction(classId: string) {
 
 // Chuyển nhiều HS sang nhóm mới; nếu HS đang ở nhóm khác trong cùng class, gỡ khỏi nhóm cũ.
 // Nếu HS bị chuyển là leader của nhóm cũ → xóa leader ở nhóm đó trước khi gỡ thành viên.
+/* Điểm đi theo nhóm mới (bác chốt 2026-11-06):
+ * Sau mỗi lần đổi thành viên nhóm, với từng em bị đổi, ở từng phiên nhóm
+ * đã chấm của lớp (dùng nhóm cố định), lấy điểm chấm của nhóm mới
+ * (annotations.score) ghi đè vào student_scores + cập nhật group_name,
+ * ghi lịch sử nguồn "regroup".
+ * - Nhóm mới chưa chấm ở phiên đó -> giữ điểm cũ.
+ * - Em không còn ở nhóm nào -> giữ điểm cũ.
+ * - Điểm sửa tay (override) cũng bị đè (bác chốt "có" 2026-11-06).
+ * Không bao giờ throw: đồng bộ điểm lỗi thì việc đổi nhóm vẫn giữ nguyên. */
+async function resyncGroupScoresForStudents(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  classId: string,
+  studentIds: string[],
+): Promise<void> {
+  try {
+    const uniqueIds = [...new Set(studentIds)]
+    if (uniqueIds.length === 0) return
+
+    const [{ data: classGroups }, { data: sessions }] = await Promise.all([
+      supabase.from("class_groups").select("id").eq("class_id", classId),
+      supabase
+        .from("sessions")
+        .select("id")
+        .eq("class_id", classId)
+        .eq("kind", "group")
+        .eq("use_fixed_groups", true),
+    ])
+    if (!sessions || sessions.length === 0) return
+    const classGroupIds = new Set((classGroups ?? []).map((g) => g.id as string))
+
+    const { data: memberships } = await supabase
+      .from("class_group_members")
+      .select("class_group_id, student_id")
+      .in("student_id", uniqueIds)
+    const groupByStudent = new Map<string, string>()
+    for (const m of (memberships ?? []) as Array<{ class_group_id: string; student_id: string }>) {
+      if (classGroupIds.has(m.class_group_id) && !groupByStudent.has(m.student_id)) {
+        groupByStudent.set(m.student_id, m.class_group_id)
+      }
+    }
+    if (groupByStudent.size === 0) return
+
+    const sessionIds = (sessions as Array<{ id: string }>).map((s) => s.id)
+    const { data: sgs } = await supabase
+      .from("session_groups")
+      .select("id, session_id, class_group_id, label")
+      .in("session_id", sessionIds)
+      .not("class_group_id", "is", null)
+    if (!sgs || sgs.length === 0) return
+    const sgByKey = new Map<string, { id: string; label: string | null }>()
+    for (const sg of sgs as Array<{
+      id: string
+      session_id: string
+      class_group_id: string
+      label: string | null
+    }>) {
+      sgByKey.set(`${sg.session_id}:${sg.class_group_id}`, { id: sg.id, label: sg.label })
+    }
+    const { data: anns } = await supabase
+      .from("annotations")
+      .select("session_group_id, score")
+      .in("session_group_id", [...sgByKey.values()].map((v) => v.id))
+      .not("score", "is", null)
+    const scoreBySg = new Map<string, number>()
+    for (const a of (anns ?? []) as Array<{ session_group_id: string; score: number }>) {
+      scoreBySg.set(a.session_group_id, a.score)
+    }
+
+    for (const studentId of uniqueIds) {
+      const groupId = groupByStudent.get(studentId)
+      if (!groupId) continue
+      for (const sessionId of sessionIds) {
+        const sg = sgByKey.get(`${sessionId}:${groupId}`)
+        if (!sg) continue
+        const score = scoreBySg.get(sg.id)
+        if (score === undefined || score === null) continue
+        const { data: existed } = await supabase
+          .from("student_scores")
+          .select("id, score, group_name")
+          .eq("session_id", sessionId)
+          .eq("student_id", studentId)
+          .maybeSingle()
+        if (existed && existed.score === score && existed.group_name === sg.label) continue
+        if (existed) {
+          await supabase
+            .from("student_scores")
+            .update({ score, group_name: sg.label, updated_at: new Date().toISOString() })
+            .eq("id", existed.id)
+        } else {
+          await supabase.from("student_scores").insert({
+            session_id: sessionId,
+            student_id: studentId,
+            score,
+            group_name: sg.label,
+          })
+        }
+        await logScoreHistory(supabase, sessionId, studentId, existed?.score ?? null, score, "regroup")
+      }
+    }
+  } catch (e) {
+    console.error("resyncGroupScoresForStudents failed:", e)
+  }
+}
+
 export async function moveStudentsToGroupAction(
   studentIds: string[],
   targetGroupId: string | null,
@@ -407,6 +511,9 @@ export async function moveStudentsToGroupAction(
       .insert(studentIds.map((sid) => ({ class_group_id: targetGroupId, student_id: sid })))
     if (error) return { ok: false, error: error.message }
   }
+
+  // Điểm đi theo nhóm mới
+  await resyncGroupScoresForStudents(supabase, classId, studentIds)
 
   revalidatePath(`/classes/${classId}/roster`)
   return { ok: true }
@@ -535,6 +642,9 @@ export async function leaderUpdateGroupMembersAction(input: {
     if (error) return { ok: false, error: "Không cập nhật được nhóm. Thử lại sau." }
   }
 
+  // Điểm đi theo nhóm mới
+  await resyncGroupScoresForStudents(supabase, input.classId, [input.targetStudentId])
+
   revalidatePath(`/c/${input.classId}`)
   return { ok: true }
 }
@@ -614,6 +724,8 @@ export async function studentChooseGroupAction(input: {
     .from("class_group_members")
     .insert({ class_group_id: input.targetGroupId, student_id: input.studentId })
   if (error) return { ok: false, error: "Không cập nhật được nhóm. Thử lại sau." }
+  // Điểm đi theo nhóm mới
+  await resyncGroupScoresForStudents(supabase, input.classId, [input.studentId])
   // Màn hình GV + các HS khác tự cập nhật qua realtime class_group_members.
   return { ok: true }
 }
@@ -766,12 +878,23 @@ export async function setGroupMembersAction(
   const supabase = await createClient()
   const guardError = await checkTeacherForClassGroup(supabase, classGroupId)
   if (guardError) throw new Error(guardError)
+  // Ghi lại thành viên cũ để đồng bộ điểm cho cả em bị gỡ ra lẫn em mới vào
+  const { data: oldMembers } = await supabase
+    .from("class_group_members")
+    .select("student_id")
+    .eq("class_group_id", classGroupId)
   await supabase.from("class_group_members").delete().eq("class_group_id", classGroupId)
   if (studentIds.length > 0) {
     await supabase
       .from("class_group_members")
       .insert(studentIds.map((sid) => ({ class_group_id: classGroupId, student_id: sid })))
   }
+  // Điểm đi theo nhóm mới
+  await resyncGroupScoresForStudents(
+    supabase,
+    classId,
+    [...new Set([...((oldMembers ?? []).map((m) => m.student_id as string)), ...studentIds])],
+  )
   revalidatePath(`/classes/${classId}/roster`)
 }
 
@@ -1095,7 +1218,7 @@ async function logScoreHistory(
   studentId: string,
   scoreOld: number | null,
   scoreNew: number | null,
-  source: "annotation" | "override" | "gradebook",
+  source: "annotation" | "override" | "gradebook" | "regroup",
 ) {
   if (scoreOld === scoreNew) return
   const {
