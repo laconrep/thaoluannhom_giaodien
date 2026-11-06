@@ -12,6 +12,7 @@ import { TeacherTour } from "@/components/tour/teacher-tour"
 import { dashboardTourSteps } from "@/components/tour/tour-config"
 import { TOUR_DASHBOARD_SEEN_KEY } from "@/components/tour/tour-store"
 import { ensureActiveUser } from "@/lib/account-status"
+import { recordSignupConsentAction } from "@/app/consent-actions"
 
 type ClassWithCounts = {
   id: string
@@ -27,6 +28,9 @@ export default async function DashboardPage() {
   const user = await getVerifiedAuthFromHeaders()
   if (!user) redirect("/auth/login")
   await ensureActiveUser(user.id)
+  // Đồng bộ bằng chứng đồng ý (lưu ở metadata lúc đăng ký) sang profiles —
+  // bao phủ trường hợp đăng ký xong phải xác nhận email mới có phiên.
+  await recordSignupConsentAction()
   const supabase = await createClient()
 
   const { data: classes } = await supabase
