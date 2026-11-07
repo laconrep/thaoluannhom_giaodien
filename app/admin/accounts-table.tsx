@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { PLANS, type Plan } from "@/lib/plans"
+import { PLANS, type Plan, type TrialState } from "@/lib/plans"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
@@ -29,6 +29,9 @@ export type AdminAccountRow = {
   role: "user" | "admin"
   status: "active" | "disabled"
   noDeviceLock: boolean
+  trialEndsAt: string | null
+  trialDaysLeft: number | null
+  trialState: TrialState
   activity: TeacherActivity
 }
 
@@ -99,6 +102,9 @@ function PlanBlock({
               <TableHead>Ngày tạo</TableHead>
               <TableHead>Đăng nhập gần nhất</TableHead>
               <TableHead>Gói</TableHead>
+              <TableHead>Hết dùng thử</TableHead>
+              <TableHead>Còn lại</TableHead>
+              <TableHead>Dùng thử</TableHead>
               <TableHead>Trạng thái</TableHead>
               <TableHead>Quyền</TableHead>
               <TableHead>Khóa thiết bị</TableHead>
@@ -118,6 +124,19 @@ function PlanBlock({
                 </TableCell>
                 <TableCell>
                   <AccountPlanSelect userId={row.id} email={row.email} currentPlan={row.plan} />
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {row.trialEndsAt ? formatDateShort(row.trialEndsAt) : "—"}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {row.trialDaysLeft === null
+                    ? "—"
+                    : row.trialDaysLeft <= 0
+                      ? "Đã hết"
+                      : `${row.trialDaysLeft} ngày`}
+                </TableCell>
+                <TableCell>
+                  <TrialBadge state={row.trialState} />
                 </TableCell>
                 <TableCell>
                   <Badge variant={row.status === "disabled" ? "destructive" : "secondary"}>
@@ -177,4 +196,17 @@ function PlanBlock({
       )}
     </div>
   )
+}
+
+function TrialBadge({ state }: { state: TrialState }) {
+  switch (state) {
+    case "trial":
+      return <Badge variant="secondary">Đang dùng thử</Badge>
+    case "expiring":
+      return <Badge variant="default">Sắp hết hạn</Badge>
+    case "expired":
+      return <Badge variant="destructive">Đã hết hạn</Badge>
+    default:
+      return <Badge variant="outline">Gói trả phí</Badge>
+  }
 }

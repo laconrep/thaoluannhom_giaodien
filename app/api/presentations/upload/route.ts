@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
-import { PLAN_DEFAULT, planLimits, type Plan } from "@/lib/plans"
+import { PLAN_DEFAULT, planLimits, effectivePlan, type Plan } from "@/lib/plans"
 import {
   MAX_PRESENTATION_BYTES,
   powerpointContentType,
@@ -60,7 +60,11 @@ export async function POST(request: NextRequest) {
         .eq("id", sessionId)
         .single(),
     ])
-    const plan = (profile?.plan as Plan | undefined) ?? PLAN_DEFAULT
+    // Dùng thử 3 tháng: gói free còn trong thời gian thử được full quyền Pro.
+    const plan = effectivePlan(
+      (profile?.plan as Plan | undefined) ?? PLAN_DEFAULT,
+      user.created_at ?? null,
+    )
     const maxPresentations = planLimits(plan).maxPresentations
     if (count !== null && count >= maxPresentations) {
       return NextResponse.json(

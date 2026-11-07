@@ -12,7 +12,7 @@ import {
   checkTeacherForSessionSlot,
   checkTeacherForStudent,
 } from "@/lib/teacher-guard"
-import { PLAN_DEFAULT, planLimits, type Plan } from "@/lib/plans"
+import { PLAN_DEFAULT, planLimits, effectivePlan, type Plan } from "@/lib/plans"
 
 /* Bảo mật: device_token/student_id đều là UUID (crypto.randomUUID() ở sảnh
  * lớp và trang nộp bài). Các filter .or() dưới đây nội suy giá trị vào chuỗi
@@ -65,8 +65,12 @@ async function getPlan(supabase: Awaited<ReturnType<typeof createClient>>, userI
     .eq("id", userId)
     .maybeSingle()
   const plan = data?.plan as Plan | undefined
-  if (plan === "free" || plan === "pro" || plan === "school") return plan
-  return PLAN_DEFAULT
+  if (plan === "pro" || plan === "school") return plan
+  // Dùng thử 3 tháng: gói free còn trong thời gian thử được full quyền Pro.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  return effectivePlan(plan ?? PLAN_DEFAULT, user?.created_at ?? null)
 }
 
 export async function upgradeToPlanAction(plan: Plan) {

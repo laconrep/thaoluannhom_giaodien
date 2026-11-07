@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/admin"
 import { AdminShell } from "@/components/admin-shell"
-import { PLAN_DEFAULT, type Plan } from "@/lib/plans"
+import { PLAN_DEFAULT, getTrialInfo, type Plan } from "@/lib/plans"
 import { EmptyState } from "@/components/empty-state"
 import { Users } from "lucide-react"
 import { AccountsTable, type AdminAccountRow } from "@/app/admin/accounts-table"
@@ -98,15 +98,21 @@ export default async function AdminPage() {
   const accounts: AdminAccountRow[] = (authData.users ?? []).map((u) => {
     const profile = profileById.get(u.id)
     const email = u.email ?? "(không có email)"
+    const plan = asPlan(profile?.plan)
+    // Dùng thử 3 tháng (bác chốt 07/11/2026): suy từ ngày tạo + gói lưu.
+    const trial = getTrialInfo(u.created_at ?? null, plan)
     return {
       id: u.id,
       email,
       createdAt: u.created_at ?? null,
       lastSignInAt: u.last_sign_in_at ?? null,
-      plan: asPlan(profile?.plan),
+      plan,
       role: asRole(profile?.role, email),
       status: asStatus(profile?.status),
       noDeviceLock: profile?.no_device_lock === true,
+      trialEndsAt: trial.endsAt,
+      trialDaysLeft: trial.daysLeft,
+      trialState: trial.state,
       activity: activityByTeacher.get(u.id) ?? emptyActivity,
     }
   })
