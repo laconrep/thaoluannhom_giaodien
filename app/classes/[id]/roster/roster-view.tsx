@@ -825,9 +825,11 @@ export function RosterView({
         <Card className="float-card">
           <CardHeader
             data-tour="roster-list"
-            className="flex flex-row flex-wrap items-center justify-between gap-x-2 gap-y-3"
+            className="flex flex-col gap-3"
           >
-            <div className="min-w-0">
+            {/* Hàng 1: tiêu đề + cài đặt lớp (sĩ số, khóa thiết bị) */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
               <CardTitle className="flex items-center gap-2 font-heading whitespace-nowrap">
                 <Users className="size-4" aria-hidden="true" />
                 Danh sách học sinh
@@ -841,25 +843,45 @@ export function RosterView({
                   </>
                 )}
               </CardDescription>
+              </div>
+              {/* Cài đặt lớp: sĩ số + khóa thiết bị */}
+              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onChangeCapacity(-1)}
+                  aria-label="Giảm sĩ số"
+                >
+                  <Minus className="size-4" aria-hidden="true" />
+                </Button>
+                <span className="text-sm tabular-nums w-9 text-center font-semibold whitespace-nowrap">{capacity}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onChangeCapacity(1)}
+                  aria-label="Tăng sĩ số"
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                </Button>
+                <div className="mx-1 hidden h-5 w-px bg-border sm:block" aria-hidden="true" />
+                <Button
+                  variant={deviceLockEnabled ? "default" : "outline"}
+                  size="sm"
+                  className="whitespace-nowrap"
+                  title={
+                    deviceLockEnabled
+                      ? "Đang bật khóa thiết bị học sinh — bấm để tắt"
+                      : "Khóa thiết bị học sinh đang tắt — bấm để bật"
+                  }
+                  onClick={toggleDeviceLock}
+                >
+                  <Lock className="size-4 mr-1" aria-hidden="true" />
+                  Khóa thiết bị học sinh
+                </Button>
+              </div>
             </div>
+            {/* Hàng 2: thanh công cụ danh sách */}
             <div data-tour="bulk-select" className="flex flex-wrap items-center gap-1.5">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onChangeCapacity(-1)}
-                aria-label="Giảm sĩ số"
-              >
-                <Minus className="size-4" aria-hidden="true" />
-              </Button>
-              <span className="text-sm tabular-nums w-9 text-center font-semibold whitespace-nowrap">{capacity}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onChangeCapacity(1)}
-                aria-label="Tăng sĩ số"
-              >
-                <Plus className="size-4" aria-hidden="true" />
-              </Button>
               <Button variant="outline" size="sm" onClick={() => setBulkOpen((v) => !v)} className="whitespace-nowrap">
                 <ListPlus className="size-4 mr-1" aria-hidden="true" />
                 Dán danh sách
@@ -913,20 +935,6 @@ export function RosterView({
                     {lockedStudents.length}
                   </span>
                 )}
-              </Button>
-              <Button
-                variant={deviceLockEnabled ? "default" : "outline"}
-                size="sm"
-                className="whitespace-nowrap"
-                title={
-                  deviceLockEnabled
-                    ? "Đang bật khóa thiết bị học sinh — bấm để tắt"
-                    : "Khóa thiết bị học sinh đang tắt — bấm để bật"
-                }
-                onClick={toggleDeviceLock}
-              >
-                <Lock className="size-4 mr-1" aria-hidden="true" />
-                Khóa thiết bị học sinh
               </Button>
               <input
                 ref={fileImportRef}
