@@ -825,7 +825,7 @@ export function RosterView({
         <Card className="float-card">
           <CardHeader
             data-tour="roster-list"
-            className="flex flex-row items-center justify-between gap-2"
+            className="flex flex-row flex-wrap items-center justify-between gap-x-2 gap-y-3"
           >
             <div className="min-w-0">
               <CardTitle className="flex items-center gap-2 font-heading whitespace-nowrap">
@@ -842,7 +842,7 @@ export function RosterView({
                 )}
               </CardDescription>
             </div>
-            <div data-tour="bulk-select" className="flex items-center gap-1.5 shrink-0">
+            <div data-tour="bulk-select" className="flex flex-wrap items-center gap-1.5">
               <Button
                 variant="outline"
                 size="sm"
