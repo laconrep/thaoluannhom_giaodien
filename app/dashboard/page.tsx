@@ -43,7 +43,7 @@ export default async function DashboardPage() {
 
   return (
     <TeacherShell email={user.email}>
-      <section className="mx-auto max-w-5xl px-4 py-8 flex flex-col gap-6">
+      <section className="mx-auto max-w-7xl px-4 py-8 flex flex-col gap-6">
         <header data-tour="dashboard-header" className="flex flex-col gap-1">
           <h1 className="font-heading text-2xl md:text-3xl font-bold">Lớp của tôi</h1>
           <p className="text-sm text-muted-foreground text-pretty">
@@ -67,7 +67,7 @@ export default async function DashboardPage() {
               description="Hãy tạo lớp đầu tiên của bạn ở trên. Mỗi lớp có danh sách HS, nhóm cố định và không giới hạn phiên thảo luận."
             />
           ) : (
-            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {list.map((c) => {
                 const filled = c.students?.[0]?.count ?? 0
                 const sessions = c.sessions?.[0]?.count ?? 0
