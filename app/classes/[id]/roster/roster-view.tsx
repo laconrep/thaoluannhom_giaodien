@@ -1166,7 +1166,7 @@ export function RosterView({
 
         {/* CỘT PHẢI: danh sách nhóm */}
         <Card className="float-card" data-tour="roster-groups">
-          <CardHeader className="flex flex-col items-start gap-1.5 p-3">
+          <CardHeader className="flex flex-col items-start gap-1.5 px-3 pb-2 pt-3">
             <CardTitle className="font-heading w-full">Nhóm cố định</CardTitle>
             <CardDescription className="w-full">
               Kéo HS từ bên trái thả vào một nhóm.
@@ -1176,7 +1176,7 @@ export function RosterView({
               Thêm nhóm
             </Button>
           </CardHeader>
-          <CardContent className="flex flex-col gap-2 p-3">
+          <CardContent className="flex flex-col gap-2 px-3 pb-3 pt-1">
             {groups.map((g) => {
               const members = students.filter((s) => (memberMap[g.id] ?? []).includes(s.id))
               const expanded = expandedGroupId === g.id

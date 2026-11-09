@@ -43,7 +43,7 @@ export default async function DashboardPage() {
 
   return (
     <TeacherShell email={user.email}>
-      <section className="mx-auto max-w-7xl px-4 py-8 flex flex-col gap-6">
+      <section className="mx-auto max-w-[1600px] px-4 py-8 flex flex-col gap-6">
         <header data-tour="dashboard-header" className="flex flex-col gap-1">
           <h1 className="font-heading text-2xl md:text-3xl font-bold">Lớp của tôi</h1>
           <p className="text-sm text-muted-foreground text-pretty">
@@ -85,7 +85,10 @@ export default async function DashboardPage() {
                           <School className="size-5" aria-hidden="true" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-heading font-semibold text-base leading-snug truncate">
+                          <h3
+                            className="font-heading font-semibold text-base leading-snug truncate"
+                            title={c.name}
+                          >
                             {c.name}
                           </h3>
                           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
