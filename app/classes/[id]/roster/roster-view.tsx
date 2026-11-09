@@ -9,7 +9,6 @@ import {
   moveStudentToGroupAction,
   moveStudentsToGroupAction,
   removeClassGroupAction,
-  setCapacityAction,
   setClassDeviceLockAction,
   setGroupLeaderAction,
   swapStudentSlotsAction,
@@ -36,7 +35,6 @@ import {
   Lock,
   LockOpen,
   Save,
-  Minus,
   ChevronDown,
   ChevronRight,
   X,
@@ -186,11 +184,6 @@ export function RosterView({
     }
     return m
   }, [groups, memberMap])
-
-  const unassignedCount = useMemo(
-    () => students.filter((s) => s.name?.trim() && !studentToGroup.has(s.id)).length,
-    [students, studentToGroup],
-  )
 
   // Trạng thái dùng cho tour progressive: đã kéo ≥1 HS vào nhóm, đã gán nhóm trưởng.
   const hasMembers = useMemo(
@@ -447,14 +440,6 @@ export function RosterView({
     setImportMerged(false)
   }
 
-  function onChangeCapacity(delta: number) {
-    const next = Math.max(1, Math.min(80, capacity + delta))
-    if (next === capacity) return
-    startTransition(() => {
-      setCapacityAction(classId, next)
-    })
-  }
-
   function onAddGroup() {
     startTransition(() => {
       addClassGroupAction(classId)
@@ -597,8 +582,6 @@ export function RosterView({
       })
     })
   }
-
-  const namedCount = students.filter((s) => s.name?.trim()).length
 
   return (
     <div className="flex flex-col gap-4">
@@ -832,35 +815,8 @@ export function RosterView({
                 <Users className="size-4" aria-hidden="true" />
                 Danh sách học sinh
               </CardTitle>
-              <CardDescription>
-                {namedCount}/{capacity} HS đã có tên
-                {unassignedCount > 0 && (
-                  <>
-                    {" · "}
-                    <span className="text-primary font-medium">{unassignedCount} chưa phân nhóm</span>
-                  </>
-                )}
-              </CardDescription>
             </div>
             <div data-tour="bulk-select" className="ms-auto flex flex-wrap items-center gap-1.5">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onChangeCapacity(-1)}
-                  aria-label="Giảm sĩ số"
-                >
-                  <Minus className="size-4" aria-hidden="true" />
-                </Button>
-                <span className="text-sm tabular-nums w-9 text-center font-semibold whitespace-nowrap">{capacity}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onChangeCapacity(1)}
-                  aria-label="Tăng sĩ số"
-                >
-                  <Plus className="size-4" aria-hidden="true" />
-                </Button>
-                <div className="mx-1 hidden h-5 w-px bg-border sm:block" aria-hidden="true" />
                 <Button
                   variant={deviceLockEnabled ? "default" : "outline"}
                   size="sm"
