@@ -16,7 +16,7 @@ export function ClassTabs({ classId }: { classId: string }) {
     { href: `/classes/${classId}/share`, label: "Chia sẻ", icon: Share2 },
   ]
   return (
-    <nav data-tour="class-tabs" className="flex items-center gap-0 overflow-x-auto mt-4 -mb-px no-scrollbar">
+    <nav data-tour="class-tabs" className="flex items-center gap-1 overflow-x-auto py-2 no-scrollbar">
       {tabs.map((t) => {
         const active = pathname?.startsWith(t.href)
         const Icon = t.icon
@@ -28,10 +28,10 @@ export function ClassTabs({ classId }: { classId: string }) {
               if (t.href.includes("/gradebook")) setGradebookTourPending()
             }}
             className={cn(
-              "inline-flex items-center gap-2 px-3.5 py-2.5 text-sm whitespace-nowrap border-b-2 transition relative",
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm whitespace-nowrap transition",
               active
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground",
+                ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/70",
             )}
           >
             <Icon className="size-4" aria-hidden="true" />

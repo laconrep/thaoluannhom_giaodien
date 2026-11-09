@@ -601,7 +601,7 @@ export function RosterView({
   const namedCount = students.filter((s) => s.name?.trim()).length
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       {/* Tour hướng dẫn phân nhóm — progressive theo hành động của giáo viên */}
       <RosterTour ready={groups.length > 0} hasMembers={hasMembers} hasLeader={hasLeader} />
 
@@ -820,12 +820,12 @@ export function RosterView({
         </DialogContent>
       </Dialog>
 
-      <div className="grid lg:grid-cols-[4fr_1fr] gap-5">
+      <div className="grid lg:grid-cols-[4fr_1fr] gap-4">
         {/* KHUNG CHÍNH: danh sách HS */}
         <Card className="float-card">
           <CardHeader
             data-tour="roster-list"
-            className="flex flex-col gap-3"
+            className="flex flex-col gap-3 p-4"
           >
             {/* Hàng 1: tiêu đề + cài đặt lớp (sĩ số, khóa thiết bị) */}
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -949,7 +949,7 @@ export function RosterView({
               />
             </div>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+          <CardContent className="flex flex-col gap-4 p-4">
             {importOpen && importPreview && (
               <div className="rounded-lg border bg-muted/40 p-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-sm font-medium">
@@ -1217,7 +1217,7 @@ export function RosterView({
 
         {/* CỘT PHẢI: danh sách nhóm */}
         <Card className="float-card" data-tour="roster-groups">
-          <CardHeader className="flex flex-col items-start gap-2">
+          <CardHeader className="flex flex-col items-start gap-2 p-4">
             <CardTitle className="font-heading w-full">Nhóm cố định</CardTitle>
             <CardDescription className="w-full">
               Kéo HS từ bên trái thả vào một nhóm. Dùng chung cho mọi phiên thảo luận.
@@ -1227,7 +1227,7 @@ export function RosterView({
               Thêm nhóm
             </Button>
           </CardHeader>
-          <CardContent className="flex flex-col gap-2">
+          <CardContent className="flex flex-col gap-2 p-4">
             {groups.map((g) => {
               const members = students.filter((s) => (memberMap[g.id] ?? []).includes(s.id))
               const expanded = expandedGroupId === g.id
