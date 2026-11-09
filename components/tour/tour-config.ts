@@ -21,8 +21,10 @@ export const tourOptions: Partial<Options> = {
   buttons: ["back", "skip", "close", "primary"],
 }
 
-// Progressive: chỉ 1 hint trỏ nút "Tạo lớp mới". Hint tắt khi bấm nút (xem
-// CreateClassCard: onClick set cờ + dispatch STOP_EVENT), không chạy các bước dư.
+// Progressive: hint "Tạo lớp" trỏ nút "Tạo lớp mới" (tắt khi bấm nút — xem
+// CreateClassCard: onClick set cờ + dispatch STOP_EVENT), rồi hint "Vào lớp"
+// trỏ lưới lớp — chỉ có khi tài khoản đã có lớp (tài khoản mới chưa có lớp
+// thì không hiện, tránh trỏ vào khung trống).
 export const dashboardTourSteps: Step[] = [
   {
     target: "[data-tour='create-class']",
@@ -33,6 +35,16 @@ export const dashboardTourSteps: Step[] = [
   },
 ]
 
+export function dashboardClassListStep(): Step {
+  return {
+    target: "[data-tour='class-list']",
+    placement: "top",
+    title: "Vào lớp",
+    content:
+      "Mỗi lớp là một ô riêng — bấm vào ô để vào lớp, xem danh sách học sinh và tạo phiên thảo luận.",
+  }
+}
+
 // Roster tour progressive — từng hint xuất hiện theo hành động thật của giáo viên:
 // vào trang (danh sách HS) → kéo ≥1 HS vào nhóm (hint nhóm trưởng) → gán leader
 // (hint chuyển tab). Không dùng navigateTo — bước cuối chỉ nhắc bấm tab.
@@ -42,7 +54,7 @@ export function rosterListStep(): Step {
     placement: "right",
     title: "Danh sách học sinh",
     content:
-      "Nhập tên vào từng ô, hoặc dùng \"Dán danh sách\" và \"Import Excel\" để nhập hàng loạt. Thầy/cô chỉ cần gán nhóm trưởng cho mỗi nhóm — thành viên thì thầy/cô kéo thả vào, hoặc nhóm trưởng tự kéo trên tài khoản của mình.",
+      "Nhập tên vào từng ô, hoặc dùng \"Dán danh sách\" và \"Import Excel\" để nhập hàng loạt. Thầy/cô chỉ cần gán nhóm trưởng cho mỗi nhóm — thành viên thì thầy/cô kéo thả vào, hoặc nhóm trưởng tự kéo trên tài khoản của mình. Nút \"Khóa thiết bị học sinh\" giữ mỗi tên chỉ dùng trên một thiết bị; nút \"Mở khóa\" chỉ bấm được khi khóa đang bật.",
   }
 }
 

@@ -9,7 +9,7 @@ import { deleteClassAction } from "@/app/actions"
 import { formatDateShort } from "@/lib/utils-format"
 import { EmptyState } from "@/components/empty-state"
 import { TeacherTour } from "@/components/tour/teacher-tour"
-import { dashboardTourSteps } from "@/components/tour/tour-config"
+import { dashboardTourSteps, dashboardClassListStep } from "@/components/tour/tour-config"
 import { TOUR_DASHBOARD_SEEN_KEY } from "@/components/tour/tour-store"
 import { ensureActiveUser } from "@/lib/account-status"
 import { recordSignupConsentAction } from "@/app/consent-actions"
@@ -133,7 +133,11 @@ export default async function DashboardPage() {
 
         <TeacherTour
           tourId="dashboard"
-          steps={dashboardTourSteps}
+          steps={
+            list.length > 0
+              ? [...dashboardTourSteps, dashboardClassListStep()]
+              : dashboardTourSteps
+          }
           seenKey={TOUR_DASHBOARD_SEEN_KEY}
           autoStart
         />
