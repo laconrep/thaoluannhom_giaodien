@@ -808,7 +808,7 @@ export function RosterView({
         <Card className="float-card">
           <CardHeader
             data-tour="roster-list"
-            className="flex flex-row flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3"
+            className="flex flex-row flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2"
           >
             <div className="min-w-0">
               <CardTitle className="flex items-center gap-2 font-heading whitespace-nowrap">
@@ -898,7 +898,7 @@ export function RosterView({
               />
             </div>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4 px-4 pb-4 pt-2">
+          <CardContent className="flex flex-col gap-4 px-4 pb-4 pt-0">
             {importOpen && importPreview && (
               <div className="rounded-lg border bg-muted/40 p-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-sm font-medium">
@@ -992,8 +992,8 @@ export function RosterView({
               </div>
             )}
 
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <div className="mb-2 text-center">
+            <div className="rounded-xl border bg-muted/30 p-2">
+              <div className="mb-1 text-center">
                 <span className="text-[11px] font-bold tracking-wider text-muted-foreground">
                   GIÁO VIÊN
                 </span>
@@ -1166,17 +1166,17 @@ export function RosterView({
 
         {/* CỘT PHẢI: danh sách nhóm */}
         <Card className="float-card" data-tour="roster-groups">
-          <CardHeader className="flex flex-col items-start gap-2 p-4">
+          <CardHeader className="flex flex-col items-start gap-1.5 p-3">
             <CardTitle className="font-heading w-full">Nhóm cố định</CardTitle>
             <CardDescription className="w-full">
-              Kéo HS từ bên trái thả vào một nhóm. Dùng chung cho mọi phiên thảo luận.
+              Kéo HS từ bên trái thả vào một nhóm.
             </CardDescription>
             <Button variant="outline" size="sm" onClick={onAddGroup}>
               <Plus className="size-4 mr-1" aria-hidden="true" />
               Thêm nhóm
             </Button>
           </CardHeader>
-          <CardContent className="flex flex-col gap-2 p-4">
+          <CardContent className="flex flex-col gap-2 p-3">
             {groups.map((g) => {
               const members = students.filter((s) => (memberMap[g.id] ?? []).includes(s.id))
               const expanded = expandedGroupId === g.id
