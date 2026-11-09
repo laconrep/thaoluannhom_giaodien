@@ -31,7 +31,7 @@ export default async function ClassLayout({
   return (
     <TeacherShell email={auth.email}>
       <div className="border-b bg-card">
-        <div className="mx-auto max-w-7xl px-4 pt-2.5 pb-2.5">
+        <div className="mx-auto max-w-[1600px] px-4 pt-2.5 pb-2.5">
           <div className="flex items-end justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2.5">
               <h1 className="font-heading text-lg md:text-xl font-bold leading-tight">
@@ -46,12 +46,12 @@ export default async function ClassLayout({
         </div>
       </div>
       <div className="sticky top-[45px] z-20 border-b bg-card/95 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-4">
+        <div className="mx-auto max-w-[1600px] px-4">
           <ClassTabs classId={cls.id} />
         </div>
       </div>
       <div className="bg-muted/40 min-h-[calc(100svh-160px)]">
-        <section className="mx-auto max-w-7xl px-4 py-4">{children}</section>
+        <section className="mx-auto max-w-[1600px] px-4 py-4">{children}</section>
       </div>
     </TeacherShell>
   )

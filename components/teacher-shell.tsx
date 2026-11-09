@@ -19,7 +19,7 @@ export function TeacherShell({
   return (
     <div className="min-h-svh flex flex-col bg-background">
       <header className="border-b bg-card/95 backdrop-blur sticky top-0 z-30">
-        <div className="mx-auto max-w-7xl px-4 py-1.5 flex items-center gap-3">
+        <div className="mx-auto max-w-[1600px] px-4 py-1.5 flex items-center gap-3">
           <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
             <div className="size-7 rounded-lg bg-primary text-primary-foreground grid place-items-center shadow-sm">
               <GraduationCap className="size-4" aria-hidden="true" />

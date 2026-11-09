@@ -825,11 +825,9 @@ export function RosterView({
         <Card className="float-card">
           <CardHeader
             data-tour="roster-list"
-            className="flex flex-col gap-3 px-4 pt-4 pb-2"
+            className="flex flex-row flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3"
           >
-            {/* Hàng 1: tiêu đề + cài đặt lớp (sĩ số, khóa thiết bị) */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0">
+            <div className="min-w-0">
               <CardTitle className="flex items-center gap-2 font-heading whitespace-nowrap">
                 <Users className="size-4" aria-hidden="true" />
                 Danh sách học sinh
@@ -843,9 +841,8 @@ export function RosterView({
                   </>
                 )}
               </CardDescription>
-              </div>
-              {/* Cài đặt lớp: sĩ số + khóa thiết bị */}
-              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+            </div>
+            <div data-tour="bulk-select" className="ms-auto flex flex-wrap items-center gap-1.5">
                 <Button
                   variant="outline"
                   size="sm"
@@ -875,13 +872,9 @@ export function RosterView({
                   }
                   onClick={toggleDeviceLock}
                 >
-                  <Lock className="size-4 mr-1" aria-hidden="true" />
-                  Khóa thiết bị học sinh
-                </Button>
-              </div>
-            </div>
-            {/* Hàng 2: thanh công cụ danh sách */}
-            <div data-tour="bulk-select" className="flex flex-wrap items-center gap-1.5">
+                <Lock className="size-4 mr-1" aria-hidden="true" />
+                Khóa thiết bị học sinh
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setBulkOpen((v) => !v)} className="whitespace-nowrap">
                 <ListPlus className="size-4 mr-1" aria-hidden="true" />
                 Dán danh sách
