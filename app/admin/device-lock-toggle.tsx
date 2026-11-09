@@ -16,7 +16,9 @@ export function DeviceLockToggle({
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  // Hiển thị theo nghĩa "Khóa thiết bị": bật = đang khóa (mặc định)
+  // Hiển thị theo nghĩa "Khóa thiết bị": bật = đang khóa cho mọi lớp của
+  // giáo viên đó. Từ migration 014 (09/11/2026) mặc định là TẮT — khi tắt,
+  // khóa theo từng lớp do giáo viên tự gạt ở màn hình chính của lớp.
   const locked = !noDeviceLock
 
   return (

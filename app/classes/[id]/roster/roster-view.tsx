@@ -10,6 +10,7 @@ import {
   moveStudentsToGroupAction,
   removeClassGroupAction,
   setCapacityAction,
+  setClassDeviceLockAction,
   setGroupLeaderAction,
   swapStudentSlotsAction,
   unlockStudentSlotAction,
@@ -68,12 +69,14 @@ type Group = {
 export function RosterView({
   classId,
   capacity,
+  deviceLockEnabled: initialDeviceLockEnabled,
   students: initialStudents,
   groups: initialGroups,
   memberMap: initialMap,
 }: {
   classId: string
   capacity: number
+  deviceLockEnabled: boolean
   students: Student[]
   groups: Group[]
   memberMap: Record<string, string[]>
@@ -118,6 +121,28 @@ export function RosterView({
     () => students.filter((s) => s.device_token).sort((a, b) => a.slot_number - b.slot_number),
     [students],
   )
+
+  // Công tắc khóa thiết bị học sinh của lớp (migration 014, mặc định tắt).
+  // Chỉ khi bật thì khóa mới có tác dụng và nút "Mở khóa" mới bấm được.
+  const [deviceLockEnabled, setDeviceLockEnabled] = useState(initialDeviceLockEnabled)
+  function toggleDeviceLock() {
+    const next = !deviceLockEnabled
+    setDeviceLockEnabled(next) // lạc quan: sáng lên ngay, lỗi thì trả lại
+    startTransition(async () => {
+      try {
+        const res = await setClassDeviceLockAction(classId, next)
+        if (!res.ok) {
+          setDeviceLockEnabled(!next)
+          toast.error(res.error ?? "Không đổi được khóa thiết bị.")
+          return
+        }
+        toast.success(next ? "Đã bật khóa thiết bị học sinh." : "Đã tắt khóa thiết bị học sinh.")
+      } catch {
+        setDeviceLockEnabled(!next)
+        toast.error("Không đổi được khóa thiết bị.")
+      }
+    })
+  }
 
   // Đồng bộ dữ liệu từ DB (dùng cho Realtime event + polling fallback + sau các action).
   // Dùng useCallback để ổn định tham chiếu, tránh chạy lại effect liên tục.
@@ -868,11 +893,13 @@ export function RosterView({
                 variant="outline"
                 size="sm"
                 className="whitespace-nowrap"
-                disabled={lockedStudents.length === 0}
+                disabled={!deviceLockEnabled || lockedStudents.length === 0}
                 title={
-                  lockedStudents.length === 0
-                    ? "Không có học sinh nào đang bị khóa"
-                    : `Mở khóa hàng loạt (${lockedStudents.length} em đang bị khóa)`
+                  !deviceLockEnabled
+                    ? "Bật 'Khóa thiết bị học sinh' để dùng mở khóa"
+                    : lockedStudents.length === 0
+                      ? "Không có học sinh nào đang bị khóa"
+                      : `Mở khóa hàng loạt (${lockedStudents.length} em đang bị khóa)`
                 }
                 onClick={() => {
                   setUnlockSelected(lockedStudents.map((s) => s.id))
@@ -886,6 +913,20 @@ export function RosterView({
                     {lockedStudents.length}
                   </span>
                 )}
+              </Button>
+              <Button
+                variant={deviceLockEnabled ? "default" : "outline"}
+                size="sm"
+                className="whitespace-nowrap"
+                title={
+                  deviceLockEnabled
+                    ? "Đang bật khóa thiết bị học sinh — bấm để tắt"
+                    : "Khóa thiết bị học sinh đang tắt — bấm để bật"
+                }
+                onClick={toggleDeviceLock}
+              >
+                <Lock className="size-4 mr-1" aria-hidden="true" />
+                Khóa thiết bị học sinh
               </Button>
               <input
                 ref={fileImportRef}

@@ -25,6 +25,14 @@ function isUuid(v: string | null | undefined): v is string {
 
 /* Kiểm tra giáo viên có tắt khóa thiết bị cho HS không (migration 012).
  * Tolerant: cột no_device_lock chưa có (chưa chạy migration) → coi như vẫn khóa. */
+// Khóa thiết bị có đang TẮT với học sinh này không?
+// Quy tắc từ migration 014 (bác chốt 09/11/2026, mặc định TẮT):
+// - Khóa chỉ có tác dụng khi công tắc lớp BẬT (classes.device_lock_enabled)
+//   hoặc tài khoản đó đang bật khóa ở quyền quản trị (no_device_lock = false).
+// - Nghĩa là khóa TẮT khi: admin đã tắt cho tài khoản đó (no_device_lock =
+//   true, mặc định từ 014) VÀ công tắc lớp đang tắt.
+// - Tolerant: thiếu cột device_lock_enabled (chưa chạy migration 014) thì
+//   coi như công tắc lớp đang tắt → giữ đúng hành vi cũ theo no_device_lock.
 async function isDeviceLockDisabled(
   supabase: Awaited<ReturnType<typeof createClient>>,
   studentId: string,
@@ -44,13 +52,25 @@ async function isDeviceLockDisabled(
       .maybeSingle()
     const teacherId = (cls as { teacher_id?: string } | null)?.teacher_id
     if (!teacherId) return false
+    // Công tắc theo lớp (migration 014): đọc riêng để thiếu cột không làm
+    // hỏng phần đọc teacher_id ở trên; lỗi 42703 → coi như đang tắt.
+    const { data: clsLock, error: clsLockError } = await supabase
+      .from("classes")
+      .select("device_lock_enabled")
+      .eq("id", classId)
+      .maybeSingle()
+    const classLockEnabled =
+      !clsLockError &&
+      (clsLock as { device_lock_enabled?: boolean } | null)?.device_lock_enabled === true
     const { data: profile, error } = await supabase
       .from("profiles")
       .select("no_device_lock")
       .eq("id", teacherId)
       .maybeSingle()
     if (error) return false // 42703: cột chưa có → giữ hành vi khóa cũ
-    return (profile as { no_device_lock?: boolean } | null)?.no_device_lock === true
+    const noLockAccount =
+      (profile as { no_device_lock?: boolean } | null)?.no_device_lock === true
+    return noLockAccount && !classLockEnabled
   } catch {
     return false
   }
@@ -379,6 +399,33 @@ export async function setCapacityAction(classId: string, newCapacity: number) {
   }
   await supabase.from("classes").update({ capacity: cap }).eq("id", classId)
   revalidatePath(`/classes/${classId}`)
+}
+
+// Bật/tắt khóa thiết bị học sinh cho một lớp (migration 014, bác chốt 09/11/2026).
+// Mặc định tắt; giáo viên gạt nút "Khóa thiết bị học sinh" ở màn hình chính
+// của lớp. Chỉ giáo viên chủ lớp thực hiện được.
+// Tolerant khi chưa chạy migration 014: thiếu cột thì báo rõ để chạy SQL.
+export async function setClassDeviceLockAction(
+  classId: string,
+  enabled: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient()
+  const guardError = await checkTeacherForClass(supabase, classId)
+  if (guardError) return { ok: false, error: guardError }
+  const { error } = await supabase
+    .from("classes")
+    .update({ device_lock_enabled: enabled })
+    .eq("id", classId)
+  if (error) {
+    // 42703 = cột chưa tồn tại → migration 014 chưa chạy
+    if ((error as { code?: string }).code === "42703") {
+      return { ok: false, error: "Chưa chạy migration 014_class_device_lock.sql trong Supabase SQL Editor." }
+    }
+    return { ok: false, error: error.message }
+  }
+  revalidatePath(`/classes/${classId}/roster`)
+  revalidatePath(`/classes/${classId}`)
+  return { ok: true }
 }
 
 /* ============ CLASS GROUPS ============ */
