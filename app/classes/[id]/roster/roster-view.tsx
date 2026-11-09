@@ -805,7 +805,7 @@ export function RosterView({
 
       <div className="grid lg:grid-cols-[4fr_1fr] gap-4 items-start">
         {/* KHUNG CHÍNH: danh sách HS */}
-        <Card className="float-card">
+        <Card className="float-card gap-0 py-0">
           <CardHeader
             data-tour="roster-list"
             className="flex flex-row flex-wrap items-center gap-x-3 gap-y-2 px-4 py-1.5"
@@ -1165,7 +1165,7 @@ export function RosterView({
         </Card>
 
         {/* CỘT PHẢI: danh sách nhóm */}
-        <Card className="float-card" data-tour="roster-groups">
+        <Card className="float-card gap-0 py-0" data-tour="roster-groups">
           <CardHeader className="flex flex-col items-start gap-1.5 px-3 pb-2 pt-3">
             <div className="flex w-full items-center gap-2">
               <CardTitle className="font-heading flex-1">Nhóm cố định</CardTitle>
