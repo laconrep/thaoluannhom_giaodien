@@ -348,22 +348,6 @@ export function SessionListView({
                 )}
               </div>
 
-              {isGroup && (
-                <div className="rounded-lg border bg-background p-3">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Xem trước</p>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {Array.from({ length: displayGroups }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="aspect-square rounded bg-primary/10 border border-primary/30 flex items-center justify-center text-xs font-semibold text-primary"
-                      >
-                        N{i + 1}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <div className="flex gap-2">
                 <Button onClick={onCreate} disabled={pending} className="shadow-sm">
                   {pending && <Spinner className="mr-2" />}
