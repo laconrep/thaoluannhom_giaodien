@@ -820,12 +820,12 @@ export function RosterView({
         </DialogContent>
       </Dialog>
 
-      <div className="grid lg:grid-cols-[4fr_1fr] gap-4">
+      <div className="grid lg:grid-cols-[4fr_1fr] gap-4 items-start">
         {/* KHUNG CHÍNH: danh sách HS */}
         <Card className="float-card">
           <CardHeader
             data-tour="roster-list"
-            className="flex flex-col gap-3 p-4"
+            className="flex flex-col gap-3 px-4 pt-4 pb-2"
           >
             {/* Hàng 1: tiêu đề + cài đặt lớp (sĩ số, khóa thiết bị) */}
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -949,7 +949,7 @@ export function RosterView({
               />
             </div>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4 p-4">
+          <CardContent className="flex flex-col gap-4 px-4 pb-4 pt-2">
             {importOpen && importPreview && (
               <div className="rounded-lg border bg-muted/40 p-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-sm font-medium">
