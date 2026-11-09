@@ -67,55 +67,55 @@ export default async function DashboardPage() {
               description="Hãy tạo lớp đầu tiên của bạn ở trên. Mỗi lớp có danh sách HS, nhóm cố định và không giới hạn phiên thảo luận."
             />
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {list.map((c) => {
                 const filled = c.students?.[0]?.count ?? 0
                 const sessions = c.sessions?.[0]?.count ?? 0
                 return (
                   <li
                     key={c.id}
-                    className="group rounded-xl border bg-card float-card flex items-stretch overflow-hidden hover:border-primary/40 transition"
+                    className="group relative rounded-xl border bg-card float-card overflow-hidden hover:border-primary/40 transition"
                   >
                     <Link
                       href={`/classes/${c.id}/roster`}
-                      className="flex-1 px-4 py-3 flex items-center gap-4 hover:bg-muted/30 transition"
+                      className="block p-4 hover:bg-muted/30 transition"
                     >
-                      <div className="size-11 rounded-lg bg-primary/10 text-primary grid place-items-center shrink-0">
-                        <School className="size-5" aria-hidden="true" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-3 pe-8">
+                        <div className="size-11 rounded-lg bg-primary/10 text-primary grid place-items-center shrink-0">
+                          <School className="size-5" aria-hidden="true" />
+                        </div>
+                        <div className="flex-1 min-w-0">
                           <h3 className="font-heading font-semibold text-base leading-snug truncate">
                             {c.name}
                           </h3>
-                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                             <Users className="size-3" aria-hidden="true" />
                             {filled}/{c.capacity} chỗ
                           </span>
                         </div>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
-                          <span className="inline-flex items-center gap-1">
-                            <CalendarRange className="size-3" aria-hidden="true" />
-                            {sessions} phiên
-                          </span>
-                          <span className="text-[11px]">Tạo {formatDateShort(c.created_at)}</span>
-                        </div>
                       </div>
-                      <span className="inline-flex items-center gap-1 text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition">
-                        Vào lớp
-                        <ArrowRight className="size-4" aria-hidden="true" />
-                      </span>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <CalendarRange className="size-3" aria-hidden="true" />
+                          {sessions} phiên
+                        </span>
+                        <span className="text-[11px]">Tạo {formatDateShort(c.created_at)}</span>
+                        <span className="ms-auto inline-flex items-center gap-1 text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition">
+                          Vào lớp
+                          <ArrowRight className="size-4" aria-hidden="true" />
+                        </span>
+                      </div>
                     </Link>
                     <form
                       action={async () => {
                         "use server"
                         await deleteClassAction(c.id)
                       }}
-                      className="border-l"
+                      className="absolute right-2 top-2"
                     >
                       <button
                         type="submit"
-                        className="h-full px-3 text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition grid place-items-center"
+                        className="size-8 rounded-lg grid place-items-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
                         aria-label={`Xóa ${c.name}`}
                       >
                         <Trash2 className="size-4" aria-hidden="true" />
