@@ -114,17 +114,6 @@ export async function createClassAction(
   const name = String(formData.get("name") ?? "").trim() || "Lớp mới"
   const capacity = Math.max(1, Math.min(80, Number(formData.get("capacity") ?? 48) || 48))
   const numGroups = Math.max(2, Math.min(12, Number(formData.get("numGroups") ?? 8) || 8))
-  // Luật BVDL cá nhân 91/2025, Điều 24: dữ liệu trẻ em chỉ xử lý khi có đồng
-  // ý của cha mẹ/người giám hộ. Giáo viên phải xác nhận trước khi tạo lớp.
-  const guardianConsent = formData.get("guardianConsent") === "on"
-  if (!guardianConsent) {
-    return {
-      ok: false,
-      error:
-        "Bạn cần xác nhận đã được cha mẹ/người giám hộ của học sinh đồng ý cho các em sử dụng ứng dụng mới tạo được lớp.",
-    }
-  }
-
   const supabase = await createClient()
   const {
     data: { user },
@@ -145,34 +134,11 @@ export async function createClassAction(
       }
     }
 
-    // Ghi dấu xác nhận phụ huynh (migration 013). Tolerant: chưa chạy
-    // migration thì insert lại không kèm 2 cột mới.
-    const { isMissingSchemaError } = await import("@/lib/ai/schema-error")
-    const nowIso = new Date().toISOString()
-    let cls: { id: string } | null = null
-    let insertError: { message: string } | null = null
-    const withConsent = await supabase
+    const { data: cls, error: insertError } = await supabase
       .from("classes")
-      .insert({
-        teacher_id: user.id,
-        name,
-        capacity,
-        guardian_consent_at: nowIso,
-        guardian_consent_by: user.id,
-      })
+      .insert({ teacher_id: user.id, name, capacity })
       .select("id")
       .single()
-    cls = withConsent.data
-    insertError = withConsent.error
-    if (insertError && isMissingSchemaError(insertError)) {
-      const fallback = await supabase
-        .from("classes")
-        .insert({ teacher_id: user.id, name, capacity })
-        .select("id")
-        .single()
-      cls = fallback.data
-      insertError = fallback.error
-    }
     if (insertError || !cls) return { ok: false, error: insertError?.message ?? "Không tạo được lớp" }
 
     const slots = Array.from({ length: capacity }, (_, i) => ({
@@ -262,19 +228,10 @@ export async function updateStudentNameAction(studentId: string, name: string) {
 export async function bulkSetNamesAction(
   classId: string,
   names: string[],
-  guardianConsent?: boolean,
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
   const guardError = await checkTeacherForClass(supabase, classId)
   if (guardError) return { ok: false, error: guardError }
-  // Luật BVDL cá nhân 91/2025, Điều 24: xem importStudentsFromListAction.
-  if (!guardianConsent) {
-    return {
-      ok: false,
-      error:
-        "Bạn cần xác nhận đã được cha mẹ/người giám hộ của học sinh đồng ý cho các em sử dụng ứng dụng mới lưu được danh sách.",
-    }
-  }
   const { data: students } = await supabase
     .from("students")
     .select("id, slot_number")
@@ -285,8 +242,6 @@ export async function bulkSetNamesAction(
     const name = names[i]?.trim() || null
     await supabase.from("students").update({ name }).eq("id", students[i].id)
   }
-  const { recordGuardianConsentAction } = await import("@/app/consent-actions")
-  await recordGuardianConsentAction(classId)
   revalidatePath(`/classes/${classId}/roster`)
   return { ok: true }
 }
@@ -294,20 +249,10 @@ export async function bulkSetNamesAction(
 export async function importStudentsFromListAction(
   classId: string,
   names: string[],
-  guardianConsent?: boolean,
 ): Promise<{ ok: boolean; added?: number; error?: string }> {
   const supabase = await createClient()
   const guardError = await checkTeacherForClass(supabase, classId)
   if (guardError) return { ok: false, error: guardError }
-  // Luật BVDL cá nhân 91/2025, Điều 24: nhập tên học sinh (trẻ em) cần có
-  // đồng ý của cha mẹ/người giám hộ — giáo viên xác nhận trên giao diện.
-  if (!guardianConsent) {
-    return {
-      ok: false,
-      error:
-        "Bạn cần xác nhận đã được cha mẹ/người giám hộ của học sinh đồng ý cho các em sử dụng ứng dụng mới nhập được danh sách.",
-    }
-  }
   const clean = names
     .map((n) => (typeof n === "string" ? n.trim() : ""))
     .filter((n) => n.length > 0)
@@ -369,9 +314,6 @@ export async function importStudentsFromListAction(
       await supabase.from("students").update({ name: clean[i] }).eq("id", row.id)
     }
   }
-  // Ghi dấu xác nhận phụ huynh cho lớp (tolerant khi chưa chạy migration 013).
-  const { recordGuardianConsentAction } = await import("@/app/consent-actions")
-  await recordGuardianConsentAction(classId)
   revalidatePath(`/classes/${classId}/roster`)
   return { ok: true, added: clean.length }
 }

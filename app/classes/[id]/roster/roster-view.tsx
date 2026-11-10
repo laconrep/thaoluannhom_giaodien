@@ -89,9 +89,6 @@ export function RosterView({
   const [importFileName, setImportFileName] = useState("")
   const [importMerged, setImportMerged] = useState(false)
   const [importBusy, setImportBusy] = useState(false)
-  // Luật BVDL cá nhân 91/2025, Điều 24: nhập tên HS (trẻ em) cần đồng ý của
-  // cha mẹ/người giám hộ — tick lại mỗi lần nhập danh sách.
-  const [guardianConsent, setGuardianConsent] = useState(false)
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null)
   const [dragStudentId, setDragStudentId] = useState<string | null>(null)
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null)
@@ -321,17 +318,12 @@ export function RosterView({
 
   function onBulkPaste() {
     const names = bulkText.split(/\r?\n/)
-    if (!guardianConsent) {
-      toast.error("Bạn cần xác nhận đã được phụ huynh đồng ý mới lưu được danh sách.")
-      return
-    }
     startTransition(() => {
-      bulkSetNamesAction(classId, names, guardianConsent).then((res) => {
+      bulkSetNamesAction(classId, names).then((res) => {
         if (!res.ok) {
           toast.error(res.error ?? "Không lưu được danh sách.")
           return
         }
-        setGuardianConsent(false)
         refreshStudents()
         toast.success("Đã lưu danh sách")
       })
@@ -420,16 +412,11 @@ export function RosterView({
 
   function onImportConfirm() {
     if (!importPreview || importPreview.length === 0) return
-    if (!guardianConsent) {
-      toast.error("Bạn cần xác nhận đã được phụ huynh đồng ý mới nhập được danh sách.")
-      return
-    }
     startTransition(() => {
-      importStudentsFromListAction(classId, importPreview, guardianConsent).then((res) => {
+      importStudentsFromListAction(classId, importPreview).then((res) => {
         if (!res.ok) toast.error(res.error ?? "Không nhập được danh sách.")
         else {
           toast.success(`Đã nhập ${res.added} học sinh`)
-          setGuardianConsent(false)
           refreshStudents()
         }
       })
@@ -927,19 +914,8 @@ export function RosterView({
                     </li>
                   ))}
                 </ul>
-                <label className="flex items-start gap-2 text-xs">
-                  <Checkbox
-                    checked={guardianConsent}
-                    onCheckedChange={(v) => setGuardianConsent(v === true)}
-                    className="mt-0.5"
-                  />
-                  <span>
-                    Tôi xác nhận đã được cha mẹ/người giám hộ của các học sinh này đồng ý cho
-                    các em sử dụng ứng dụng (nhập tên, nộp bài, chấm điểm).
-                  </span>
-                </label>
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={onImportConfirm} disabled={!guardianConsent}>
+                  <Button size="sm" onClick={onImportConfirm}>
                     <Save className="size-4 mr-1" aria-hidden="true" />
                     Lưu danh sách
                   </Button>
@@ -969,19 +945,8 @@ export function RosterView({
                   onChange={(e) => setBulkText(e.target.value)}
                   placeholder={"Nguyễn Văn An\nTrần Thị Bình\n..."}
                 />
-                <label className="flex items-start gap-2 text-xs">
-                  <Checkbox
-                    checked={guardianConsent}
-                    onCheckedChange={(v) => setGuardianConsent(v === true)}
-                    className="mt-0.5"
-                  />
-                  <span>
-                    Tôi xác nhận đã được cha mẹ/người giám hộ của các học sinh này đồng ý cho
-                    các em sử dụng ứng dụng (nhập tên, nộp bài, chấm điểm).
-                  </span>
-                </label>
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={onBulkPaste} disabled={!guardianConsent}>
+                  <Button size="sm" onClick={onBulkPaste}>
                     <Save className="size-4 mr-1" aria-hidden="true" />
                     Lưu danh sách
                   </Button>

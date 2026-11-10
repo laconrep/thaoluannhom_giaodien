@@ -43,27 +43,3 @@ export async function recordSignupConsentAction(): Promise<void> {
     return
   }
 }
-
-/** Ghi dấu giáo viên đã xác nhận được phụ huynh đồng ý cho lớp này.
- * Tolerant: migration 013 chưa chạy thì bỏ qua (xác nhận trên giao diện
- * vẫn chặn được việc nhập khi chưa tick). */
-export async function recordGuardianConsentAction(classId: string): Promise<void> {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
-    const { error } = await supabase
-      .from("classes")
-      .update({
-        guardian_consent_at: new Date().toISOString(),
-        guardian_consent_by: user.id,
-      })
-      .eq("id", classId)
-      .eq("teacher_id", user.id)
-    if (error && !isMissingSchemaError(error)) throw error
-  } catch {
-    return
-  }
-}

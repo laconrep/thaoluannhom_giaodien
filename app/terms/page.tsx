@@ -22,8 +22,7 @@ export default function TermsPage() {
         <ul className="list-disc pl-5">
           <li>
             <strong>Đồng ý của phụ huynh:</strong> trước khi nhập danh sách học sinh vào lớp, bạn
-            phải thông báo cho cha mẹ/người giám hộ và chỉ nhập dữ liệu khi đã được họ đồng ý. Khi
-            tạo lớp hoặc nhập danh sách, bạn xác nhận việc này trên ứng dụng.
+            phải thông báo cho cha mẹ/người giám hộ và chỉ nhập dữ liệu khi đã được họ đồng ý.
           </li>
           <li>
             Chỉ nhập dữ liệu học sinh phục vụ việc dạy học; không đăng tải nội dung vi phạm pháp

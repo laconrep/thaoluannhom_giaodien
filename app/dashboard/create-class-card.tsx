@@ -1,11 +1,9 @@
 "use client"
 
 import { useEffect, useState, useTransition } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClassAction } from "@/app/actions"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui/field"
@@ -18,9 +16,6 @@ export function CreateClassCard() {
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  // Luật BVDL cá nhân 91/2025, Điều 24: học sinh là trẻ em — chỉ nhập dữ
-  // liệu khi đã được cha mẹ/người giám hộ đồng ý.
-  const [guardianConsent, setGuardianConsent] = useState(false)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -62,7 +57,6 @@ export function CreateClassCard() {
         <form
           action={async (fd) => {
             setError(null)
-            fd.set("guardianConsent", guardianConsent ? "on" : "")
             startTransition(async () => {
               try {
                 const result = await createClassAction(fd)
@@ -114,34 +108,13 @@ export function CreateClassCard() {
                 Mỗi phiên thảo luận nhóm sẽ dùng cấu trúc này. Có thể thay đổi sau.
               </FieldDescription>
             </Field>
-            <label className="flex items-start gap-2 text-sm">
-              <Checkbox
-                id="guardian-consent"
-                checked={guardianConsent}
-                onCheckedChange={(v) => setGuardianConsent(v === true)}
-                className="mt-0.5"
-              />
-              <span>
-                Tôi xác nhận đã thông báo và được cha mẹ/người giám hộ của học sinh đồng ý cho
-                các em sử dụng ứng dụng (nhập tên, nộp bài, chấm điểm) theo{" "}
-                <Link
-                  href="/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary underline"
-                >
-                  Chính sách bảo mật
-                </Link>
-                .
-              </span>
-            </label>
             {error && (
               <p role="alert" className="text-sm text-destructive">
                 {error}
               </p>
             )}
             <div className="flex gap-2">
-              <Button type="submit" disabled={pending || !guardianConsent}>
+              <Button type="submit" disabled={pending}>
                 {pending && <Spinner className="mr-2" />}
                 Tạo lớp
               </Button>
