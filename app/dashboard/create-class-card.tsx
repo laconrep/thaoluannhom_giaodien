@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
 import { Plus } from "lucide-react"
+import { toast } from "sonner"
+import { defaultGroupCount } from "@/lib/utils"
 import { setSeen, TOUR_DASHBOARD_SEEN_KEY, STOP_EVENT, RESTART_EVENT } from "@/components/tour/tour-store"
 
 export function CreateClassCard() {
@@ -16,6 +18,11 @@ export function CreateClassCard() {
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  // Số nhóm gợi ý theo sĩ số (~6 HS/nhóm) — đổi sĩ số thì gợi ý theo, trừ khi
+  // giáo viên đã sửa tay số nhóm.
+  const [capacity, setCapacity] = useState(48)
+  const [numGroups, setNumGroups] = useState(() => defaultGroupCount(48))
+  const [numGroupsTouched, setNumGroupsTouched] = useState(false)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -64,6 +71,7 @@ export function CreateClassCard() {
                   setError(result.error)
                   return
                 }
+                toast.success(`Đã tạo lớp ${String(fd.get("name") ?? "").trim() || "mới"}`)
                 router.push(`/classes/${result.classId}/roster`)
               } catch (caught) {
                 const digest = (caught as { digest?: string } | null)?.digest ?? ""
@@ -88,7 +96,12 @@ export function CreateClassCard() {
                 type="number"
                 min={1}
                 max={80}
-                defaultValue={48}
+                value={capacity}
+                onChange={(e) => {
+                  const v = Math.max(1, Math.min(80, Number(e.target.value) || 1))
+                  setCapacity(v)
+                  if (!numGroupsTouched) setNumGroups(defaultGroupCount(v))
+                }}
                 required
               />
               <FieldDescription>Mặc định 48. Có thể điều chỉnh sau.</FieldDescription>
@@ -101,11 +114,16 @@ export function CreateClassCard() {
                 type="number"
                 min={2}
                 max={12}
-                defaultValue={8}
+                value={numGroups}
+                onChange={(e) => {
+                  setNumGroupsTouched(true)
+                  setNumGroups(Math.max(2, Math.min(12, Number(e.target.value) || 2)))
+                }}
                 required
               />
               <FieldDescription>
-                Mỗi phiên thảo luận nhóm sẽ dùng cấu trúc này. Có thể thay đổi sau.
+                Khoảng 6 học sinh/nhóm, tự gợi ý theo sĩ số. Đổi được sau ở tab Danh sách &amp;
+                nhóm.
               </FieldDescription>
             </Field>
             {error && (

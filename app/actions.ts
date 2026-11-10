@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { colorForIndex } from "@/lib/group-colors"
+import { defaultGroupCount } from "@/lib/utils"
 import {
   checkTeacherForClass,
   checkTeacherForClassGroup,
@@ -113,7 +114,13 @@ export async function createClassAction(
 ): Promise<{ ok: true; classId: string } | { ok: false; error: string }> {
   const name = String(formData.get("name") ?? "").trim() || "Lớp mới"
   const capacity = Math.max(1, Math.min(80, Number(formData.get("capacity") ?? 48) || 48))
-  const numGroups = Math.max(2, Math.min(12, Number(formData.get("numGroups") ?? 8) || 8))
+  // Số nhóm mặc định theo sĩ số (~6 HS/nhóm, tối thiểu 2, tối đa 8) khi form
+  // không gửi số nhóm — lớp 10 HS được 2 nhóm thay vì 8 như trước.
+  const numGroupsRaw = Number(formData.get("numGroups"))
+  const numGroups = Math.max(
+    2,
+    Math.min(12, Number.isFinite(numGroupsRaw) && numGroupsRaw > 0 ? numGroupsRaw : defaultGroupCount(capacity)),
+  )
   const supabase = await createClient()
   const {
     data: { user },
@@ -228,22 +235,28 @@ export async function updateStudentNameAction(studentId: string, name: string) {
 export async function bulkSetNamesAction(
   classId: string,
   names: string[],
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; added?: number; skipped?: number; error?: string }> {
   const supabase = await createClient()
   const guardError = await checkTeacherForClass(supabase, classId)
   if (guardError) return { ok: false, error: guardError }
+  const clean = names.map((n) => (typeof n === "string" ? n.trim() : "")).filter((n) => n.length > 0)
+  if (clean.length === 0) return { ok: false, error: "Danh sách không có tên nào." }
   const { data: students } = await supabase
     .from("students")
-    .select("id, slot_number")
+    .select("id, slot_number, name")
     .eq("class_id", classId)
     .order("slot_number")
   if (!students) return { ok: false, error: "Không tìm thấy lớp." }
-  for (let i = 0; i < Math.min(students.length, names.length); i++) {
-    const name = names[i]?.trim() || null
-    await supabase.from("students").update({ name }).eq("id", students[i].id)
+  // Dán = thêm vào ô còn trống, không bao giờ thay hay xóa tên đã có.
+  // Dòng trống trong phần dán được bỏ qua (không xóa tên ô đó).
+  const empty = students.filter((s) => !(s.name ?? "").trim())
+  let added = 0
+  for (let i = 0; i < Math.min(empty.length, clean.length); i++) {
+    await supabase.from("students").update({ name: clean[i] }).eq("id", empty[i].id)
+    added++
   }
   revalidatePath(`/classes/${classId}/roster`)
-  return { ok: true }
+  return { ok: true, added, skipped: clean.length - added }
 }
 
 export async function importStudentsFromListAction(

@@ -33,11 +33,11 @@ import { sounds, isSoundEnabled, setSoundEnabled } from "@/lib/sounds"
 import { PresentationUpload } from "@/components/presentation-upload"
 import { PresentationViewer, startPresentationMode } from "@/components/presentation-viewer"
 import { TeacherTour } from "@/components/tour/teacher-tour"
-import { presentationStartStep, aiGradePanelStep } from "@/components/tour/tour-config"
+import { presentationStartStep, boardTourSteps } from "@/components/tour/tour-config"
 import {
   getSeen,
   PRESENTATION_START_SEEN_KEY,
-  TOUR_AIGRADE_SEEN_KEY,
+  TOUR_BOARD_SEEN_KEY,
   TOUR_ONBOARDING_SEEN_KEY,
 } from "@/components/tour/tour-store"
 import { AiGradePanel } from "@/components/ai-grade-panel"
@@ -671,13 +671,14 @@ export function GroupSessionBoard({
               </h3>
               <p className="text-xs text-muted-foreground">{className}</p>
 
-              <div>
+              <div data-tour="session-timer">
                 <TimerPanel
                   sessionId={displaySession.id}
                   status={displaySession.status}
                   endsAt={displaySession.ends_at}
                   durationSeconds={displaySession.duration_seconds}
                   onChanged={handleSessionChanged}
+                  emptySession={displayGroups.every((g) => !g.claimed)}
                 />
               </div>
 
@@ -714,7 +715,7 @@ export function GroupSessionBoard({
 
               {/* Presentation upload */}
               {isTeacher && !embedded && (
-                <>
+                <div data-tour="presentation-upload">
                   <div className="h-px bg-border my-1" />
                   <p className="text-xs font-semibold text-muted-foreground mb-0.5">
                     PowerPoint
@@ -723,7 +724,7 @@ export function GroupSessionBoard({
                     sessionId={session.id}
                     onUploadSuccess={(pres) => setPresentation(pres)}
                   />
-                </>
+                </div>
               )}
 
               {/* Chế độ chiếu lớp slideshow */}
@@ -819,9 +820,10 @@ export function GroupSessionBoard({
 
               <div className="h-px bg-border my-1" />
 
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">
-                Các nhóm ({displayGroups.length})
-              </p>
+              <div data-tour="session-groups">
+                <p className="text-xs font-semibold text-muted-foreground mb-0.5">
+                  Các nhóm ({displayGroups.length})
+                </p>
               <ul className="flex flex-col gap-1">
                 {displayGroups.map((g, idx) => {
                   const sub = displaySubsByGroup[g.id]
@@ -868,6 +870,7 @@ export function GroupSessionBoard({
                   )
                 })}
               </ul>
+              </div>
             </>
           ) : (
             // Sidebar thu gọn — chỉ icon
@@ -932,9 +935,9 @@ export function GroupSessionBoard({
       )}
       {isTeacher && (
         <TeacherTour
-          tourId="ai-grade-panel"
-          steps={[aiGradePanelStep()]}
-          seenKey={TOUR_AIGRADE_SEEN_KEY}
+          tourId="board"
+          steps={boardTourSteps(!!presentation)}
+          seenKey={TOUR_BOARD_SEEN_KEY}
           autoStart
           autoStartWhen={getSeen(PRESENTATION_START_SEEN_KEY) || !presentation}
         />

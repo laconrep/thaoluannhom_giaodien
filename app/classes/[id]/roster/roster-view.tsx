@@ -89,6 +89,8 @@ export function RosterView({
   const [importFileName, setImportFileName] = useState("")
   const [importMerged, setImportMerged] = useState(false)
   const [importBusy, setImportBusy] = useState(false)
+  // Đang lưu danh sách (dán hoặc import) — nút Lưu hiện "Đang lưu..." tới khi xong.
+  const [listSaving, setListSaving] = useState(false)
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null)
   const [dragStudentId, setDragStudentId] = useState<string | null>(null)
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null)
@@ -318,18 +320,30 @@ export function RosterView({
 
   function onBulkPaste() {
     const names = bulkText.split(/\r?\n/)
+    setListSaving(true)
     startTransition(() => {
       bulkSetNamesAction(classId, names).then((res) => {
+        setListSaving(false)
         if (!res.ok) {
           toast.error(res.error ?? "Không lưu được danh sách.")
           return
         }
         refreshStudents()
-        toast.success("Đã lưu danh sách")
+        const added = res.added ?? 0
+        const skipped = res.skipped ?? 0
+        if (added === 0) {
+          toast.error("Hết ô trống — tăng sĩ số rồi dán lại.")
+        } else if (skipped > 0) {
+          toast.success(
+            `Đã thêm ${added} tên — còn ${skipped} tên chưa có ô trống, tăng sĩ số rồi dán lại.`,
+          )
+        } else {
+          toast.success(`Đã thêm ${added} tên vào danh sách`)
+        }
+        setBulkOpen(false)
+        setBulkText("")
       })
     })
-    setBulkOpen(false)
-    setBulkText("")
   }
 
   // Header detection: bỏ dòng đầu nếu giống tiêu đề cột
@@ -344,18 +358,23 @@ export function RosterView({
   // Tải mẫu Excel: 1 cột "Họ và tên" + vài dòng ví dụ (đúng định dạng web app nhận).
   // xlsx chỉ tải khi bấm nút (dynamic import) để nhẹ bundle trang roster.
   async function downloadTemplate() {
-    const XLSX = await import("xlsx")
-    const ws = XLSX.utils.aoa_to_sheet([
-      ["Họ và tên"],
-      ["Nguyễn Văn An"],
-      ["Trần Thị Bình"],
-      ["Lê Quang Minh"],
-      ["Phạm Thu Hà"],
-    ])
-    ws["!cols"] = [{ wch: 28 }]
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "Danh sách")
-    XLSX.writeFile(wb, "danh-sach-hoc-sinh-mau.xlsx")
+    try {
+      const XLSX = await import("xlsx")
+      const ws = XLSX.utils.aoa_to_sheet([
+        ["Họ và tên"],
+        ["Nguyễn Văn An"],
+        ["Trần Thị Bình"],
+        ["Lê Quang Minh"],
+        ["Phạm Thu Hà"],
+      ])
+      ws["!cols"] = [{ wch: 28 }]
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "Danh sách")
+      XLSX.writeFile(wb, "danh-sach-hoc-sinh-mau.xlsx")
+      toast.success("Đã tải mẫu Excel")
+    } catch {
+      toast.error("Không tải được mẫu Excel. Vui lòng thử lại.")
+    }
   }
 
   async function handleImportFile(file: File) {
@@ -412,19 +431,21 @@ export function RosterView({
 
   function onImportConfirm() {
     if (!importPreview || importPreview.length === 0) return
+    setListSaving(true)
     startTransition(() => {
       importStudentsFromListAction(classId, importPreview).then((res) => {
+        setListSaving(false)
         if (!res.ok) toast.error(res.error ?? "Không nhập được danh sách.")
         else {
           toast.success(`Đã nhập ${res.added} học sinh`)
           refreshStudents()
+          setImportOpen(false)
+          setImportPreview(null)
+          setImportFileName("")
+          setImportMerged(false)
         }
       })
     })
-    setImportOpen(false)
-    setImportPreview(null)
-    setImportFileName("")
-    setImportMerged(false)
   }
 
   function onAddGroup() {
@@ -915,9 +936,9 @@ export function RosterView({
                   ))}
                 </ul>
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={onImportConfirm}>
+                  <Button size="sm" onClick={onImportConfirm} disabled={listSaving}>
                     <Save className="size-4 mr-1" aria-hidden="true" />
-                    Lưu danh sách
+                    {listSaving ? "Đang lưu..." : "Lưu danh sách"}
                   </Button>
                   <Button
                     size="sm"
@@ -937,7 +958,8 @@ export function RosterView({
             {bulkOpen && (
               <div className="rounded-lg border bg-muted/40 p-3 flex flex-col gap-2">
                 <p className="text-xs text-muted-foreground">
-                  Dán danh sách (mỗi dòng một tên, theo thứ tự ô 1, 2, 3...). Ô trống sẽ để tên rỗng.
+                  Dán danh sách (mỗi dòng một tên). Tên mới sẽ điền vào các ô còn trống — tên đã
+                  có không bị thay hay xóa.
                 </p>
                 <textarea
                   className="min-h-[180px] w-full rounded-md border bg-background p-2 text-sm font-mono"
@@ -946,9 +968,9 @@ export function RosterView({
                   placeholder={"Nguyễn Văn An\nTrần Thị Bình\n..."}
                 />
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={onBulkPaste}>
+                  <Button size="sm" onClick={onBulkPaste} disabled={listSaving}>
                     <Save className="size-4 mr-1" aria-hidden="true" />
-                    Lưu danh sách
+                    {listSaving ? "Đang lưu..." : "Lưu danh sách"}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setBulkOpen(false)}>
                     Hủy

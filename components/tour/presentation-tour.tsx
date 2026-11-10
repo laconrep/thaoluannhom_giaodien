@@ -17,6 +17,7 @@ import {
   presentationGradeStep,
   presentationAllSessionsStep,
   presentationCreateSessionStep,
+  withLastProgress,
 } from "./tour-config"
 import { useTourOptions } from "./use-tour-options"
 
@@ -111,7 +112,11 @@ export function PresentationTour({
       case "edge":
         return [presentationEdgeStep()]
       case "drawer":
-        return [presentationTimerStep(), presentationQrStep(), presentationGradeStep()]
+        return [
+          presentationTimerStep(),
+          presentationQrStep(),
+          withLastProgress(presentationGradeStep(), 3, 3),
+        ]
       case "all-sessions":
         return [presentationAllSessionsStep()]
       case "create-session":

@@ -10,9 +10,11 @@ import {
 } from "./tour-store"
 import {
   tourLocale,
-  rosterListStep,
+  rosterPasteStep,
+  rosterGroupsStep,
   rosterLeaderStep,
   rosterNextStep,
+  withLastProgress,
 } from "./tour-config"
 import { useTourOptions } from "./use-tour-options"
 
@@ -104,7 +106,8 @@ export function RosterTour({ ready, hasMembers, hasLeader }: RosterTourProps) {
   const steps = useMemo<Step[]>(() => {
     switch (stage) {
       case "list":
-        return [rosterListStep()]
+        // 2 bước ngắn: nhập danh sách (trỏ cụm nút) → phân nhóm (trỏ khung nhóm).
+        return [rosterPasteStep(), withLastProgress(rosterGroupsStep(), 2, 2)]
       case "leader":
         return [rosterLeaderStep()]
       case "next":
@@ -134,6 +137,7 @@ export function RosterTour({ ready, hasMembers, hasLeader }: RosterTourProps) {
       key={`roster-${stage}`}
       steps={steps}
       run={run}
+      continuous
       scrollToFirstStep={false}
       locale={tourLocale}
       options={tourOptions}

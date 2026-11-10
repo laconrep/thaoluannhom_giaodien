@@ -24,7 +24,7 @@ import {
 } from "lucide-react"
 import { formatDate } from "@/lib/utils-format"
 import { TeacherTour } from "@/components/tour/teacher-tour"
-import { sessionsNextStep, sessionsPresetsStep } from "@/components/tour/tour-config"
+import { sessionsNextStep, sessionsFormTourSteps } from "@/components/tour/tour-config"
 import {
   classTourSeenKey,
   consumeSessionsNextPending,
@@ -182,7 +182,7 @@ export function SessionListView({
       {open && (
         <TeacherTour
           tourId="sessions-presets"
-          steps={[sessionsPresetsStep()]}
+          steps={sessionsFormTourSteps(isGroup, hasFixed)}
           seenKey={presetsSeenKey}
           autoStart
           autoStartWhen={!getSeen(TOUR_ONBOARDING_SEEN_KEY) && !presetsDismissed}
@@ -241,7 +241,7 @@ export function SessionListView({
               </Field>
 
               {isGroup && hasFixed && (
-                <Field>
+                <Field data-tour="session-group-mode">
                   <FieldLabel>Cách chia nhóm</FieldLabel>
                   <div className="grid sm:grid-cols-2 gap-2">
                     <button
@@ -341,7 +341,7 @@ export function SessionListView({
                     />
                     <FieldDescription>
                       {useFixed && hasFixed
-                        ? `Đang dùng ${fixedGroupsCount} nhóm cố định của lớp`
+                        ? `Đang dùng ${fixedGroupsCount} nhóm cố định của lớp — đổi số nhóm ở tab Danh sách & nhóm`
                         : "Từ 2 đến 12 nhóm (phiên này)"}
                     </FieldDescription>
                   </Field>
@@ -384,7 +384,7 @@ export function SessionListView({
           <EmptyState
             icon={Icon}
             title={`Chưa có ${title1.toLowerCase()} nào`}
-            description="Bấm 'Tạo phiên mới' ở trên để bắt đầu. Bác có thể dùng preset chọn nhanh."
+            description="Bấm 'Tạo phiên mới' ở trên để bắt đầu. Thầy/cô có thể dùng preset chọn nhanh."
           />
         ) : (
           <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">

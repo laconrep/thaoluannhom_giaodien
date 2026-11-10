@@ -115,6 +115,7 @@ export function TimerPanel({
   onChanged,
   assignMode = false,
   onAssignClick,
+  emptySession = false,
 }: {
   sessionId: string
   status: Status
@@ -124,6 +125,8 @@ export function TimerPanel({
   /** Luồng giao việc cá nhân: nút "Bắt đầu" thành "Giao bài" mở popup soạn đề; set giờ nằm trong popup. */
   assignMode?: boolean
   onAssignClick?: () => void
+  /** Phiên chưa có học sinh nào trong nhóm → bấm "Bắt đầu" thì hỏi lại trước. */
+  emptySession?: boolean
 }) {
   const [unlimited, setUnlimited] = useState(() => isUnlimitedDuration(durationSeconds))
   const [minutes, setMinutes] = useState<number>(() =>
@@ -133,6 +136,7 @@ export function TimerPanel({
     isUnlimitedDuration(durationSeconds) ? 0 : durationSeconds % 60,
   )
   const [, startTransition] = useTransition()
+  const [confirmStart, setConfirmStart] = useState(false)
 
   const left = useCountdown(endsAt, status)
   const runningUnlimited = status === "running" && !endsAt
@@ -280,8 +284,27 @@ export function TimerPanel({
             <Send className="size-4" aria-hidden="true" />
             Giao bài
           </Button>
+        ) : confirmStart ? (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[11px] leading-tight text-muted-foreground">
+              Phiên chưa có học sinh nào trong nhóm. Bắt đầu luôn hay để các em vào nhóm trước?
+            </p>
+            <div className="flex gap-1.5">
+              <Button size="sm" onClick={handleStart} className="gap-1 flex-1">
+                <Play className="size-4" aria-hidden="true" />
+                Bắt đầu luôn
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setConfirmStart(false)} className="flex-1">
+                Để sau
+              </Button>
+            </div>
+          </div>
         ) : (
-          <Button size="sm" onClick={handleStart} className="gap-1">
+          <Button
+            size="sm"
+            onClick={() => (emptySession ? setConfirmStart(true) : handleStart())}
+            className="gap-1"
+          >
             <Play className="size-4" aria-hidden="true" />
             Bắt đầu
           </Button>
