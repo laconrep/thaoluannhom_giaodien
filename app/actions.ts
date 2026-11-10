@@ -1065,6 +1065,9 @@ async function revalidateSessionPage(sessionId: string) {
   const { data } = await supabase.from("sessions").select("class_id").eq("id", sessionId).maybeSingle()
   if (data?.class_id) {
     revalidatePath(`/classes/${data.class_id}/sessions/${sessionId}`, "page")
+    // Phiên giao việc cá nhân mở ở đường khác — trước đây chỉ revalidate đường
+    // bảng nhóm nên server component bảng cá nhân không được làm mới.
+    revalidatePath(`/classes/${data.class_id}/individual/${sessionId}`, "page")
   }
 }
 

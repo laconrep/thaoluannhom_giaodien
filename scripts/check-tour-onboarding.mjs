@@ -169,6 +169,8 @@ const required = [
   ["app/classes/[id]/sessions/[sid]/group-board.tsx", "presentation-create-session"],
   ["components/presentation-viewer.tsx", "presentation-edge"],
   ["components/presentation-viewer.tsx", "presentation-qr"],
+  ["components/timer-panel.tsx", "individual-assign"],
+  ["components/ai-grade-panel.tsx", "ai-grade-results"],
 ]
 for (const [file, attr] of required) {
   const src = readFileSync(join(root, file), "utf8")

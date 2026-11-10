@@ -13,6 +13,9 @@ import {
   startAiGradeJobAction,
 } from "@/app/ai-grade-actions"
 import { Button } from "@/components/ui/button"
+import { TeacherTour } from "@/components/tour/teacher-tour"
+import { aiGradeProgressStep } from "@/components/tour/tour-config"
+import { TOUR_AIGRADE_SEEN_KEY } from "@/components/tour/tour-store"
 import { Switch } from "@/components/ui/switch"
 import {
   Dialog,
@@ -382,6 +385,15 @@ export function AiGradePanel({
       data-tour="ai-grade-panel"
       className="rounded-md border bg-primary/5 border-primary/20 p-2 flex flex-col gap-1.5 mt-1"
     >
+      {/* Hint sau khi bấm "Chấm bài AI": chỉ tự bật khi job đang chạy, 1 lần duy nhất. */}
+      <TeacherTour
+        tourId="ai-grade-progress"
+        steps={[aiGradeProgressStep()]}
+        seenKey={TOUR_AIGRADE_SEEN_KEY}
+        autoStart
+        autoStartWhen={!!job && (job.status === "queued" || job.status === "running")}
+        listenRestart={false}
+      />
       <div className="flex items-center gap-2 text-xs">
         <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
         <span className="font-semibold">Chấm bài AI</span>
@@ -427,7 +439,13 @@ export function AiGradePanel({
               : "Chấm bài AI"}
           </Button>
           {job && (
-            <Button variant="secondary" size="sm" className="h-7 text-xs gap-1" onClick={openResults}>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={openResults}
+              data-tour="ai-grade-results"
+            >
               <Eye className="size-3" />
               {running ? "Xem tiến độ chấm" : "Xem kết quả chấm"}
             </Button>

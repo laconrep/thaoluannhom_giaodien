@@ -30,6 +30,9 @@ import { Switch } from "@/components/ui/switch"
 import { AvatarInitials } from "@/components/avatar-initials"
 import { toast } from "sonner"
 import { AiGradePanel } from "@/components/ai-grade-panel"
+import { TeacherTour } from "@/components/tour/teacher-tour"
+import { individualTourSteps } from "@/components/tour/tour-config"
+import { TOUR_INDIVIDUAL_SEEN_KEY } from "@/components/tour/tour-store"
 import { isRichTextEmpty } from "@/lib/rich-text"
 import { useFreshFileUrl } from "@/hooks/use-fresh-file-url"
 
@@ -258,13 +261,42 @@ export function IndividualBoard({
   }
 
   async function toggleShareResults() {
-    await shareResultsAction(session.id, !session.results_shared_at)
+    const share = !session.results_shared_at
+    const patch = { results_shared_at: share ? new Date().toISOString() : null }
+    // Gạt ngay tại chỗ như bảng nhóm — trước đây chỉ gọi action rồi trông chờ
+    // Realtime đẩy về nên nút gạt đứng yên tới khi F5.
+    handleSessionPatch(patch)
+    try {
+      await shareResultsAction(session.id, share)
+      toast.success(share ? "Đã chia sẻ kết quả tới HS" : "Đã thu hồi chia sẻ")
+    } catch (e) {
+      handleSessionPatch({ results_shared_at: session.results_shared_at })
+      toast.error(e instanceof Error ? e.message : "Không đổi được chia sẻ kết quả")
+    }
+  }
+
+  // Cập nhật state phiên tại chỗ sau mỗi thao tác (mẫu bảng nhóm) — không trông
+  // chờ Realtime: TimerPanel "Bắt đầu"/"Hết giờ"/"Mở lại" và popup Giao bài đều
+  // đẩy dòng session mới về đây qua onChanged/onSessionChange.
+  function handleSessionChanged(next: any) {
+    if (!next) return
+    setSession((s) => ({ ...s, ...next }))
+  }
+
+  function handleSessionPatch(patch: Partial<SessionRow>) {
+    setSession((s) => ({ ...s, ...patch }))
   }
 
   const submittedCount = Object.keys(subsBySlot).length
 
   return (
     <div className="-mx-4 -my-6">
+      <TeacherTour
+        tourId="individual"
+        steps={individualTourSteps()}
+        seenKey={TOUR_INDIVIDUAL_SEEN_KEY}
+        autoStart
+      />
       <div className="grid grid-cols-12 gap-3 h-[calc(100svh-170px)] px-4">
         <aside className="col-span-12 md:col-span-2 flex md:flex-col gap-2 border rounded-xl bg-card p-3 overflow-auto">
           <Link
@@ -288,6 +320,7 @@ export function IndividualBoard({
             durationSeconds={session.duration_seconds}
             assignMode
             onAssignClick={() => setAssignOpen(true)}
+            onChanged={handleSessionChanged}
           />
 
           <Button variant="outline" size="sm" onClick={copyShareLink} className="gap-1">
@@ -299,7 +332,13 @@ export function IndividualBoard({
             <span className="leading-tight">Cho phép dán</span>
             <Switch
               checked={session.allow_paste}
-              onCheckedChange={(v) => togglePasteAction(session.id, v)}
+              onCheckedChange={(v) => {
+                handleSessionPatch({ allow_paste: v })
+                togglePasteAction(session.id, v).catch((e) => {
+                  handleSessionPatch({ allow_paste: !v })
+                  toast.error(e instanceof Error ? e.message : "Không đổi được cho phép dán")
+                })
+              }}
               aria-label="Cho phép dán"
             />
           </label>
@@ -324,7 +363,15 @@ export function IndividualBoard({
                   <span className="leading-tight">Cho phép tải xuống</span>
                   <Switch
                     checked={session.allow_download}
-                    onCheckedChange={(v) => toggleDownloadAction(session.id, v)}
+                    onCheckedChange={(v) => {
+                      handleSessionPatch({ allow_download: v })
+                      toggleDownloadAction(session.id, v).catch((e) => {
+                        handleSessionPatch({ allow_download: !v })
+                        toast.error(
+                          e instanceof Error ? e.message : "Không đổi được cho phép tải xuống",
+                        )
+                      })
+                    }}
                     aria-label="Cho phép tải xuống"
                   />
                 </label>
@@ -510,7 +557,12 @@ export function IndividualBoard({
         />
       )}
 
-      <AssignTaskDialog open={assignOpen} onOpenChange={setAssignOpen} session={session} />
+      <AssignTaskDialog
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        session={session}
+        onSessionChange={handleSessionChanged}
+      />
     </div>
   )
 }

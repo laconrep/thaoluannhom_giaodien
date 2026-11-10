@@ -8,6 +8,7 @@ import { requestAiBaremAction, saveSessionAiRubricAction, listGradedSamplesActio
 import { parseGradingBarem } from "@/lib/ai/rubric-format"
 import { extractAnswerFromFile } from "@/lib/answer-extract"
 import { cn } from "@/lib/utils"
+import { getSeen, setSeen, TOUR_BAREM_SEEN_KEY } from "@/components/tour/tour-store"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -110,6 +111,13 @@ const SAMPLE_STEPS = ["Chọn bài mẫu", "AI suy barem", "Duyệt & lưu"]
 
 export function RubricBaremDialog({ sessionId, open, onOpenChange, initialRubric, onSaved }: Props) {
   const [tab, setTab] = useState<"answer" | "sample">("answer")
+  // Hint hướng dẫn trong popup: hiện mỗi lần mở cho tới khi bấm "Đã hiểu" (1 lần duy nhất).
+  // Dùng hộp gợi ý thay cho tour Joyride vì popup là modal Radix — bấm nút
+  // trên tooltip Joyride sẽ chạm vùng ngoài popup và làm popup đóng mất.
+  const [showBaremHint, setShowBaremHint] = useState(false)
+  useEffect(() => {
+    if (open) setShowBaremHint(!getSeen(TOUR_BAREM_SEEN_KEY))
+  }, [open ])
   const [answer, setAnswer] = useState("")
   const [maxScore, setMaxScore] = useState(10)
   const [generating, setGenerating] = useState(false)
@@ -511,6 +519,35 @@ export function RubricBaremDialog({ sessionId, open, onOpenChange, initialRubric
             Chọn 1 trong 2 cách: dán hoặc tải đáp án mẫu, hoặc để AI suy tiêu chí từ một bài đã chấm tay.
           </DialogDescription>
         </DialogHeader>
+
+        {showBaremHint && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs flex flex-col gap-1.5">
+            <p className="leading-relaxed">
+              <span className="font-semibold">Cách tạo tiêu chí chấm: </span>
+              tab <span className="font-semibold">Từ bài chấm mẫu</span> — chọn 1 bài đã chấm tay
+              rồi bấm <span className="font-semibold">AI suy barem từ bài mẫu</span> (đợi dưới 2
+              phút); tab <span className="font-semibold">Từ đáp án mẫu</span> — dán đáp án và thang
+              điểm.
+            </p>
+            <p className="leading-relaxed">
+              Duyệt barem rồi bấm <span className="font-semibold">Lưu tiêu chí</span> — xong quay
+              lại bấm <span className="font-semibold">Chấm bài AI</span>.
+            </p>
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 text-[11px]"
+                onClick={() => {
+                  setSeen(TOUR_BAREM_SEEN_KEY)
+                  setShowBaremHint(false)
+                }}
+              >
+                Đã hiểu
+              </Button>
+            </div>
+          </div>
+        )}
 
         <Tabs value={tab} onValueChange={(v) => setTab(v === "sample" ? "sample" : "answer")}>
           <TabsList className="grid w-full grid-cols-2">

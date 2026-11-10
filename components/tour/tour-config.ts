@@ -318,3 +318,41 @@ export function boardTourSteps(hasPresentation: boolean): Step[] {
   return steps
 }
 
+// Tour bảng giao việc cá nhân: nút "Giao bài" mở popup soạn đề + set giờ,
+// rồi tới khung chấm AI (nội dung như bảng nhóm, đổi "nhóm" thành "học sinh").
+export function individualAssignStep(): Step {
+  return {
+    target: "[data-tour='individual-assign']",
+    placement: "bottom",
+    title: "Giao bài",
+    content:
+      "Bấm \"Giao bài\" để soạn đề và set giờ — gõ/dán nội dung hoặc đính kèm file Word/PDF/TXT, xem trước rồi bấm \"Bắt đầu\" là học sinh thấy đề và đồng hồ bắt đầu chạy.",
+  }
+}
+
+export function individualAiGradeStep(): Step {
+  return {
+    target: "[data-tour='ai-grade-panel']",
+    placement: "bottom",
+    title: "Chấm bài AI",
+    content:
+      "Bật công tắc \"Bật chấm AI\" ở khung này trước — bật rồi mới hiện nút \"Tiêu chí chấm\" và \"Chấm bài AI\". Tạo tiêu chí chấm từ bài chấm mẫu, rồi bấm \"Chấm bài AI\" — AI chấm ngầm từng bài, gập máy vẫn chạy. Điểm tự ghi vào sổ điểm của từng học sinh.",
+  }
+}
+
+export function individualTourSteps(): Step[] {
+  return [individualAssignStep(), withLastProgress(individualAiGradeStep(), 2, 2)]
+}
+
+// Hint sau khi bấm "Chấm bài AI": trỏ nút xem tiến độ/kết quả — chỉ hiện khi
+// đã có job chấm (nút này chỉ render khi job tồn tại).
+export function aiGradeProgressStep(): Step {
+  return {
+    target: "[data-tour='ai-grade-results']",
+    placement: "bottom",
+    title: "Xem kết quả chấm",
+    content:
+      "AI đang chấm ngầm từng bài. Bấm nút này để xem tiến độ; chấm xong bấm lại để xem điểm từng bài, rồi bấm \"Duyệt lên điểm\" mới ghi điểm cho học sinh.",
+  }
+}
+

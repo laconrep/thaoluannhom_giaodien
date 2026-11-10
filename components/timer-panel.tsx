@@ -280,7 +280,7 @@ export function TimerPanel({
 
       {status === "idle" &&
         (assignMode ? (
-          <Button size="sm" onClick={onAssignClick} className="gap-1">
+          <Button size="sm" onClick={onAssignClick} className="gap-1" data-tour="individual-assign">
             <Send className="size-4" aria-hidden="true" />
             Giao bài
           </Button>

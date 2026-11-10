@@ -80,10 +80,13 @@ export function AssignTaskDialog({
   open,
   onOpenChange,
   session,
+  onSessionChange,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   session: SessionRow
+  /** Đẩy dòng session mới về bảng để đồng hồ chạy ngay — không trông chờ Realtime. */
+  onSessionChange?: (session: SessionRow) => void
 }) {
   const [step, setStep] = useState<"edit" | "preview">("edit")
   const [text, setText] = useState("")
@@ -167,7 +170,10 @@ export function AssignTaskDialog({
         source,
       })
       if (!saved.ok) throw new Error(saved.error ?? "Không lưu được đề bài.")
-      await startSessionAction(session.id, durationToSeconds(duration))
+      const next = await startSessionAction(session.id, durationToSeconds(duration))
+      // startSessionAction trả về dòng session mới (status running + ends_at):
+      // đẩy về bảng để TimerPanel chuyển sang đếm giờ ngay, không đợi Realtime.
+      if (next) onSessionChange?.(next)
       toast.success("Đã giao bài cho học sinh.")
       onOpenChange(false)
     } catch (e: any) {
