@@ -1110,9 +1110,12 @@ export async function endSessionAction(sessionId: string) {
   const supabase = await createClient()
   const guardError = await checkTeacherForSession(supabase, sessionId)
   if (guardError) throw new Error(guardError)
+  // Ghi ends_at = thời điểm kết thúc thật (thay vì null) để assertSessionAcceptsSubmission
+  // tính được ân hạn 5 phút cho bài tự nộp (phương án A, chốt 12/11/2026). Các chỗ
+  // hiển thị dùng useCountdown đều trả 0 khi status !== "running" nên không đổi gì.
   const { error } = await supabase
     .from("sessions")
-    .update({ status: "ended", ends_at: null })
+    .update({ status: "ended", ends_at: new Date().toISOString() })
     .eq("id", sessionId)
   if (error) throw new Error(error.message)
   await revalidateSessionPage(sessionId)
@@ -1735,9 +1738,15 @@ export async function bulkUnlockStudentSlotsAction(input: {
   return { ok: true, unlocked: count ?? ids.length }
 }
 
+/** Ân hạn cho bài TỰ NỘP sau khi phiên kết thúc (chốt 12/11/2026, phương án A):
+ * bảng GV tự kết thúc phiên sau hạn +0,3s trong khi máy HS cần vài giây để tải
+ * file lên nên bài tự nộp luôn đến sau — không có ân hạn thì mất bài. */
+const AUTO_SUBMIT_GRACE_MS = 5 * 60 * 1000
+
 async function assertSessionAcceptsSubmission(
   supabase: Awaited<ReturnType<typeof createClient>>,
   sessionId: string,
+  isAuto = false,
 ) {
   const { data: session, error } = await supabase
     .from("sessions")
@@ -1746,7 +1755,15 @@ async function assertSessionAcceptsSubmission(
     .maybeSingle()
   if (error || !session) throw new Error("Không tìm thấy phiên làm bài.")
   // A client timer may fire a moment after ends_at; the authoritative lock is status.
-  if (session.status !== "running") throw new Error("Phiên làm bài đã kết thúc.")
+  if (session.status === "running") return
+  // Ân hạn (phương án A): bài TỰ NỘP vẫn được nhận trong 5 phút sau khi phiên
+  // kết thúc (ends_at lúc này là thời điểm kết thúc thật — xem endSessionAction).
+  // Nộp tay sau khi hết giờ vẫn bị từ chối như cũ.
+  if (isAuto && session.status === "ended" && session.ends_at) {
+    const endedMs = new Date(session.ends_at).getTime()
+    if (Number.isFinite(endedMs) && Date.now() - endedMs <= AUTO_SUBMIT_GRACE_MS) return
+  }
+  throw new Error("Phiên làm bài đã kết thúc.")
 }
 
 export async function submitGroupReportAction(args: {
@@ -1758,7 +1775,7 @@ export async function submitGroupReportAction(args: {
 }): Promise<{ ok: boolean; error?: string }> {
   try {
     const supabase = await createClient()
-    await assertSessionAcceptsSubmission(supabase, args.sessionId)
+    await assertSessionAcceptsSubmission(supabase, args.sessionId, args.isAuto ?? false)
     const { sanitizeSubmissionHtml } = await import("@/lib/rich-text")
     const textContent = args.textContent ? sanitizeSubmissionHtml(args.textContent) : null
     const { data: existing } = await supabase
@@ -1815,7 +1832,7 @@ export async function submitIndividualReportAction(args: {
 }): Promise<{ ok: boolean; error?: string }> {
   try {
     const supabase = await createClient()
-    await assertSessionAcceptsSubmission(supabase, args.sessionId)
+    await assertSessionAcceptsSubmission(supabase, args.sessionId, args.isAuto ?? false)
     const { sanitizeSubmissionHtml } = await import("@/lib/rich-text")
     const textContent = args.textContent ? sanitizeSubmissionHtml(args.textContent) : null
     const { data: existing } = await supabase

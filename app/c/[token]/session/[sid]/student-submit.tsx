@@ -150,6 +150,10 @@ export function StudentSubmit({
   const [selfStudentId, setSelfStudentId] = useState<string | null>(null)
   const [identityLoaded, setIdentityLoaded] = useState(false)
   const autoSubmitted = useRef(false)
+  // Tự nộp sớm khi còn 30 giây (phương án B, chốt 12/11/2026) — ref riêng với
+  // autoSubmitted để lần tự nộp lúc hết giờ vẫn chạy được nếu HS quay lại sửa
+  // bài sau lần nộp sớm (lần đó sẽ lưu bản sửa cuối).
+  const earlyAutoSubmitted = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -499,6 +503,21 @@ export function StudentSubmit({
       setBusy(false)
     }
   }
+
+  // Tự nộp sớm khi còn 30 giây (phương án B, chốt 12/11/2026): nộp khi phiên
+  // vẫn đang chạy nên bài chắc chắn vào hệ thống trước khi bảng GV tự kết thúc
+  // phiên (sau hạn +0,3s). HS vẫn bấm "Quay lại sửa bài" để sửa tiếp; lần tự
+  // nộp lúc hết giờ bên dưới sẽ lưu bản sửa cuối. Chỉ chạy với phiên có hạn
+  // (remaining = 0 với phiên không hạn hoặc đã kết thúc nên không chạm tới).
+  useEffect(() => {
+    if (!identityLoaded || submitted || !selectedId || !running) return
+    if (earlyAutoSubmitted.current) return
+    if (!session.ends_at || remaining <= 0 || remaining > 30) return
+    if (isRichTextEmpty(text) && !staged.length) return
+    earlyAutoSubmitted.current = true
+    handleSubmit(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remaining, identityLoaded, selectedId, staged.length, submitted, text])
 
   useEffect(() => {
     if (!identityLoaded || !ended || autoSubmitted.current || submitted || !selectedId) return
